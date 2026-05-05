@@ -129,12 +129,12 @@ onMounted(() => fetchOffers(1))
                             </tr>
                         </thead>
                         <tbody>
-                            <tr v-for="offer in filteredOffers" :key="offer.id" class="clickable-row" @click="router.push(`/trade-offers/${offer.id}`)">
+                            <tr v-for="offer in filteredOffers" :key="offer.uuid ?? offer.id" class="clickable-row" @click="router.push(`/trade-offers/${offer.uuid ?? offer.id}`)">
                                 <td><code class="mono">{{ offer.trade_offer_id || '—' }}</code></td>
                                 <td>
                                     <router-link
                                         v-if="offer.sales"
-                                        :to="`/sales/${offer.sales.id}`"
+                                        :to="`/sales/${offer.sales.uuid ?? offer.sales.id}`"
                                         class="order-link"
                                     >
                                         {{ offer.sales.order_number }}
@@ -153,10 +153,10 @@ onMounted(() => fetchOffers(1))
                                 <td>
                                     <div class="action-group">
                                         <button
-                                            v-if="offer.sales?.id"
+                                            v-if="offer.sales?.uuid || offer.sales?.id"
                                             class="btn-action btn-retry"
-                                            :disabled="retrySaleUuid === offer.sales.id"
-                                            @click.stop="retrySale(offer.sales.id)"
+                                            :disabled="retrySaleUuid === (offer.sales.uuid ?? offer.sales.id)"
+                                            @click.stop="retrySale(offer.sales.uuid ?? offer.sales.id)"
                                             title="Reenviar trade"
                                         >
                                             <Icon icon="mdi:refresh" />

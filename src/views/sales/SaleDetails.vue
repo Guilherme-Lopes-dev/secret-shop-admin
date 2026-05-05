@@ -9,16 +9,19 @@ const route = useRoute()
 const router = useRouter()
 const sale = ref<any>(null)
 const loading = ref(true)
+const error = ref('')
 const nowTs = ref(Date.now())
 let collectorTimer: number | null = null
 
 const fetchSale = async () => {
     loading.value = true
+    error.value = ''
     try {
         const response = await adminService.getSaleById(route.params.id as string)
         if (response.data) sale.value = response.data
-    } catch (error) {
-        console.error('Erro ao buscar venda:', error)
+    } catch (err: any) {
+        error.value = err?.response?.data?.message || 'Erro ao buscar venda.'
+        console.error('Erro ao buscar venda:', err)
     } finally {
         loading.value = false
     }
@@ -111,6 +114,7 @@ onBeforeUnmount(() => {
         </header>
 
         <div v-if="loading" class="loading-state">Carregando detalhes...</div>
+        <div v-else-if="error" class="loading-state">{{ error }}</div>
 
         <template v-else-if="sale">
             <div class="sale-hero">
@@ -191,7 +195,7 @@ onBeforeUnmount(() => {
                         </div>
                         <div class="info-row">
                             <span class="label">UUID</span>
-                            <code class="value mono">{{ sale.users?.id || 'N/A' }}</code>
+                            <code class="value mono">{{ sale.users?.uuid || 'N/A' }}</code>
                         </div>
                         <div class="info-row">
                             <span class="label">IP</span>

@@ -121,9 +121,9 @@ onMounted(fetchUser)
                             <tbody>
                                 <tr
                                     v-for="sale in user.sales"
-                                    :key="sale.id"
+                                    :key="sale.uuid ?? sale.id"
                                     class="clickable-row"
-                                    @click="router.push(`/sales/${sale.id}`)"
+                                    @click="router.push(`/sales/${sale.uuid ?? sale.id}`)"
                                 >
                                     <td><strong>{{ sale.order_number }}</strong></td>
                                     <td>{{ formatCurrency(sale.total_amount) }}</td>

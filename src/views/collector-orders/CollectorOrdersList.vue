@@ -45,7 +45,7 @@ const fetchUnreadCount = async () => {
 const markRead = async (notification: any) => {
     if (notification.is_read) return
     try {
-        await adminService.markCollectorNotificationRead(notification.uuid)
+        await adminService.markCollectorNotificationRead(notification.id ?? notification.uuid)
         notification.is_read = true
         notification.read_at = new Date().toISOString()
         unreadCount.value = Math.max(0, unreadCount.value - 1)
@@ -166,7 +166,7 @@ onMounted(async () => {
                         <tbody>
                             <tr
                                 v-for="n in notifications"
-                                :key="n.uuid"
+                                :key="n.id ?? n.uuid"
                                 :class="{ 'row-unread': !n.is_read, 'row-clickable': !!saleUuid(n) }"
                                 @click="saleUuid(n) && router.push(`/sales/${saleUuid(n)}`)"
                             >

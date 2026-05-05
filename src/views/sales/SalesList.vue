@@ -96,13 +96,13 @@ onMounted(() => fetchSales(1))
                                 v-for="sale in filteredSales"
                                 :key="sale.id"
                                 class="row-clickable"
-                                @click="router.push(`/sales/${sale.uuid}`)"
+                                @click="router.push(`/sales/${sale.id ?? sale.uuid}`)"
                             >
                                 <td><strong>{{ sale.order_number }}</strong></td>
                                 <td>
                                     <div class="user-cell">
                                         <span>{{ sale.users?.username || 'Desconhecido' }}</span>
-                                        <small v-if="sale.users?.uuid" class="muted">{{ sale.users.uuid.substring(0, 8) }}...</small>
+                                        <small v-if="sale.users?.id || sale.users?.uuid" class="muted">{{ (sale.users?.id ?? sale.users?.uuid).substring(0, 8) }}...</small>
                                     </div>
                                 </td>
                                 <td>{{ $dayjs(sale.created_at).format('DD/MM/YYYY HH:mm') }}</td>
@@ -113,7 +113,7 @@ onMounted(() => fetchSales(1))
                                     </span>
                                 </td>
                                 <td>
-                                    <button class="btn-view" @click.stop="router.push(`/sales/${sale.uuid}`)">
+                                    <button class="btn-view" @click.stop="router.push(`/sales/${sale.id ?? sale.uuid}`)">
                                         Ver Detalhes
                                     </button>
                                 </td>

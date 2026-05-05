@@ -114,7 +114,7 @@ onMounted(() => {
             <div class="header-actions">
                 <select v-model="botFilter" @change="onFilterChange" class="filter-select">
                     <option value="">Todos os bots</option>
-                    <option v-for="bot in bots" :key="bot.uuid" :value="bot.uuid">{{ bot.name }}</option>
+                    <option v-for="bot in bots" :key="bot.id ?? bot.uuid" :value="bot.id ?? bot.uuid">{{ bot.name }}</option>
                 </select>
                 <select v-model="statusFilter" @change="onFilterChange" class="filter-select">
                     <option v-for="opt in statusOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>

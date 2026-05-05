@@ -195,7 +195,7 @@ onBeforeUnmount(() => {
                         </div>
                         <div class="info-row">
                             <span class="label">UUID</span>
-                            <code class="value mono">{{ sale.users?.uuid || 'N/A' }}</code>
+                            <code class="value mono">{{ sale.users?.id || sale.users?.uuid || 'N/A' }}</code>
                         </div>
                         <div class="info-row">
                             <span class="label">IP</span>

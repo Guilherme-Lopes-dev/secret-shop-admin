@@ -13,6 +13,11 @@ const error = ref('')
 const expandedPayload = ref<string | null>(null)
 const retrying = ref(false)
 const syncing = ref(false)
+const payloadSections = [
+    { key: 'send_request_payload', label: 'Send Request' },
+    { key: 'send_response_payload', label: 'Send Response' },
+    { key: 'last_sync_payload', label: 'Último Sync' },
+] as const
 
 const fetchOffer = async () => {
     loading.value = true
@@ -279,14 +284,14 @@ onMounted(fetchOffer)
             <div class="section">
                 <h2 class="section-title">Payloads</h2>
                 <div class="payloads-grid">
-                    <div v-for="[key, label] in [['send_request_payload', 'Send Request'], ['send_response_payload', 'Send Response'], ['last_sync_payload', 'Último Sync']]" :key="key">
-                        <button class="payload-toggle" @click="togglePayload(key)" :disabled="!offer[key]">
+                    <div v-for="section in payloadSections" :key="section.key">
+                        <button class="payload-toggle" @click="togglePayload(section.key)" :disabled="!offer[section.key]">
                             <Icon icon="mdi:code-json" />
-                            {{ label }}
-                            <Icon :icon="expandedPayload === key ? 'mdi:chevron-up' : 'mdi:chevron-down'" class="chevron" />
+                            {{ section.label }}
+                            <Icon :icon="expandedPayload === section.key ? 'mdi:chevron-up' : 'mdi:chevron-down'" class="chevron" />
                         </button>
-                        <pre v-if="expandedPayload === key && offer[key]" class="json-block">{{ formatJson(offer[key]) }}</pre>
-                        <p v-else-if="!offer[key]" class="payload-empty">Vazio</p>
+                        <pre v-if="expandedPayload === section.key && offer[section.key]" class="json-block">{{ formatJson(offer[section.key]) }}</pre>
+                        <p v-else-if="!offer[section.key]" class="payload-empty">Vazio</p>
                     </div>
                 </div>
             </div>

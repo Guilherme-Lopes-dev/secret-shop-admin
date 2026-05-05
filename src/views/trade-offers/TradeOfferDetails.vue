@@ -13,11 +13,17 @@ const error = ref('')
 const expandedPayload = ref<string | null>(null)
 const retrying = ref(false)
 const syncing = ref(false)
-const payloadSections = [
+
+type PayloadSectionKey =
+    | 'send_request_payload'
+    | 'send_response_payload'
+    | 'last_sync_payload'
+
+const payloadSections: Array<{ key: PayloadSectionKey; label: string }> = [
     { key: 'send_request_payload', label: 'Send Request' },
     { key: 'send_response_payload', label: 'Send Response' },
     { key: 'last_sync_payload', label: 'Último Sync' },
-] as const
+]
 
 const fetchOffer = async () => {
     loading.value = true
@@ -84,6 +90,10 @@ const statusHistory = computed(() => {
 const togglePayload = (key: string) => {
     expandedPayload.value = expandedPayload.value === key ? null : key
 }
+
+const getOfferPayload = (key: PayloadSectionKey) => offer.value?.[key]
+
+const hasOfferPayload = (key: PayloadSectionKey) => Boolean(getOfferPayload(key))
 
 onMounted(fetchOffer)
 </script>
@@ -285,13 +295,13 @@ onMounted(fetchOffer)
                 <h2 class="section-title">Payloads</h2>
                 <div class="payloads-grid">
                     <div v-for="section in payloadSections" :key="section.key">
-                        <button class="payload-toggle" @click="togglePayload(section.key)" :disabled="!offer[section.key]">
+                        <button class="payload-toggle" @click="togglePayload(section.key)" :disabled="!hasOfferPayload(section.key)">
                             <Icon icon="mdi:code-json" />
                             {{ section.label }}
                             <Icon :icon="expandedPayload === section.key ? 'mdi:chevron-up' : 'mdi:chevron-down'" class="chevron" />
                         </button>
-                        <pre v-if="expandedPayload === section.key && offer[section.key]" class="json-block">{{ formatJson(offer[section.key]) }}</pre>
-                        <p v-else-if="!offer[section.key]" class="payload-empty">Vazio</p>
+                        <pre v-if="expandedPayload === section.key && hasOfferPayload(section.key)" class="json-block">{{ formatJson(getOfferPayload(section.key)) }}</pre>
+                        <p v-else-if="!hasOfferPayload(section.key)" class="payload-empty">Vazio</p>
                     </div>
                 </div>
             </div>

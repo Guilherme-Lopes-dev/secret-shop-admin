@@ -16,7 +16,8 @@ const navItems = [
     { label: 'Usuários', icon: 'mdi:account-group-outline', to: '/users', name: 'users' },
     { label: 'Trade Offers', icon: 'mdi:swap-horizontal', to: '/trade-offers', name: 'trade-offers' },
     { label: 'Inventário', icon: 'mdi:sword', to: '/inventory', name: 'inventory' },
-    { label: 'Collectors', icon: 'mdi:trophy-outline', to: '/collector-orders', name: 'collector-orders' },
+    { label: 'Collectors', icon: 'mdi:trophy-outline', to: '/collectors', name: 'collectors' },
+    { label: 'Pedidos Collector', icon: 'mdi:receipt-text-outline', to: '/collector-orders', name: 'collector-orders' },
     { label: 'Add Produto', icon: 'mdi:plus-circle-outline', to: '/products/create', name: 'create-product' },
 ]
 

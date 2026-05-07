@@ -64,6 +64,16 @@ const routes = [
         component: () => import('@/views/inventory/InventoryDetails.vue'),
       },
       {
+        path: 'collectors',
+        name: 'collectors',
+        component: () => import('@/views/collectors/CollectorsList.vue'),
+      },
+      {
+        path: 'collectors/review',
+        name: 'collectors-review',
+        component: () => import('@/views/collectors/CollectorsReview.vue'),
+      },
+      {
         path: 'collector-orders',
         name: 'collector-orders',
         component: () => import('@/views/collector-orders/CollectorOrdersList.vue'),

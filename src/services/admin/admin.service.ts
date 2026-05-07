@@ -112,6 +112,10 @@ export const adminService = {
     return api.get('/steam-bots')
   },
 
+  async getSteamInventoryBySteamId(steamId: string) {
+    return api.get(`/steam/admin/skins/${steamId}`)
+  },
+
   // Collector notifications
   async getCollectorNotifications(page: number = 1, limit: number = 20, onlyUnread: boolean = false) {
     const params = new URLSearchParams({

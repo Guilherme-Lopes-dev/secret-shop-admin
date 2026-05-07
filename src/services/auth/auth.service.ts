@@ -17,8 +17,8 @@ export const authService = {
   login(): Promise<void> {
     return new Promise((resolve, reject) => {
       const steamLoginUrl = API_URL
-        ? new URL('/auth/steam', API_URL).toString()
-        : `${window.location.origin}/auth/steam`
+        ? new URL('/auth/steam/admin', API_URL).toString()
+        : `${window.location.origin}/auth/steam/admin`
 
       localStorage.removeItem(LS_KEY)
 

@@ -1,5 +1,6 @@
 import axios, { type InternalAxiosRequestConfig } from 'axios'
 import { useAuthStore } from '@/stores/auth.store'
+import { router } from '@/router'
 
 const API_URL = import.meta.env.VITE_API_URL?.trim() || ''
 const IS_NGROK_URL = /ngrok(-free)?\.app|ngrok-free\.dev$/i.test(
@@ -51,6 +52,7 @@ api.interceptors.response.use(
         .catch(async () => {
           const authStore = useAuthStore()
           authStore.clearSession()
+          router.push('/login')
         })
         .finally(() => {
           refreshPromise = null

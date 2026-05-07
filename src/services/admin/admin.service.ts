@@ -36,9 +36,23 @@ export const adminService = {
   },
 
   // Users
-  async getAllUsers(page: number = 1, limit: number = 20, search?: string) {
+  async getAllUsers(
+    page: number = 1,
+    limit: number = 20,
+    search?: string,
+    sort?: string,
+    minOrders?: number,
+    maxOrders?: number,
+    minSpent?: number,
+    maxSpent?: number,
+  ) {
     const params = new URLSearchParams({ page: String(page), limit: String(limit) })
     if (search) params.append('search', search)
+    if (sort) params.append('sort', sort)
+    if (minOrders !== undefined) params.append('minOrders', String(minOrders))
+    if (maxOrders !== undefined) params.append('maxOrders', String(maxOrders))
+    if (minSpent !== undefined) params.append('minSpent', String(minSpent))
+    if (maxSpent !== undefined) params.append('maxSpent', String(maxSpent))
     return api.get(`/admin/users?${params}`)
   },
 

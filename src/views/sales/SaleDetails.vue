@@ -12,6 +12,16 @@ const loading = ref(true)
 const error = ref('')
 const nowTs = ref(Date.now())
 let collectorTimer: number | null = null
+const tradeLinkCopied = ref(false)
+let copyTimer: ReturnType<typeof setTimeout> | null = null
+
+function copyTradeLink() {
+    if (!sale.value?.users?.trade_link) return
+    navigator.clipboard.writeText(sale.value.users.trade_link)
+    tradeLinkCopied.value = true
+    if (copyTimer) clearTimeout(copyTimer)
+    copyTimer = setTimeout(() => { tradeLinkCopied.value = false }, 2000)
+}
 
 const fetchSale = async () => {
     loading.value = true
@@ -204,6 +214,34 @@ onBeforeUnmount(() => {
                         <div class="info-row">
                             <span class="label">Anti-fraude</span>
                             <span class="value">{{ sale.anti_fraud_score ?? '-' }}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="label">WhatsApp</span>
+                            <a
+                                v-if="sale.users?.contact"
+                                :href="`https://wa.me/${sale.users.contact.replace(/\D/g, '')}`"
+                                target="_blank"
+                                rel="noopener"
+                                class="value link-wame"
+                            >
+                                <Icon icon="mdi:whatsapp" class="wame-icon" />
+                                {{ sale.users.contact }}
+                            </a>
+                            <span v-else class="value">-</span>
+                        </div>
+                        <div class="info-row trade-link-row">
+                            <span class="label">Trade Link</span>
+                            <div v-if="sale.users?.trade_link" class="trade-link-value">
+                                <span class="trade-link-text">{{ sale.users.trade_link }}</span>
+                                <button
+                                    class="copy-btn"
+                                    :title="tradeLinkCopied ? 'Copiado!' : 'Copiar'"
+                                    @click="copyTradeLink"
+                                >
+                                    <Icon :icon="tradeLinkCopied ? 'mdi:check' : 'mdi:content-copy'" />
+                                </button>
+                            </div>
+                            <span v-else class="value">-</span>
                         </div>
                     </div>
                 </div>
@@ -647,4 +685,54 @@ table
     padding 2rem
     color #64748b
     font-size 0.875rem
+
+.link-wame
+    display inline-flex
+    align-items center
+    gap 0.35rem
+    color #25d366
+    text-decoration none
+    font-size 0.875rem
+    max-width 60%
+    text-align right
+    word-break break-word
+
+    &:hover
+        text-decoration underline
+
+.wame-icon
+    font-size 1rem
+    flex-shrink 0
+
+.trade-link-row
+    align-items flex-start
+
+.trade-link-value
+    display flex
+    align-items flex-start
+    gap 0.5rem
+    flex 1
+    min-width 0
+
+.trade-link-text
+    font-size 0.8rem
+    color #94a3b8
+    word-break break-all
+    line-height 1.4
+    flex 1
+
+.copy-btn
+    flex-shrink 0
+    background none
+    border none
+    cursor pointer
+    color #6366f1
+    font-size 1rem
+    padding 0
+    display flex
+    align-items center
+    transition color 0.15s
+
+    &:hover
+        color #818cf8
 </style>

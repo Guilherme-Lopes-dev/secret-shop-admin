@@ -296,6 +296,7 @@ function proceedWithSelected() {
         steamId: inventory.value?.steamId ?? normalizedSteamId.value,
         items: selectedItems.value,
         priceInputs: {},
+        heroSelects: {},
     })
 
     router.push('/collectors/review')

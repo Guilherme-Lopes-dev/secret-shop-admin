@@ -63,8 +63,8 @@ function buildPayload() {
         botId: botId.value ?? null,
         items: items.value.map((item) => ({
             assetId: item.assetId,
-            classId: item.classId || null,
-            instanceId: item.instanceId || null,
+            classId: item.classId,
+            instanceId: item.instanceId,
             name: item.name,
             marketHashName: item.marketHashName,
             type: item.type ?? null,

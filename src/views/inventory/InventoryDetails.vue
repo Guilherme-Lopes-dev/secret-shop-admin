@@ -13,6 +13,8 @@ const uuid = route.params.uuid as string
 const item = ref<any>(null)
 const loading = ref(true)
 const saving = ref(false)
+const priceLocked = ref(false)
+const lockingPrice = ref(false)
 
 const rarityOptions = [
     'Common', 'Uncommon', 'Rare', 'Mythical', 'Legendary', 'Immortal',
@@ -66,8 +68,26 @@ const itemStatus = computed(() => {
     return { label: 'Disponível', cls: 'badge-available' }
 })
 
+const handleToggleLock = async () => {
+    const skinUuid = item.value?.skins?.id
+    if (!skinUuid) return
+    lockingPrice.value = true
+    try {
+        const locked = !priceLocked.value
+        await adminService.toggleSkinPriceLock(skinUuid, locked)
+        priceLocked.value = locked
+        if (item.value?.skins) item.value.skins.price_locked = locked
+        toast.success(locked ? 'Preço bloqueado — sync automático desativado.' : 'Preço desbloqueado — sync automático ativado.')
+    } catch (e: any) {
+        toast.error(e?.response?.data?.message || 'Erro ao alterar lock.')
+    } finally {
+        lockingPrice.value = false
+    }
+}
+
 const populateForm = (data: any) => {
     const s = data.skins ?? {}
+    priceLocked.value = s.price_locked ?? false
     form.value = {
         name: s.name ?? '',
         hero: s.hero ?? '',
@@ -117,7 +137,7 @@ const handleSave = async () => {
             hero: form.value.hero || undefined,
             rarity: form.value.rarity || undefined,
             icon_url_large: form.value.icon_url_large || undefined,
-            manual_price: parseCents(form.value.manual_price_brl),
+            manual_price: price,
             median_price: parseCents(form.value.median_price_brl),
             lowest_price: parseCents(form.value.lowest_price_brl),
             price,
@@ -235,6 +255,20 @@ onMounted(fetchItem)
                 <div class="form-section">
                     <h2 class="form-section-title">
                         <Icon icon="mdi:currency-usd" /> Preços (R$)
+                        <button
+                            type="button"
+                            class="lock-toggle"
+                            :class="{ 'lock-toggle--locked': priceLocked }"
+                            :disabled="lockingPrice"
+                            @click="handleToggleLock"
+                            :title="priceLocked ? 'Preço bloqueado — clique para permitir sync automático' : 'Preço livre — clique para bloquear sync automático'"
+                        >
+                            <Icon
+                                :icon="lockingPrice ? 'mdi:loading' : priceLocked ? 'mdi:lock' : 'mdi:lock-open-outline'"
+                                :class="{ spinning: lockingPrice }"
+                            />
+                            {{ priceLocked ? 'Bloqueado' : 'Livre para sync' }}
+                        </button>
                     </h2>
 
                     <div class="form-row form-row--4">
@@ -637,6 +671,40 @@ onMounted(fetchItem)
         font-family monospace
         font-size 0.78rem
         color #94a3b8
+
+.lock-toggle
+    display inline-flex
+    align-items center
+    gap 0.35rem
+    margin-left auto
+    background rgba(255,255,255,0.04)
+    border 1px solid rgba(255,255,255,0.1)
+    border-radius 6px
+    color #94a3b8
+    padding 0.3rem 0.75rem
+    font-size 0.78rem
+    font-weight 500
+    cursor pointer
+    transition all 0.2s
+
+    &:hover:not(:disabled)
+        border-color rgba(255,152,0,0.35)
+        color #ff9800
+        background rgba(255,152,0,0.06)
+
+    &--locked
+        border-color rgba(244,67,54,0.35)
+        color #f44336
+        background rgba(244,67,54,0.06)
+
+        &:hover:not(:disabled)
+            border-color rgba(76,175,80,0.35)
+            color #4caf50
+            background rgba(76,175,80,0.06)
+
+    &:disabled
+        opacity 0.4
+        cursor not-allowed
 
 .form-actions
     display flex

@@ -27,6 +27,16 @@ const fetchSale = async () => {
     }
 }
 
+const buildSteamImageUrl = (image: string | null | undefined, size: string = '80fx80f') => {
+    if (!image) return null
+    if (image.startsWith('http://') || image.startsWith('https://')) return image
+    return `https://steamcommunity-a.akamaihd.net/economy/image/${image}/${size}`
+}
+
+const resolveItemImageUrl = (item: any) => {
+    return buildSteamImageUrl(item?.skin_image ?? item?.bot_inventory?.skins?.icon_url_large ?? null)
+}
+
 const getStatusClass = (status: string) => {
     if (!status) return ''
     const normalized = status.toLowerCase()
@@ -214,7 +224,7 @@ onBeforeUnmount(() => {
                         <table>
                             <thead>
                                 <tr>
-                                    <th>Nome</th>
+                                    <th>Item</th>
                                     <th>Qtd</th>
                                     <th>Preco Unit.</th>
                                     <th>Desconto</th>
@@ -224,14 +234,27 @@ onBeforeUnmount(() => {
                             <tbody>
                                 <tr v-for="item in sale.sale_items" :key="item.id">
                                     <td>
-                                        <div class="item-name">
-                                            <strong>{{ item.skin_name }}</strong>
-                                            <span
-                                                v-if="item.bot_inventory?.is_collector"
-                                                class="collector-tag"
-                                            >
-                                                Collector
-                                            </span>
+                                        <div class="item-cell">
+                                            <img
+                                                v-if="resolveItemImageUrl(item)"
+                                                :src="resolveItemImageUrl(item) || ''"
+                                                class="item-thumb"
+                                                :alt="item.skin_name"
+                                            />
+                                            <div v-else class="item-thumb-placeholder">
+                                                <Icon icon="mdi:image-off-outline" />
+                                            </div>
+                                            <div class="item-copy">
+                                                <div class="item-name">
+                                                    <strong>{{ item.skin_name }}</strong>
+                                                    <span
+                                                        v-if="item.bot_inventory?.is_collector"
+                                                        class="collector-tag"
+                                                    >
+                                                        Collector
+                                                    </span>
+                                                </div>
+                                            </div>
                                         </div>
                                     </td>
                                     <td>{{ item.quantity }}</td>
@@ -533,6 +556,39 @@ onBeforeUnmount(() => {
 
 .table-wrapper
     overflow-x auto
+
+.item-cell
+    display flex
+    align-items center
+    gap 0.85rem
+    min-width 240px
+
+.item-thumb
+    width 52px
+    height 52px
+    object-fit cover
+    border-radius 10px
+    border 1px solid rgba(255,255,255,0.08)
+    background rgba(255,255,255,0.04)
+    flex-shrink 0
+
+.item-thumb-placeholder
+    width 52px
+    height 52px
+    display inline-flex
+    align-items center
+    justify-content center
+    border-radius 10px
+    color #64748b
+    background rgba(255,255,255,0.03)
+    border 1px solid rgba(255,255,255,0.06)
+    flex-shrink 0
+
+.item-copy
+    min-width 0
+    display flex
+    flex-direction column
+    gap 0.35rem
 
 table
     width 100%

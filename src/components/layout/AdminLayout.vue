@@ -18,7 +18,7 @@ const navItems = [
     { label: 'Inventário', icon: 'mdi:sword', to: '/inventory', name: 'inventory' },
     { label: 'Collectors', icon: 'mdi:trophy-outline', to: '/collectors', name: 'collectors' },
     { label: 'Pedidos Collector', icon: 'mdi:receipt-text-outline', to: '/collector-orders', name: 'collector-orders' },
-    { label: 'Add Produto', icon: 'mdi:plus-circle-outline', to: '/products/create', name: 'create-product' },
+    // { label: 'Add Produto', icon: 'mdi:plus-circle-outline', to: '/products/create', name: 'create-product' },
 ]
 
 const isActive = (item: typeof navItems[0]) => {

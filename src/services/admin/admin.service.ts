@@ -139,6 +139,39 @@ export const adminService = {
     return api.patch(`/admin/notifications/read-all?types=${collectorNotificationTypes}`)
   },
 
+  // Collectors
+  async bulkUpsertCollectors(payload: {
+    steamId: string
+    botId?: number | null
+    items: Array<{
+      assetId: string
+      classId?: string | null
+      instanceId?: string | null
+      name: string
+      marketHashName: string
+      type?: string | null
+      iconUrl?: string | null
+      iconUrlLarge?: string | null
+      amount?: number
+      tradable?: boolean
+      marketable?: boolean
+      commodity?: boolean
+      price?: number | null
+      heroSlug?: string
+    }>
+  }) {
+    return api.post('/collectors/admin/bulk', payload)
+  },
+
+  // Dota Heroes
+  async getDotaHeroes() {
+    return api.get<Array<{ uuid: string; slug: string; name: string; image: string | null }>>('/dota-heroes')
+  },
+
+  async toggleSkinPriceLock(skinUuid: string, locked: boolean) {
+    return api.patch(`/skins/admin/skin/${skinUuid}/price-lock`, { locked })
+  },
+
   // Products
   async createProduct(dto: {
     name: string

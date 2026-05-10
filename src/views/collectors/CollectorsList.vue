@@ -12,6 +12,7 @@ import {
     type CollectorInventoryItem,
     type CollectorInventoryPayload,
 } from '@/utils/collectorsSelection'
+import { ITEM_SET_ALLOWLIST } from '@/utils/collectorsAllowlist'
 
 type CollectorsCacheStore = {
     lastSteamId: string | null
@@ -44,7 +45,9 @@ const hasCachedCurrentSteamId = computed(
 const openCacheButtonLabel = computed(() => (hasCachedCurrentSteamId.value ? 'Abrir cache' : 'Buscar'))
 
 const filteredItems = computed(() => {
-    const source = inventory.value?.items ?? []
+    const source = (inventory.value?.items ?? []).filter((item) =>
+        ITEM_SET_ALLOWLIST.has(item.marketHashName),
+    )
     const query = itemSearch.value.trim().toLowerCase()
 
     if (!query) {
@@ -343,7 +346,7 @@ onMounted(() => {
                     Collectors
                 </h1>
                 <p class="page-subtitle">
-                    Consulte um inventario Steam por SteamID64 com cache local e paginacao.
+                    Consulte um inventario Steam
                 </p>
             </div>
         </header>

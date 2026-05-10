@@ -23,6 +23,26 @@ const minPriceInput = ref('')
 const maxPriceInput = ref('')
 let searchTimeout: ReturnType<typeof setTimeout> | null = null
 
+const togglingLock = ref<Set<string>>(new Set())
+
+const handleToggleLock = async (item: any, event: MouseEvent) => {
+    event.stopPropagation()
+    const skinUuid = item.skins?.id
+    if (!skinUuid || togglingLock.value.has(skinUuid)) return
+
+    const locked = !item.skins?.price_locked
+    togglingLock.value = new Set([...togglingLock.value, skinUuid])
+    try {
+        await adminService.toggleSkinPriceLock(skinUuid, locked)
+        item.skins.price_locked = locked
+        toast.success(locked ? 'Preço bloqueado para sync automático.' : 'Preço desbloqueado.')
+    } catch (e: any) {
+        toast.error(e?.response?.data?.message || 'Erro ao alterar lock.')
+    } finally {
+        togglingLock.value = new Set([...togglingLock.value].filter(id => id !== skinUuid))
+    }
+}
+
 const statusOptions = [
     { label: 'Todos', value: '' },
     { label: 'Disponível', value: 'available' },
@@ -178,6 +198,7 @@ onMounted(() => {
                                 <th>Preço</th>
                                 <th>Tradable</th>
                                 <th>Status</th>
+                                <th>Preço Lock</th>
                                 <th>Criado em</th>
                             </tr>
                         </thead>
@@ -211,6 +232,20 @@ onMounted(() => {
                                     <span class="status-badge" :class="itemStatus(item).cls">
                                         {{ itemStatus(item).label }}
                                     </span>
+                                </td>
+                                <td class="center" @click.stop>
+                                    <button
+                                        class="lock-btn"
+                                        :class="{ locked: item.skins?.price_locked }"
+                                        :disabled="togglingLock.has(item.skins?.id)"
+                                        :title="item.skins?.price_locked ? 'Preço bloqueado — clique para desbloquear' : 'Preço livre — clique para bloquear'"
+                                        @click="handleToggleLock(item, $event)"
+                                    >
+                                        <Icon
+                                            :icon="togglingLock.has(item.skins?.id) ? 'mdi:loading' : item.skins?.price_locked ? 'mdi:lock' : 'mdi:lock-open-outline'"
+                                            :class="{ spinning: togglingLock.has(item.skins?.id) }"
+                                        />
+                                    </button>
                                 </td>
                                 <td>{{ $dayjs(item.created_at).format('DD/MM/YY') }}</td>
                             </tr>
@@ -493,6 +528,36 @@ table
 .status-canceled
     background rgba(244,67,54,0.1)
     color #f44336
+
+.lock-btn
+    background transparent
+    border 1px solid rgba(255,255,255,0.1)
+    border-radius 6px
+    color #64748b
+    padding 0.3rem 0.5rem
+    cursor pointer
+    font-size 1rem
+    display inline-flex
+    align-items center
+    transition all 0.2s
+
+    &:hover:not(:disabled)
+        border-color rgba(255,152,0,0.4)
+        color #ff9800
+
+    &.locked
+        border-color rgba(244,67,54,0.3)
+        color #f44336
+        background rgba(244,67,54,0.06)
+
+        &:hover:not(:disabled)
+            border-color rgba(76,175,80,0.4)
+            color #4caf50
+            background rgba(76,175,80,0.06)
+
+    &:disabled
+        opacity 0.4
+        cursor not-allowed
 
 .empty-state
     text-align center

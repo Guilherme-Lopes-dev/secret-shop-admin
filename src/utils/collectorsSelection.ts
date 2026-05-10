@@ -23,8 +23,10 @@ export type CollectorInventoryPayload = {
 
 export type CollectorReviewSelection = {
   steamId: string
+  botId?: number
   items: CollectorInventoryItem[]
   priceInputs: Record<string, string>
+  heroSelects: Record<string, string>
 }
 
 const REVIEW_STORAGE_KEY = 'secretshop-admin:collectors-review-selection:v1'
@@ -67,11 +69,21 @@ export function readCollectorReviewSelection(): CollectorReviewSelection | null 
 
     return {
       steamId: typeof parsed.steamId === 'string' ? parsed.steamId : '',
+      botId: typeof parsed.botId === 'number' ? parsed.botId : undefined,
       items,
       priceInputs:
         parsed.priceInputs && typeof parsed.priceInputs === 'object'
           ? Object.fromEntries(
               Object.entries(parsed.priceInputs).map(([key, value]) => [
+                key,
+                typeof value === 'string' ? value : String(value ?? ''),
+              ]),
+            )
+          : {},
+      heroSelects:
+        parsed.heroSelects && typeof parsed.heroSelects === 'object'
+          ? Object.fromEntries(
+              Object.entries(parsed.heroSelects).map(([key, value]) => [
                 key,
                 typeof value === 'string' ? value : String(value ?? ''),
               ]),

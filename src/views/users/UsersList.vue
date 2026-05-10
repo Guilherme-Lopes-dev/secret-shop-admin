@@ -2,6 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { adminService } from '@/services/admin/admin.service'
+import { formatCurrency } from '@/utils/formatCurrency'
 import { Icon } from '@iconify/vue'
 
 const router = useRouter()
@@ -12,12 +13,37 @@ const totalPages = ref(1)
 const totalItems = ref(0)
 const limit = ref(20)
 const search = ref('')
+const sortFilter = ref('')
+const minOrdersInput = ref('')
+const maxOrdersInput = ref('')
+const minSpentInput = ref('')
+const maxSpentInput = ref('')
 let searchTimeout: ReturnType<typeof setTimeout> | null = null
+
+const sortOptions = [
+    { label: 'Mais recente', value: '' },
+    { label: 'Mais pedidos', value: 'orders' },
+    { label: 'Maior gasto', value: 'spent' },
+]
 
 const fetchUsers = async (page: number) => {
     loading.value = true
     try {
-        const response = await adminService.getAllUsers(page, limit.value, search.value || undefined)
+        const minOrders = minOrdersInput.value ? parseInt(minOrdersInput.value) : undefined
+        const maxOrders = maxOrdersInput.value ? parseInt(maxOrdersInput.value) : undefined
+        const minSpent = minSpentInput.value ? Math.round(parseFloat(minSpentInput.value) * 100) : undefined
+        const maxSpent = maxSpentInput.value ? Math.round(parseFloat(maxSpentInput.value) * 100) : undefined
+
+        const response = await adminService.getAllUsers(
+            page,
+            limit.value,
+            search.value || undefined,
+            sortFilter.value || undefined,
+            minOrders,
+            maxOrders,
+            minSpent,
+            maxSpent,
+        )
         if (response.data) {
             users.value = response.data.data
             totalPages.value = response.data.pages
@@ -31,9 +57,16 @@ const fetchUsers = async (page: number) => {
     }
 }
 
+let filterTimeout: ReturnType<typeof setTimeout> | null = null
+
+const onFilterChange = () => fetchUsers(1)
+const onFilterInput = () => {
+    if (filterTimeout) clearTimeout(filterTimeout)
+    filterTimeout = setTimeout(() => fetchUsers(1), 300)
+}
 const onSearchInput = () => {
     if (searchTimeout) clearTimeout(searchTimeout)
-    searchTimeout = setTimeout(() => fetchUsers(1), 400)
+    searchTimeout = setTimeout(() => fetchUsers(1), 200)
 }
 
 const nextPage = () => { if (currentPage.value < totalPages.value) fetchUsers(currentPage.value + 1) }
@@ -49,7 +82,10 @@ onMounted(() => fetchUsers(1))
                 <h1 class="page-title">Usuários</h1>
                 <p class="page-subtitle">{{ totalItems }} usuários cadastrados</p>
             </div>
-            <div class="search-box">
+        </header>
+
+        <div class="filters-row">
+            <div class="search-wrap">
                 <Icon icon="mdi:magnify" class="search-icon" />
                 <input
                     v-model="search"
@@ -59,25 +95,88 @@ onMounted(() => fetchUsers(1))
                     class="search-input"
                 />
             </div>
-        </header>
+            <select v-model="sortFilter" @change="onFilterChange" class="filter-select">
+                <option v-for="opt in sortOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+            </select>
+            <div class="range-group">
+                <span class="range-label">Pedidos</span>
+                <input
+                    v-model="minOrdersInput"
+                    @input="onFilterInput"
+                    type="number"
+                    min="0"
+                    placeholder="Mín"
+                    class="range-input"
+                />
+                <span class="range-sep">—</span>
+                <input
+                    v-model="maxOrdersInput"
+                    @input="onFilterInput"
+                    type="number"
+                    min="0"
+                    placeholder="Máx"
+                    class="range-input"
+                />
+            </div>
+            <div class="range-group">
+                <span class="range-label">Gasto (R$)</span>
+                <input
+                    v-model="minSpentInput"
+                    @input="onFilterInput"
+                    type="number"
+                    min="0"
+                    placeholder="Mín"
+                    class="range-input"
+                />
+                <span class="range-sep">—</span>
+                <input
+                    v-model="maxSpentInput"
+                    @input="onFilterInput"
+                    type="number"
+                    min="0"
+                    placeholder="Máx"
+                    class="range-input"
+                />
+            </div>
+        </div>
 
         <div class="section">
-            <div v-if="loading" class="loading-state">Carregando usuários...</div>
-            <div v-else>
-                <div class="table-wrapper">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Usuário</th>
-                                <th>Steam ID</th>
-                                <th>E-mail</th>
-                                <th>Pedidos</th>
-                                <th>Role</th>
-                                <th>Cadastro</th>
-                                <th>Ações</th>
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Usuário</th>
+                            <th>Steam ID</th>
+                            <th>E-mail</th>
+                            <th>Pedidos</th>
+                            <th>Valor Gasto</th>
+                            <th>Role</th>
+                            <th>Cadastro</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <template v-if="loading">
+                            <tr v-for="n in limit" :key="n" class="skeleton-row">
+                                <td>
+                                    <div class="user-cell">
+                                        <div class="skeleton skeleton-avatar" />
+                                        <div>
+                                            <div class="skeleton skeleton-line" style="width: 100px" />
+                                            <div class="skeleton skeleton-line" style="width: 60px; margin-top: 4px" />
+                                        </div>
+                                    </div>
+                                </td>
+                                <td><div class="skeleton skeleton-line" style="width: 120px" /></td>
+                                <td><div class="skeleton skeleton-line" style="width: 140px" /></td>
+                                <td><div class="skeleton skeleton-line" style="width: 40px" /></td>
+                                <td><div class="skeleton skeleton-line" style="width: 70px" /></td>
+                                <td><div class="skeleton skeleton-line" style="width: 50px" /></td>
+                                <td><div class="skeleton skeleton-line" style="width: 80px" /></td>
+                                <td><div class="skeleton skeleton-line" style="width: 40px" /></td>
                             </tr>
-                        </thead>
-                        <tbody>
+                        </template>
+                        <template v-else>
                             <tr v-for="user in users" :key="user.id">
                                 <td>
                                     <div class="user-cell">
@@ -94,6 +193,7 @@ onMounted(() => fetchUsers(1))
                                 <td><code class="mono">{{ user.steam_id || '—' }}</code></td>
                                 <td>{{ user.email || '—' }}</td>
                                 <td><span class="count-badge">{{ user._count?.sales ?? 0 }}</span></td>
+                                <td class="spent-cell">{{ formatCurrency(user.total_spent ?? 0) }}</td>
                                 <td>
                                     <span class="status-badge" :class="user.admin ? 'status-admin' : 'status-user'">
                                         {{ user.admin ? 'Admin' : 'User' }}
@@ -105,17 +205,17 @@ onMounted(() => fetchUsers(1))
                                 </td>
                             </tr>
                             <tr v-if="users.length === 0">
-                                <td colspan="7" class="empty-state">Nenhum usuário encontrado.</td>
+                                <td colspan="8" class="empty-state">Nenhum usuário encontrado.</td>
                             </tr>
-                        </tbody>
-                    </table>
-                </div>
+                        </template>
+                    </tbody>
+                </table>
+            </div>
 
-                <div class="pagination" v-if="totalPages > 1">
-                    <button class="page-btn" :disabled="currentPage === 1" @click="prevPage">Anterior</button>
-                    <span class="page-info">Página {{ currentPage }} de {{ totalPages }}</span>
-                    <button class="page-btn" :disabled="currentPage === totalPages" @click="nextPage">Próxima</button>
-                </div>
+            <div class="pagination" v-if="!loading && totalPages > 1">
+                <button class="page-btn" :disabled="currentPage === 1" @click="prevPage">Anterior</button>
+                <span class="page-info">Página {{ currentPage }} de {{ totalPages }}</span>
+                <button class="page-btn" :disabled="currentPage === totalPages" @click="nextPage">Próxima</button>
             </div>
         </div>
     </div>
@@ -145,30 +245,90 @@ onMounted(() => fetchUsers(1))
     color #94a3b8
     font-size 0.9rem
 
-.search-box
+.filters-row
     display flex
     align-items center
-    gap 0.5rem
+    gap 0.75rem
+    flex-wrap wrap
+    margin-bottom 1.25rem
+
+.search-wrap
+    position relative
+    flex 1
+    min-width 200px
+
+.search-icon
+    position absolute
+    left 0.65rem
+    top 50%
+    transform translateY(-50%)
+    color #64748b
+    font-size 1rem
+    pointer-events none
+
+.search-input
+    width 100%
     background #1a1a1e
     border 1px solid rgba(255,255,255,0.08)
     border-radius 8px
-    padding 0.5rem 0.75rem
-
-.search-icon
-    color #64748b
-    font-size 1.1rem
-    flex-shrink 0
-
-.search-input
-    background transparent
-    border none
-    outline none
     color #fff
+    padding 0.5rem 0.75rem 0.5rem 2.1rem
     font-size 0.875rem
-    width 260px
+    outline none
+    box-sizing border-box
 
     &::placeholder
         color #64748b
+
+    &:focus
+        border-color rgba(99,102,241,0.4)
+
+.filter-select
+    background #1a1a1e
+    border 1px solid rgba(255,255,255,0.08)
+    border-radius 8px
+    color #fff
+    padding 0.5rem 0.75rem
+    font-size 0.875rem
+    outline none
+    cursor pointer
+
+    option
+        background #1a1a1e
+
+.range-group
+    display flex
+    align-items center
+    gap 0.4rem
+
+.range-label
+    color #64748b
+    font-size 0.78rem
+    white-space nowrap
+
+.range-input
+    width 90px
+    background #1a1a1e
+    border 1px solid rgba(255,255,255,0.08)
+    border-radius 8px
+    color #fff
+    padding 0.5rem 0.6rem
+    font-size 0.875rem
+    outline none
+
+    &::placeholder
+        color #64748b
+
+    &:focus
+        border-color rgba(99,102,241,0.4)
+
+    &::-webkit-outer-spin-button,
+    &::-webkit-inner-spin-button
+        -webkit-appearance none
+
+.range-sep
+    color #64748b
+    font-size 0.875rem
 
 .section
     background #1a1a1e
@@ -248,6 +408,11 @@ table
     font-size 0.8rem
     font-weight 600
 
+.spent-cell
+    color #4caf50
+    font-weight 500
+    font-size 0.82rem
+
 .status-badge
     padding 3px 8px
     border-radius 5px
@@ -310,4 +475,28 @@ table
 .page-info
     color #94a3b8
     font-size 0.875rem
+
+.skeleton
+    background linear-gradient(90deg, rgba(255,255,255,0.05) 25%, rgba(255,255,255,0.1) 50%, rgba(255,255,255,0.05) 75%)
+    background-size 200% 100%
+    border-radius 4px
+    animation skeleton-shimmer 1.4s infinite
+
+.skeleton-avatar
+    width 32px
+    height 32px
+    border-radius 50%
+    flex-shrink 0
+
+.skeleton-line
+    height 12px
+
+.skeleton-row td
+    border-bottom 1px solid rgba(255,255,255,0.04)
+
+@keyframes skeleton-shimmer
+    0%
+        background-position 200% 0
+    100%
+        background-position -200% 0
 </style>

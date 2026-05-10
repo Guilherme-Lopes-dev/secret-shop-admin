@@ -106,12 +106,10 @@ router.beforeEach(async (to, _from, next) => {
 
   if (!sessionRestored) {
     sessionRestored = true
-    console.log('[router] bootstrapping session...')
     try {
       await authService.bootstrapSession()
-      console.log('[router] session bootstrapped — isAuthenticated:', authStore.isAuthenticated, '| isAdmin:', authStore.isAdmin)
     } catch (err: any) {
-      console.warn('[router] bootstrap failed:', err?.response?.status, err?.message)
+      console.error('Error bootstrapping session:', err)
     }
   }
 

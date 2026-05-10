@@ -144,8 +144,8 @@ onMounted(() => fetchOffers(1))
                                 <td>{{ offer.steam_bots?.name || '—' }}</td>
                                 <td><code class="mono">{{ offer.user_steam_id || '—' }}</code></td>
                                 <td>
-                                    <span class="status-badge" :class="getStatusClass(offer.status || offer.offer_status)">
-                                        {{ offer.status || offer.offer_status || '—' }}
+                                    <span class="status-badge" :class="getStatusClass(offer.offer_status || offer.status)">
+                                        {{ offer.offer_status || offer.status || '—' }}
                                     </span>
                                 </td>
                                 <td class="center">{{ offer.attempt_count ?? 0 }}</td>

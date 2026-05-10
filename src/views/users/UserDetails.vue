@@ -63,6 +63,27 @@ onMounted(fetchUser)
                 </div>
             </div>
 
+            <div class="user-stats">
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <Icon icon="mdi:cash-multiple" width="22" />
+                    </div>
+                    <div class="stat-info">
+                        <span class="stat-label">Total Gasto</span>
+                        <span class="stat-value">{{ formatCurrency(user.total_spent ?? 0) }}</span>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon stat-icon--blue">
+                        <Icon icon="mdi:cart-outline" width="22" />
+                    </div>
+                    <div class="stat-info">
+                        <span class="stat-label">Total de Pedidos</span>
+                        <span class="stat-value">{{ user._count?.sales ?? 0 }}</span>
+                    </div>
+                </div>
+            </div>
+
             <div class="details-grid">
                 <div class="section">
                     <h2 class="section-title">Informações</h2>
@@ -218,6 +239,51 @@ onMounted(fetchUser)
     font-family monospace
     font-size 0.78rem
     color #64748b
+
+.user-stats
+    display flex
+    gap 1rem
+    margin-bottom 1.5rem
+    flex-wrap wrap
+
+.stat-card
+    background #1a1a1e
+    border 1px solid rgba(255,255,255,0.05)
+    border-radius 12px
+    padding 1rem 1.25rem
+    display flex
+    align-items center
+    gap 0.875rem
+    min-width 180px
+
+.stat-icon
+    width 42px
+    height 42px
+    border-radius 9px
+    background rgba(76,175,80,0.12)
+    color #4caf50
+    display flex
+    align-items center
+    justify-content center
+    flex-shrink 0
+
+    &--blue
+        background rgba(33,150,243,0.12)
+        color #2196f3
+
+.stat-info
+    display flex
+    flex-direction column
+
+.stat-label
+    font-size 0.78rem
+    color #64748b
+    margin-bottom 0.15rem
+
+.stat-value
+    font-size 1.1rem
+    font-weight 700
+    color #e2e8f0
 
 .details-grid
     display grid

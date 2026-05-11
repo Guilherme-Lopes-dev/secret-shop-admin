@@ -1,3 +1,45 @@
+import type { CollectorInventoryItem } from './collectorsSelection'
+
+export const DOTA2_RARITIES = [
+    'Common',
+    'Uncommon',
+    'Rare',
+    'Mythical',
+    'Legendary',
+    'Immortal',
+    'Arcana',
+    'Ancient',
+    'Prismatic',
+] as const
+
+export type Dota2Rarity = (typeof DOTA2_RARITIES)[number]
+
+export function getRarityFromType(type: string | null): Dota2Rarity | null {
+    if (!type) return null
+    const firstWord = type.trim().split(/\s+/)[0] ?? ''
+    return (
+        (DOTA2_RARITIES.find(
+            (r) => r.toLowerCase() === firstWord.toLowerCase(),
+        ) as Dota2Rarity) ?? null
+    )
+}
+
+export function isMythicalBundle(item: CollectorInventoryItem): boolean {
+    const t = (item.type ?? '').toLowerCase()
+    return t.includes('mythical') && t.includes('bundle')
+}
+
+export function isMythicalWearable(item: CollectorInventoryItem): boolean {
+    const t = (item.type ?? '').toLowerCase()
+    return t.includes('mythical') && t.includes('wearable')
+}
+
+export function isBundle(item: CollectorInventoryItem): boolean {
+    return (item.type ?? '').toLowerCase().includes('bundle')
+}
+
+// ── Hero map (kept for review step) ──────────────────────────────────────────
+
 interface ItemSetEntry {
     hero: string
     market_hash_name: string
@@ -164,18 +206,16 @@ const ITEM_SET_LIST: ItemSetEntry[] = [
     { hero: '', market_hash_name: 'White Widow' },
     { hero: '', market_hash_name: 'Angel of the Abyss' },
     { hero: '', market_hash_name: 'Blinding Bastion' },
-    { hero: '', market_hash_name: 'Harrow’s Harvest' },
+    { hero: '', market_hash_name: 'Harrow\'s Harvest' },
     { hero: '', market_hash_name: 'Seed of Strife' },
     { hero: '', market_hash_name: 'Laurels of the Dawnstar' },
-    { hero: '', market_hash_name: 'Sodbustin’ Saboteurs' },
+    { hero: '', market_hash_name: 'Sodbustin\' Saboteurs' },
     { hero: '', market_hash_name: 'Sins of the Simian Sovereign' },
     { hero: '', market_hash_name: 'Worship of the Whispered Wing' },
     { hero: '', market_hash_name: 'Cunning Counterfelt' },
     { hero: '', market_hash_name: 'Fluid Frenzy' },
-    { hero: '', market_hash_name: 'Stone Giant Stronghold' }
+    { hero: '', market_hash_name: 'Stone Giant Stronghold' },
 ]
-
-export const ITEM_SET_ALLOWLIST = new Set(ITEM_SET_LIST.map((i) => i.market_hash_name))
 
 const ITEM_SET_HERO_MAP = new Map(
     ITEM_SET_LIST.map((i) => [i.market_hash_name, i.hero || null]),

@@ -12,7 +12,13 @@ import {
     type CollectorInventoryItem,
     type CollectorInventoryPayload,
 } from '@/utils/collectorsSelection'
-import { ITEM_SET_ALLOWLIST } from '@/utils/collectorsAllowlist'
+import {
+    DOTA2_RARITIES,
+    getRarityFromType,
+    isMythicalBundle,
+    isMythicalWearable,
+    type Dota2Rarity,
+} from '@/utils/collectorsAllowlist'
 
 type CollectorsCacheStore = {
     lastSteamId: string | null
@@ -34,6 +40,10 @@ const loadedFromCache = ref(false)
 const lastError = ref('')
 const selectedItemKeys = ref<string[]>([])
 const cacheStore = ref<CollectorsCacheStore>(createEmptyCacheStore())
+const selectedRarity = ref<Dota2Rarity | ''>('')
+const onlyMythicalBundles = ref(false)
+const onlyMythicalWearables = ref(false)
+const onlyNotTradable = ref(false)
 
 const pageSizeOptions = [20, 50, 100]
 
@@ -45,14 +55,25 @@ const hasCachedCurrentSteamId = computed(
 const openCacheButtonLabel = computed(() => (hasCachedCurrentSteamId.value ? 'Abrir cache' : 'Buscar'))
 
 const filteredItems = computed(() => {
-    const source = (inventory.value?.items ?? []).filter((item) =>
-        ITEM_SET_ALLOWLIST.has(item.marketHashName),
-    )
-    const query = itemSearch.value.trim().toLowerCase()
+    let source = inventory.value?.items ?? []
 
-    if (!query) {
-        return source
+    if (selectedRarity.value) {
+        source = source.filter((item) => getRarityFromType(item.type) === selectedRarity.value)
     }
+
+    if (onlyMythicalBundles.value || onlyMythicalWearables.value) {
+        source = source.filter((item) =>
+            (onlyMythicalBundles.value && isMythicalBundle(item)) ||
+            (onlyMythicalWearables.value && isMythicalWearable(item)),
+        )
+    }
+
+    if (onlyNotTradable.value) {
+        source = source.filter((item) => !item.tradable)
+    }
+
+    const query = itemSearch.value.trim().toLowerCase()
+    if (!query) return source
 
     return source.filter((item) =>
         [
@@ -314,7 +335,7 @@ const prevPage = () => {
     }
 }
 
-watch([itemSearch, limit], () => {
+watch([itemSearch, limit, selectedRarity, onlyMythicalBundles, onlyMythicalWearables, onlyNotTradable], () => {
     currentPage.value = 1
 })
 
@@ -408,6 +429,31 @@ onMounted(() => {
                     class="search-input"
                 />
             </div>
+
+            <select v-model="selectedRarity" class="filter-select">
+                <option value="">Todas raridades</option>
+                <option v-for="rarity in DOTA2_RARITIES" :key="rarity" :value="rarity">
+                    {{ rarity }}
+                </option>
+            </select>
+
+            <label class="filter-toggle" :class="{ 'filter-toggle--active': onlyMythicalBundles }">
+                <input v-model="onlyMythicalBundles" type="checkbox" class="filter-toggle-checkbox" />
+                <Icon icon="mdi:package-variant-closed" />
+                Mythical Bundle
+            </label>
+
+            <label class="filter-toggle" :class="{ 'filter-toggle--active': onlyMythicalWearables }">
+                <input v-model="onlyMythicalWearables" type="checkbox" class="filter-toggle-checkbox" />
+                <Icon icon="mdi:tshirt-crew-outline" />
+                Mythical Wearable
+            </label>
+
+            <label class="filter-toggle" :class="{ 'filter-toggle--active': onlyNotTradable }">
+                <input v-model="onlyNotTradable" type="checkbox" class="filter-toggle-checkbox" />
+                <Icon icon="mdi:lock-outline" />
+                Not Tradable
+            </label>
 
             <select v-model.number="limit" class="filter-select">
                 <option v-for="pageSize in pageSizeOptions" :key="pageSize" :value="pageSize">
@@ -717,6 +763,31 @@ onMounted(() => {
 
     option
         background #1a1a1e
+
+.filter-toggle
+    display inline-flex
+    align-items center
+    gap 0.4rem
+    padding 0.65rem 0.9rem
+    border-radius 8px
+    border 1px solid rgba(255,255,255,0.08)
+    background #1a1a1e
+    color #94a3b8
+    font-size 0.88rem
+    cursor pointer
+    user-select none
+    transition all 0.18s
+
+    &--active
+        color #d97706
+        background rgba(217,119,6,0.12)
+        border-color rgba(217,119,6,0.3)
+
+    &:hover
+        border-color rgba(255,255,255,0.18)
+
+.filter-toggle-checkbox
+    display none
 
 .loading-state
     padding 3rem

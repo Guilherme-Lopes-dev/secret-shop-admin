@@ -74,6 +74,11 @@ const routes = [
         component: () => import('@/views/collectors/CollectorsReview.vue'),
       },
       {
+        path: 'collectors/catalog',
+        name: 'collectors-catalog',
+        component: () => import('@/views/collectors/CollectorsCatalog.vue'),
+      },
+      {
         path: 'collector-orders',
         name: 'collector-orders',
         component: () => import('@/views/collector-orders/CollectorOrdersList.vue'),

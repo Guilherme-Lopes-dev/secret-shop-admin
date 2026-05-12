@@ -57,7 +57,7 @@ export function readCollectorReviewSelection(): CollectorReviewSelection | null 
   }
 
   try {
-    const raw = window.sessionStorage.getItem(REVIEW_STORAGE_KEY)
+    const raw = window.localStorage.getItem(REVIEW_STORAGE_KEY)
     if (!raw) {
       return null
     }
@@ -100,7 +100,7 @@ export function saveCollectorReviewSelection(selection: CollectorReviewSelection
     return
   }
 
-  window.sessionStorage.setItem(REVIEW_STORAGE_KEY, JSON.stringify(selection))
+  window.localStorage.setItem(REVIEW_STORAGE_KEY, JSON.stringify(selection))
 }
 
 export function clearCollectorReviewSelection() {
@@ -108,5 +108,5 @@ export function clearCollectorReviewSelection() {
     return
   }
 
-  window.sessionStorage.removeItem(REVIEW_STORAGE_KEY)
+  window.localStorage.removeItem(REVIEW_STORAGE_KEY)
 }

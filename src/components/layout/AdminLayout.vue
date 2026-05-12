@@ -16,13 +16,15 @@ const navItems = [
     { label: 'Usuários', icon: 'mdi:account-group-outline', to: '/users', name: 'users' },
     { label: 'Trade Offers', icon: 'mdi:swap-horizontal', to: '/trade-offers', name: 'trade-offers' },
     { label: 'Inventário', icon: 'mdi:sword', to: '/inventory', name: 'inventory' },
-    { label: 'Collectors', icon: 'mdi:trophy-outline', to: '/collectors', name: 'collectors' },
+    { label: 'Collectors', icon: 'mdi:trophy-outline', to: '/collectors', name: 'collectors', exact: true },
+    { label: 'Catálogo Col.', icon: 'mdi:trophy-variant-outline', to: '/collectors/catalog', name: 'collectors-catalog', exact: false },
     { label: 'Pedidos Collector', icon: 'mdi:receipt-text-outline', to: '/collector-orders', name: 'collector-orders' },
     // { label: 'Add Produto', icon: 'mdi:plus-circle-outline', to: '/products/create', name: 'create-product' },
 ]
 
 const isActive = (item: typeof navItems[0]) => {
     if (item.name === 'dashboard') return route.path === '/'
+    if ((item as any).exact) return route.path === item.to || route.path === item.to + '/'
     return route.path.startsWith(item.to)
 }
 

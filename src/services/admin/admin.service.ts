@@ -153,6 +153,35 @@ export const adminService = {
     return api.patch(`/admin/notifications/read-all?types=${collectorNotificationTypes}`)
   },
 
+  // Collectors catalog
+  async getCollectors(params: {
+    page?: number
+    limit?: number
+    steamId?: string
+    search?: string
+    minPrice?: number
+    maxPrice?: number
+  } = {}) {
+    const p = new URLSearchParams({ page: String(params.page ?? 1), limit: String(params.limit ?? 20) })
+    if (params.steamId) p.append('steamId', params.steamId)
+    if (params.search) p.append('search', params.search)
+    if (params.minPrice !== undefined) p.append('minPrice', String(params.minPrice))
+    if (params.maxPrice !== undefined) p.append('maxPrice', String(params.maxPrice))
+    return api.get(`/collectors/admin?${p}`)
+  },
+
+  async updateCollectorPrice(uuid: string, price: number | null) {
+    return api.patch(`/collectors/admin/${uuid}/price`, { price })
+  },
+
+  async updateCollectorHero(uuid: string, heroSlug: string | null) {
+    return api.patch(`/collectors/admin/${uuid}/hero`, { heroSlug })
+  },
+
+  async deleteCollector(uuid: string) {
+    return api.delete(`/collectors/admin/${uuid}`)
+  },
+
   // Collectors
   async bulkUpsertCollectors(payload: {
     steamId: string

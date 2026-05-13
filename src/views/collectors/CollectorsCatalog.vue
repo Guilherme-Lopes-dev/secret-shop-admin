@@ -38,6 +38,10 @@ const search = ref('')
 const steamIdFilter = ref('')
 const minPriceInput = ref('')
 const maxPriceInput = ref('')
+const noPriceOnly = ref(false)
+
+const bulkPriceInput = ref('')
+const bulkSaving = ref(false)
 
 const heroes = ref<DotaHero[]>([])
 const heroValues = ref<Record<string, string>>({})
@@ -66,6 +70,7 @@ async function load() {
         const max = parseInt(maxPriceInput.value, 10)
         if (!isNaN(min) && min >= 0) params.minPrice = min
         if (!isNaN(max) && max >= 0) params.maxPrice = max
+        if (noPriceOnly.value) params.noPrice = true
 
         const res = await adminService.getCollectors(params)
         const data = (res as any).data ?? res
@@ -158,6 +163,34 @@ async function saveHero(item: CollectorItem) {
     }
 }
 
+async function bulkApplyPrice() {
+    const raw = String(bulkPriceInput.value ?? '').trim()
+    const price = parseInt(raw, 10)
+    if (!raw || isNaN(price) || price < 0) {
+        toast.error('Preço inválido.')
+        return
+    }
+    bulkSaving.value = true
+    try {
+        const results = await Promise.allSettled(
+            items.value.map((item, idx) =>
+                adminService.updateCollectorPrice(item.id, price).then(() => {
+                    if (items.value[idx]) items.value[idx]!.price = price
+                })
+            )
+        )
+        const ok = results.filter(r => r.status === 'fulfilled').length
+        const fail = results.filter(r => r.status === 'rejected').length
+        if (ok > 0) {
+            toast.success(`Preço aplicado em ${ok} iten${ok !== 1 ? 's' : ''}.`)
+            bulkPriceInput.value = ''
+        }
+        if (fail > 0) toast.error(`${fail} iten${fail !== 1 ? 's' : ''} falharam.`)
+    } finally {
+        bulkSaving.value = false
+    }
+}
+
 function applyFilters() {
     page.value = 1
     load()
@@ -235,9 +268,38 @@ onMounted(async () => {
                     Filtrar
                 </button>
 
+                <label class="filter-checkbox">
+                    <input type="checkbox" v-model="noPriceOnly" @change="applyFilters" />
+                    Sem preço
+                </label>
+
                 <select v-model.number="limit" class="filter-select">
                     <option v-for="s in pageSizeOptions" :key="s" :value="s">{{ s }} por página</option>
                 </select>
+            </div>
+
+            <div class="bulk-price-row">
+                <Icon icon="mdi:tag-multiple-outline" class="bulk-icon" />
+                <span class="bulk-label">Preço em bulk:</span>
+                <input
+                    v-model="bulkPriceInput"
+                    type="number"
+                    min="0"
+                    placeholder="centavos"
+                    class="price-input price-input--sm"
+                    @keyup.enter="bulkApplyPrice"
+                />
+                <span v-if="bulkPriceInput && !isNaN(parseInt(bulkPriceInput, 10))" class="bulk-preview">
+                    {{ formatCurrency(parseInt(bulkPriceInput, 10)) }}
+                </span>
+                <button
+                    class="btn-primary btn-primary--bulk"
+                    :disabled="bulkSaving || !bulkPriceInput || items.length === 0"
+                    @click="bulkApplyPrice"
+                >
+                    <Icon :icon="bulkSaving ? 'mdi:loading' : 'mdi:tag-check-outline'" :class="{ spinning: bulkSaving }" />
+                    Aplicar em {{ items.length }} iten{{ items.length !== 1 ? 's' : '' }}
+                </button>
             </div>
 
             <p class="results-meta" v-if="!loading">
@@ -345,7 +407,7 @@ onMounted(async () => {
                                             </button>
                                         </div>
                                         <small v-if="editingValues[itemKey(item)]" class="price-preview">
-                                            {{ formatCurrency(parseInt(editingValues[itemKey(item)], 10)) }}
+                                            {{ formatCurrency(parseInt(editingValues[itemKey(item)]!, 10)) }}
                                         </small>
                                     </template>
                                     <template v-else>
@@ -517,6 +579,57 @@ onMounted(async () => {
     &:disabled
         opacity 0.6
         cursor not-allowed
+
+.filter-checkbox
+    display flex
+    align-items center
+    gap 0.4rem
+    color #94a3b8
+    font-size 0.88rem
+    cursor pointer
+    white-space nowrap
+    user-select none
+
+    input[type="checkbox"]
+        accent-color #6366f1
+        width 16px
+        height 16px
+        cursor pointer
+
+.bulk-price-row
+    display flex
+    align-items center
+    gap 0.75rem
+    margin-top 0.75rem
+    padding-top 0.75rem
+    border-top 1px solid rgba(255,255,255,0.05)
+    flex-wrap wrap
+
+.bulk-icon
+    color #f59e0b
+    font-size 1.1rem
+    flex-shrink 0
+
+.bulk-label
+    color #94a3b8
+    font-size 0.88rem
+    white-space nowrap
+
+.bulk-preview
+    color #4ade80
+    font-size 0.82rem
+    font-weight 700
+    white-space nowrap
+
+.price-input--sm
+    width 160px
+
+.btn-primary--bulk
+    background #f59e0b
+    color #000
+
+    &:hover:not(:disabled)
+        background #d97706
 
 .results-meta
     margin-top 0.75rem

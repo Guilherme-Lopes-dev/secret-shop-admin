@@ -39,9 +39,13 @@ const steamIdFilter = ref('')
 const minPriceInput = ref('')
 const maxPriceInput = ref('')
 const noPriceOnly = ref(false)
+const noHeroOnly = ref(false)
 
 const bulkPriceInput = ref('')
 const bulkSaving = ref(false)
+
+const bulkHeroSlug = ref('')
+const bulkHeroSaving = ref(false)
 
 const heroes = ref<DotaHero[]>([])
 const heroValues = ref<Record<string, string>>({})
@@ -71,6 +75,7 @@ async function load() {
         if (!isNaN(min) && min >= 0) params.minPrice = min
         if (!isNaN(max) && max >= 0) params.maxPrice = max
         if (noPriceOnly.value) params.noPrice = true
+        if (noHeroOnly.value) params.noHero = true
 
         const res = await adminService.getCollectors(params)
         const data = (res as any).data ?? res
@@ -160,6 +165,28 @@ async function saveHero(item: CollectorItem) {
         const next = new Set(heroSavingKeys.value)
         next.delete(key)
         heroSavingKeys.value = next
+    }
+}
+
+async function bulkApplyHero() {
+    const slug = bulkHeroSlug.value || null
+    bulkHeroSaving.value = true
+    try {
+        const results = await Promise.allSettled(
+            items.value.map((item, idx) =>
+                adminService.updateCollectorHero(item.id, slug).then(() => {
+                    if (items.value[idx]) {
+                        heroValues.value[itemKey(items.value[idx]!)] = slug ?? ''
+                    }
+                })
+            )
+        )
+        const ok = results.filter(r => r.status === 'fulfilled').length
+        const fail = results.filter(r => r.status === 'rejected').length
+        if (ok > 0) toast.success(`Hero aplicado em ${ok} iten${ok !== 1 ? 's' : ''}.`)
+        if (fail > 0) toast.error(`${fail} iten${fail !== 1 ? 's' : ''} falharam.`)
+    } finally {
+        bulkHeroSaving.value = false
     }
 }
 
@@ -273,6 +300,11 @@ onMounted(async () => {
                     Sem preço
                 </label>
 
+                <label class="filter-checkbox">
+                    <input type="checkbox" v-model="noHeroOnly" @change="applyFilters" />
+                    Sem hero
+                </label>
+
                 <select v-model.number="limit" class="filter-select">
                     <option v-for="s in pageSizeOptions" :key="s" :value="s">{{ s }} por página</option>
                 </select>
@@ -298,6 +330,25 @@ onMounted(async () => {
                     @click="bulkApplyPrice"
                 >
                     <Icon :icon="bulkSaving ? 'mdi:loading' : 'mdi:tag-check-outline'" :class="{ spinning: bulkSaving }" />
+                    Aplicar em {{ items.length }} iten{{ items.length !== 1 ? 's' : '' }}
+                </button>
+            </div>
+
+            <div class="bulk-price-row">
+                <Icon icon="mdi:sword" class="bulk-icon" />
+                <span class="bulk-label">Hero em bulk:</span>
+                <select v-model="bulkHeroSlug" class="hero-select hero-select--bulk">
+                    <option value="">— sem hero —</option>
+                    <option v-for="hero in heroes" :key="hero.id" :value="hero.slug">
+                        {{ hero.name }}
+                    </option>
+                </select>
+                <button
+                    class="btn-primary btn-primary--bulk-hero"
+                    :disabled="bulkHeroSaving || items.length === 0"
+                    @click="bulkApplyHero"
+                >
+                    <Icon :icon="bulkHeroSaving ? 'mdi:loading' : 'mdi:sword-cross'" :class="{ spinning: bulkHeroSaving }" />
                     Aplicar em {{ items.length }} iten{{ items.length !== 1 ? 's' : '' }}
                 </button>
             </div>
@@ -630,6 +681,18 @@ onMounted(async () => {
 
     &:hover:not(:disabled)
         background #d97706
+
+.btn-primary--bulk-hero
+    background #6366f1
+    color #fff
+
+    &:hover:not(:disabled)
+        background #5457de
+
+.hero-select--bulk
+    max-width 220px
+    padding 0.62rem 0.75rem
+    font-size 0.88rem
 
 .results-meta
     margin-top 0.75rem

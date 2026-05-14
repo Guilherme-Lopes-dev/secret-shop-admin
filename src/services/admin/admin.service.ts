@@ -161,12 +161,16 @@ export const adminService = {
     search?: string
     minPrice?: number
     maxPrice?: number
+    noPrice?: boolean
+    noHero?: boolean
   } = {}) {
     const p = new URLSearchParams({ page: String(params.page ?? 1), limit: String(params.limit ?? 20) })
     if (params.steamId) p.append('steamId', params.steamId)
     if (params.search) p.append('search', params.search)
     if (params.minPrice !== undefined) p.append('minPrice', String(params.minPrice))
     if (params.maxPrice !== undefined) p.append('maxPrice', String(params.maxPrice))
+    if (params.noPrice) p.append('noPrice', 'true')
+    if (params.noHero) p.append('noHero', 'true')
     return api.get(`/collectors/admin?${p}`)
   },
 

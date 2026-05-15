@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import { toast } from 'vue3-toastify'
@@ -26,15 +26,12 @@ type CollectorsCacheStore = {
 }
 
 const STORAGE_KEY = 'secretshop-admin:collectors-cache:v1'
-const DEFAULT_LIMIT = 20
 const MAX_CACHED_INVENTORIES = 2
 
 const router = useRouter()
 const steamIdInput = ref('')
 const itemSearch = ref('')
 const loading = ref(false)
-const currentPage = ref(1)
-const limit = ref(DEFAULT_LIMIT)
 const inventory = ref<CollectorInventoryPayload | null>(null)
 const loadedFromCache = ref(false)
 const lastError = ref('')
@@ -44,8 +41,6 @@ const selectedRarity = ref<Dota2Rarity | ''>('')
 const onlyMythicalBundles = ref(false)
 const onlyMythicalWearables = ref(false)
 const onlyNotTradable = ref(false)
-
-const pageSizeOptions = [20, 50, 100]
 
 const normalizedSteamId = computed(() => steamIdInput.value.trim())
 const hasValidSteamId = computed(() => /^\d{17}$/.test(normalizedSteamId.value))
@@ -87,15 +82,6 @@ const filteredItems = computed(() => {
     )
 })
 
-const totalPages = computed(() =>
-    Math.max(1, Math.ceil(filteredItems.value.length / limit.value)),
-)
-
-const paginatedItems = computed(() => {
-    const start = (currentPage.value - 1) * limit.value
-    return filteredItems.value.slice(start, start + limit.value)
-})
-
 const selectedItems = computed(() => {
     const items = inventory.value?.items ?? []
     const selectedSet = new Set(selectedItemKeys.value)
@@ -105,26 +91,11 @@ const selectedItems = computed(() => {
 const hasSelectedItems = computed(() => selectedItems.value.length > 0)
 
 const areAllVisibleSelected = computed(() => {
-    if (paginatedItems.value.length === 0) {
-        return false
-    }
-
-    return paginatedItems.value.every((item) =>
+    if (filteredItems.value.length === 0) return false
+    return filteredItems.value.every((item) =>
         selectedItemKeys.value.includes(getCollectorItemKey(item)),
     )
 })
-
-const currentRangeStart = computed(() => {
-    if (filteredItems.value.length === 0) {
-        return 0
-    }
-
-    return (currentPage.value - 1) * limit.value + 1
-})
-
-const currentRangeEnd = computed(() =>
-    Math.min(currentPage.value * limit.value, filteredItems.value.length),
-)
 
 const formattedFetchedAt = computed(() => {
     if (!inventory.value?.fetchedAt) {
@@ -211,7 +182,6 @@ function applyInventory(payload: CollectorInventoryPayload, fromCache: boolean) 
     inventory.value = payload
     steamIdInput.value = payload.steamId
     loadedFromCache.value = fromCache
-    currentPage.value = 1
     lastError.value = ''
 
     const storedSelection = readCollectorReviewSelection()
@@ -302,7 +272,7 @@ function toggleItemSelection(item: CollectorInventoryItem) {
 }
 
 function toggleVisibleSelection() {
-    const visibleKeys = paginatedItems.value.map((item) => getCollectorItemKey(item))
+    const visibleKeys = filteredItems.value.map((item) => getCollectorItemKey(item))
 
     if (areAllVisibleSelected.value) {
         selectedItemKeys.value = selectedItemKeys.value.filter((key) => !visibleKeys.includes(key))
@@ -322,28 +292,6 @@ function proceedWithSelected() {
 
     router.push('/collectors/review')
 }
-
-const nextPage = () => {
-    if (currentPage.value < totalPages.value) {
-        currentPage.value += 1
-    }
-}
-
-const prevPage = () => {
-    if (currentPage.value > 1) {
-        currentPage.value -= 1
-    }
-}
-
-watch([itemSearch, limit, selectedRarity, onlyMythicalBundles, onlyMythicalWearables, onlyNotTradable], () => {
-    currentPage.value = 1
-})
-
-watch(totalPages, (value) => {
-    if (currentPage.value > value) {
-        currentPage.value = value
-    }
-})
 
 onMounted(() => {
     cacheStore.value = readCacheStore()
@@ -455,11 +403,6 @@ onMounted(() => {
                 Not Tradable
             </label>
 
-            <select v-model.number="limit" class="filter-select">
-                <option v-for="pageSize in pageSizeOptions" :key="pageSize" :value="pageSize">
-                    {{ pageSize }} por pagina
-                </option>
-            </select>
         </div>
 
         <section class="section">
@@ -471,8 +414,7 @@ onMounted(() => {
             <div v-else-if="inventory">
                 <div class="list-meta">
                     <span>
-                        Mostrando {{ currentRangeStart }}-{{ currentRangeEnd }} de {{ filteredItems.length }}
-                        item{{ filteredItems.length !== 1 ? 's' : '' }}
+                        {{ filteredItems.length }} item{{ filteredItems.length !== 1 ? 's' : '' }}
                     </span>
                     <div class="list-actions">
                         <span>{{ selectedItems.length }} selecionado{{ selectedItems.length !== 1 ? 's' : '' }}</span>
@@ -495,7 +437,7 @@ onMounted(() => {
                                     <input
                                         type="checkbox"
                                         :checked="areAllVisibleSelected"
-                                        :disabled="paginatedItems.length === 0"
+                                        :disabled="filteredItems.length === 0"
                                         @change="toggleVisibleSelection"
                                     />
                                 </th>
@@ -509,7 +451,7 @@ onMounted(() => {
                         </thead>
                         <tbody>
                             <tr
-                                v-for="item in paginatedItems"
+                                v-for="item in filteredItems"
                                 :key="getCollectorItemKey(item)"
                                 :class="{ 'row-selected': isItemSelected(item) }"
                             >
@@ -558,7 +500,7 @@ onMounted(() => {
                                 </td>
                             </tr>
 
-                            <tr v-if="paginatedItems.length === 0">
+                            <tr v-if="filteredItems.length === 0">
                                 <td colspan="7" class="empty-state">
                                     Nenhum item encontrado para esse filtro.
                                 </td>
@@ -567,11 +509,7 @@ onMounted(() => {
                     </table>
                 </div>
 
-                <div class="pagination" v-if="totalPages > 1">
-                    <button class="page-btn" :disabled="currentPage === 1" @click="prevPage">Anterior</button>
-                    <span class="page-info">Pagina {{ currentPage }} de {{ totalPages }}</span>
-                    <button class="page-btn" :disabled="currentPage === totalPages" @click="nextPage">Proxima</button>
-                </div>
+
             </div>
 
             <div v-else class="empty-panel">
@@ -959,34 +897,6 @@ tr:hover td
     margin-bottom 0.75rem
     color #f59e0b
 
-.pagination
-    display flex
-    justify-content flex-end
-    align-items center
-    gap 1rem
-    padding-top 1rem
-    border-top 1px solid rgba(255,255,255,0.05)
-
-.page-btn
-    background #2a2a30
-    color #fff
-    border 1px solid rgba(255,255,255,0.1)
-    padding 0.45rem 1rem
-    border-radius 6px
-    cursor pointer
-    font-size 0.85rem
-    transition all 0.2s
-
-    &:hover:not(:disabled)
-        background #3a3a42
-
-    &:disabled
-        opacity 0.4
-        cursor not-allowed
-
-.page-info
-    color #94a3b8
-    font-size 0.85rem
 
 @media (max-width: 900px)
     .hero-controls

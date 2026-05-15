@@ -112,12 +112,12 @@ async function submit() {
     submitProgress.value = { current: 0, total: chunks.length }
 
     try {
-        for (let i = 0; i < chunks.length; i++) {
-            submitProgress.value = { current: i + 1, total: chunks.length }
+        for (const [index, chunk] of chunks.entries()) {
+            submitProgress.value = { current: index + 1, total: chunks.length }
             await adminService.bulkUpsertCollectors({
                 steamId: steamId.value,
                 botId: botId.value ?? null,
-                items: chunks[i],
+                items: chunk,
             })
         }
         clearCollectorReviewSelection()

@@ -23,6 +23,9 @@ const heroSelects = ref<Record<string, string>>({})
 const heroes = ref<DotaHero[]>([])
 const isSubmitting = ref(false)
 const submitError = ref<string | null>(null)
+const submitProgress = ref<{ current: number; total: number } | null>(null)
+
+const CHUNK_SIZE = 200
 
 const parseCents = (value: string): number | undefined => {
     if (!value) return undefined
@@ -84,34 +87,46 @@ async function submit() {
     submitError.value = null
     isSubmitting.value = true
 
+    const allItems = items.value.map((item) => ({
+        assetId: item.assetId,
+        classId: item.classId,
+        instanceId: item.instanceId,
+        name: item.name,
+        marketHashName: item.marketHashName,
+        type: item.type ?? null,
+        iconUrl: item.iconUrl ?? null,
+        iconUrlLarge: item.iconUrlLarge ?? null,
+        amount: item.amount,
+        tradable: item.tradable,
+        marketable: item.marketable,
+        commodity: item.commodity,
+        price: parseCents(priceInputs.value[getCollectorItemKey(item)] ?? '') ?? null,
+        heroSlug: heroSelects.value[getCollectorItemKey(item)] || undefined,
+    }))
+
+    const chunks: typeof allItems[] = []
+    for (let i = 0; i < allItems.length; i += CHUNK_SIZE) {
+        chunks.push(allItems.slice(i, i + CHUNK_SIZE))
+    }
+
+    submitProgress.value = { current: 0, total: chunks.length }
+
     try {
-        const payload = buildPayload()
-        await adminService.bulkUpsertCollectors({
-            steamId: payload.steamId,
-            botId: payload.botId,
-            items: payload.items.map((item) => ({
-                assetId: item.assetId,
-                classId: item.classId,
-                instanceId: item.instanceId,
-                name: item.name,
-                marketHashName: item.marketHashName,
-                type: item.type,
-                iconUrl: item.iconUrl,
-                iconUrlLarge: item.iconUrlLarge,
-                amount: item.amount,
-                tradable: item.tradable,
-                marketable: item.marketable,
-                commodity: item.commodity,
-                price: item.price ?? undefined,
-                heroSlug: heroSelects.value[getCollectorItemKey(item)] || undefined,
-            })),
-        })
+        for (let i = 0; i < chunks.length; i++) {
+            submitProgress.value = { current: i + 1, total: chunks.length }
+            await adminService.bulkUpsertCollectors({
+                steamId: steamId.value,
+                botId: botId.value ?? null,
+                items: chunks[i],
+            })
+        }
         clearCollectorReviewSelection()
         router.push('/collectors')
     } catch (err: unknown) {
         submitError.value = err instanceof Error ? err.message : 'Erro ao salvar collectors.'
     } finally {
         isSubmitting.value = false
+        submitProgress.value = null
     }
 }
 
@@ -212,7 +227,7 @@ onMounted(async () => {
 
                 <button class="btn-submit" :disabled="isSubmitting" @click="submit">
                     <Icon :icon="isSubmitting ? 'mdi:loading' : 'mdi:content-save-outline'" :class="{ spin: isSubmitting }" />
-                    {{ isSubmitting ? 'Salvando...' : 'Salvar Collectors' }}
+                    {{ isSubmitting ? (submitProgress ? `Lote ${submitProgress.current}/${submitProgress.total}...` : 'Salvando...') : 'Salvar Collectors' }}
                 </button>
             </div>
         </div>

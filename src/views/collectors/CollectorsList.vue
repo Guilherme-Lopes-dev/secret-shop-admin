@@ -549,7 +549,9 @@ onMounted(() => {
                                 <td>{{ item.type || '-' }}</td>
                                 <td>
                                     <div class="flags">
-                                        <span class="flag" :class="item.tradable ? 'flag--ok' : 'flag--muted'">Tradable</span>
+                                        <span class="flag" :class="item.tradable ? 'flag--ok' : 'flag--no'">
+                                            {{ item.tradable ? 'Tradable' : 'Non-Tradable' }}
+                                        </span>
                                         <span class="flag" :class="item.marketable ? 'flag--ok' : 'flag--muted'">Marketable</span>
                                         <span class="flag" :class="item.commodity ? 'flag--warn' : 'flag--muted'">Commodity</span>
                                     </div>
@@ -931,6 +933,11 @@ tr:hover td
         color #f59e0b
         background rgba(245,158,11,0.12)
         border 1px solid rgba(245,158,11,0.2)
+
+    &--no
+        color #f87171
+        background rgba(248,113,113,0.1)
+        border 1px solid rgba(248,113,113,0.2)
 
     &--muted
         color #94a3b8

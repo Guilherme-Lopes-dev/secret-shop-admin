@@ -60,6 +60,10 @@ export const adminService = {
     return api.get(`/admin/users/${uuid}`)
   },
 
+  async toggleUserActive(uuid: string) {
+    return api.patch(`/admin/users/${uuid}/toggle-active`)
+  },
+
   // Trade offers
   async getTradeOffers(page: number = 1, limit: number = 20, status?: string) {
     const params = new URLSearchParams({ page: String(page), limit: String(limit) })

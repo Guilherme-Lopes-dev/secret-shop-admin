@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { adminService } from '@/services/admin/admin.service'
 import { formatCurrency } from '@/utils/formatCurrency'
 import { Icon } from '@iconify/vue'
+import { toast } from 'vue3-toastify'
 
 const route = useRoute()
 const router = useRouter()
@@ -21,6 +22,29 @@ const fetchUser = async () => {
         error.value = e?.response?.data?.message || 'Erro ao carregar usuário.'
     } finally {
         loading.value = false
+    }
+}
+
+const toggling = ref(false)
+const confirmingToggle = ref(false)
+
+const toggleActive = async () => {
+    if (!user.value) return
+    if (!confirmingToggle.value) {
+        confirmingToggle.value = true
+        return
+    }
+
+    confirmingToggle.value = false
+    toggling.value = true
+    try {
+        const response = await adminService.toggleUserActive(route.params.uuid as string)
+        user.value = { ...user.value, is_active: response.data.is_active }
+        toast.success(response.data.is_active ? 'Usuário ativado.' : 'Usuário desativado.')
+    } catch (e: any) {
+        toast.error(e?.response?.data?.message || 'Erro ao alterar status do usuário.')
+    } finally {
+        toggling.value = false
     }
 }
 
@@ -58,7 +82,28 @@ onMounted(fetchUser)
                         <span class="status-badge" :class="user.admin ? 'status-admin' : 'status-user'">
                             {{ user.admin ? 'Administrador' : 'Usuário' }}
                         </span>
+                        <span class="status-badge" :class="user.is_active ? 'status-active' : 'status-inactive'">
+                            {{ user.is_active ? 'Ativo' : 'Inativo' }}
+                        </span>
                         <code class="hero-uuid">{{ user.id }}</code>
+                    </div>
+                    <div class="toggle-action">
+                        <button
+                            class="btn-toggle-active"
+                            :class="{ 'btn-danger': user.is_active && !confirmingToggle, 'btn-success': !user.is_active && !confirmingToggle, 'btn-confirm': confirmingToggle }"
+                            :disabled="toggling"
+                            @click="toggleActive"
+                        >
+                            <Icon :icon="confirmingToggle ? 'mdi:alert' : user.is_active ? 'mdi:account-cancel' : 'mdi:account-check'" />
+                            {{ toggling ? 'Aguarde...' : confirmingToggle ? 'Confirmar?' : user.is_active ? 'Desativar usuário' : 'Ativar usuário' }}
+                        </button>
+                        <button
+                            v-if="confirmingToggle"
+                            class="btn-toggle-active btn-cancel"
+                            @click="confirmingToggle = false"
+                        >
+                            Cancelar
+                        </button>
                     </div>
                 </div>
             </div>
@@ -399,6 +444,64 @@ table
 .status-user
     background rgba(148,163,184,0.08)
     color #94a3b8
+
+.status-active
+    background rgba(76,175,80,0.12)
+    color #4caf50
+
+.status-inactive
+    background rgba(244,67,54,0.12)
+    color #f44336
+
+.toggle-action
+    display flex
+    align-items center
+    gap 0.5rem
+    margin-top 0.75rem
+
+.btn-toggle-active
+    display inline-flex
+    align-items center
+    gap 0.4rem
+    padding 0.45rem 1rem
+    border-radius 8px
+    border none
+    font-size 0.82rem
+    font-weight 600
+    cursor pointer
+    transition all 0.15s
+
+    &:disabled
+        opacity 0.5
+        cursor not-allowed
+
+.btn-danger
+    background rgba(244,67,54,0.12)
+    color #f44336
+
+    &:hover:not(:disabled)
+        background rgba(244,67,54,0.22)
+
+.btn-success
+    background rgba(76,175,80,0.12)
+    color #4caf50
+
+    &:hover:not(:disabled)
+        background rgba(76,175,80,0.22)
+
+.btn-confirm
+    background rgba(255,152,0,0.15)
+    color #ff9800
+
+    &:hover:not(:disabled)
+        background rgba(255,152,0,0.25)
+
+.btn-cancel
+    background rgba(148,163,184,0.08)
+    color #94a3b8
+
+    &:hover
+        background rgba(148,163,184,0.14)
 
 .status-completed
     background rgba(76,175,80,0.1)

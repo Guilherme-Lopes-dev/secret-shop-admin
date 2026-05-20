@@ -23,6 +23,21 @@ export const adminService = {
     return api.get(`/admin/sales/${id}`)
   },
 
+  async getSaleAsaasPayment(uuid: string) {
+    return api.get<{
+      id: string
+      status: string
+      billingType: string
+      value: number
+      netValue?: number | null
+      dueDate: string
+      description?: string | null
+      invoiceUrl?: string | null
+      bankSlipUrl?: string | null
+      transactionReceiptUrl?: string | null
+    }>(`/admin/sales/${uuid}/asaas-payment`)
+  },
+
   async updateSaleStatus(uuid: string, status: string) {
     return api.patch(`/admin/sales/${uuid}/status`, { status })
   },
@@ -221,6 +236,88 @@ export const adminService = {
 
   async toggleSkinPriceLock(skinUuid: string, locked: boolean) {
     return api.patch(`/skins/admin/skin/${skinUuid}/price-lock`, { locked })
+  },
+
+  // Pass config
+  async getPassConfig() {
+    return api.get<{
+      pass_active: boolean
+      points_per_brl: number
+      decay_inactivity_days: number
+      decay_points_per_week: number
+      inactive_from: string | null
+      inactive_until: string | null
+    }>('/admin/passes/config')
+  },
+
+  async setPassConfig(dto: {
+    pass_active?: boolean
+    points_per_brl?: number
+    decay_inactivity_days?: number
+    decay_points_per_week?: number
+    inactive_from?: string
+    inactive_until?: string
+  }) {
+    return api.put('/admin/passes/config', dto)
+  },
+
+  async getPassTiers() {
+    return api.get<Array<{
+      rank: number
+      name: string
+      min_points: number
+      benefits: Array<{ id: string; benefit_type: string; config: Record<string, unknown>; active: boolean; created_at: string }>
+    }>>('/admin/passes/tiers')
+  },
+
+  async createPassBenefit(tierRank: number, benefitType: string, config: Record<string, unknown>) {
+    return api.post(`/admin/passes/tiers/${tierRank}/benefits`, { benefit_type: benefitType, config })
+  },
+
+  async updatePassBenefit(id: string, patch: { active?: boolean; config?: Record<string, unknown> }) {
+    return api.patch(`/admin/passes/benefits/${id}`, patch)
+  },
+
+  async deletePassBenefit(id: string) {
+    return api.delete(`/admin/passes/benefits/${id}`)
+  },
+
+  async setTierThreshold(rank: number, minPoints: number) {
+    return api.put(`/admin/passes/tiers/${rank}/threshold`, { min_points: minPoints })
+  },
+
+  // Collector Sales (admin)
+  async getCollectorSales(params: {
+    page?: number
+    limit?: number
+    payment_status?: string
+    delivery_status?: string
+    search?: string
+  } = {}) {
+    const p = new URLSearchParams({ page: String(params.page ?? 1), limit: String(params.limit ?? 20) })
+    if (params.payment_status) p.append('payment_status', params.payment_status)
+    if (params.delivery_status) p.append('delivery_status', params.delivery_status)
+    if (params.search) p.append('search', params.search)
+    return api.get(`/collector-sales/admin/list?${p}`)
+  },
+
+  async updateCollectorDelivery(uuid: string, deliveryStatus: string, notes?: string) {
+    return api.patch(`/collector-sales/admin/${uuid}/delivery`, {
+      delivery_status: deliveryStatus,
+      ...(notes ? { notes } : {}),
+    })
+  },
+
+  async cancelCollectorSale(uuid: string, refund = false) {
+    return api.post(`/collector-sales/admin/${uuid}/cancel`, { refund })
+  },
+
+  async getCollectorSaleDetail(uuid: string) {
+    return api.get(`/collector-sales/${uuid}`)
+  },
+
+  async getCollectorSaleFriendship(uuid: string) {
+    return api.get(`/collector-sales/${uuid}/friendship`)
   },
 
   // Products

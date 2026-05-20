@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { toast } from 'vue3-toastify'
 import { adminService } from '@/services/admin/admin.service'
 import { formatCurrency } from '@/utils/formatCurrency'
+import { generateSaleReportPdf } from '@/utils/pdf/saleReport'
 import { Icon } from '@iconify/vue'
 
 const route = useRoute()
@@ -14,6 +16,8 @@ const nowTs = ref(Date.now())
 let collectorTimer: number | null = null
 const tradeLinkCopied = ref(false)
 let copyTimer: ReturnType<typeof setTimeout> | null = null
+const exportingPdf = ref(false)
+const fetchingReceipt = ref(false)
 
 function copyTradeLink() {
     if (!sale.value?.users?.trade_link) return
@@ -111,6 +115,49 @@ const collectorReminderCountdown = computed(() => {
     return formatDuration(diff)
 })
 
+const exportPdf = () => {
+    if (!sale.value) return
+    exportingPdf.value = true
+    try {
+        generateSaleReportPdf(sale.value)
+    } catch (err) {
+        console.error('Erro ao gerar PDF:', err)
+        toast.error('Falha ao gerar PDF do relatorio.')
+    } finally {
+        exportingPdf.value = false
+    }
+}
+
+const isPaid = computed(() => String(sale.value?.payment_status || '').toUpperCase() === 'PAID')
+
+const openAsaasReceipt = async () => {
+    if (!sale.value) return
+    if (!sale.value.asaas_payment_id) {
+        toast.warning('Venda nao possui cobranca Asaas vinculada.')
+        return
+    }
+    const saleUuid = sale.value.id || sale.value.uuid || (route.params.id as string)
+    if (!saleUuid) {
+        toast.error('UUID da venda nao disponivel.')
+        return
+    }
+    fetchingReceipt.value = true
+    try {
+        const { data } = await adminService.getSaleAsaasPayment(saleUuid)
+        const url = data?.transactionReceiptUrl || data?.invoiceUrl || data?.bankSlipUrl
+        if (!url) {
+            toast.warning('Asaas nao retornou URL de comprovante.')
+            return
+        }
+        window.open(url, '_blank', 'noopener,noreferrer')
+    } catch (err: any) {
+        console.error('Erro ao buscar comprovante Asaas:', err)
+        toast.error(err?.response?.data?.message || 'Falha ao buscar comprovante no Asaas.')
+    } finally {
+        fetchingReceipt.value = false
+    }
+}
+
 onMounted(async () => {
     await fetchSale()
     collectorTimer = window.setInterval(() => {
@@ -142,6 +189,22 @@ onBeforeUnmount(() => {
                 <span class="status-badge-lg" :class="getStatusClass(sale.payment_status)">
                     {{ formatStatusText(sale.payment_status) }}
                 </span>
+                <div class="hero-actions">
+                    <button class="btn-action" :disabled="exportingPdf" @click="exportPdf">
+                        <Icon icon="mdi:file-pdf-box" />
+                        {{ exportingPdf ? 'Gerando...' : 'Relatorio PDF' }}
+                    </button>
+                    <button
+                        v-if="isPaid"
+                        class="btn-action btn-secondary"
+                        :disabled="fetchingReceipt || !sale.asaas_payment_id"
+                        :title="!sale.asaas_payment_id ? 'Venda sem cobranca Asaas' : ''"
+                        @click="openAsaasReceipt"
+                    >
+                        <Icon icon="mdi:receipt-text-outline" />
+                        {{ fetchingReceipt ? 'Buscando...' : 'Comprovante Asaas' }}
+                    </button>
+                </div>
             </div>
 
             <div class="details-grid">
@@ -378,6 +441,40 @@ onBeforeUnmount(() => {
     gap 1rem
     margin-bottom 1.75rem
     flex-wrap wrap
+
+.hero-actions
+    display flex
+    gap 0.6rem
+    margin-left auto
+    flex-wrap wrap
+
+.btn-action
+    display inline-flex
+    align-items center
+    gap 0.4rem
+    background #6366f1
+    color #fff
+    border none
+    padding 0.55rem 0.95rem
+    border-radius 8px
+    font-size 0.82rem
+    font-weight 600
+    cursor pointer
+    transition background 0.2s, opacity 0.2s
+
+    &:hover:not(:disabled)
+        background #4f46e5
+
+    &:disabled
+        opacity 0.5
+        cursor not-allowed
+
+    &.btn-secondary
+        background rgba(255,255,255,0.06)
+        border 1px solid rgba(255,255,255,0.1)
+
+        &:hover:not(:disabled)
+            background rgba(255,255,255,0.12)
 
 .page-title
     font-size 1.8rem

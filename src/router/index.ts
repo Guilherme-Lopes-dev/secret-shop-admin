@@ -84,9 +84,19 @@ const routes = [
         component: () => import('@/views/collector-orders/CollectorOrdersList.vue'),
       },
       {
+        path: 'collector-orders/:uuid',
+        name: 'collector-order-detail',
+        component: () => import('@/views/collector-orders/CollectorOrderDetail.vue'),
+      },
+      {
         path: 'products/create',
         name: 'create-product',
         component: () => import('@/views/products/CreateProduct.vue'),
+      },
+      {
+        path: 'passes',
+        name: 'passes',
+        component: () => import('@/views/passes/PassConfig.vue'),
       },
     ],
   },

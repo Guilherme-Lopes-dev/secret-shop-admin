@@ -402,11 +402,11 @@ onMounted(fetchSale)
                         <div v-if="friendship?.available" class="kv-grid friendship-meta">
                             <div class="kv">
                                 <span class="kv-label">Steam ID Bot</span>
-                                <span class="kv-value mono small">{{ friendship.bot_steam_id }}</span>
+                                <span class="kv-value mono small">{{ friendship.bot_steamid }}</span>
                             </div>
                             <div class="kv">
                                 <span class="kv-label">Steam ID Comprador</span>
-                                <span class="kv-value mono small">{{ friendship.buyer_steam_id }}</span>
+                                <span class="kv-value mono small">{{ friendship.buyer_steamid }}</span>
                             </div>
                         </div>
                     </div>

@@ -317,7 +317,7 @@ export const adminService = {
   },
 
   async getCollectorSaleFriendship(uuid: string) {
-    return api.get(`/collector-sales/${uuid}/friendship`)
+    return api.get(`/collector-sales/${uuid}/friendship/admin`)
   },
 
   // Products

@@ -10,7 +10,7 @@ const chartInstance = ref<Chart | null>(null)
 const loading = ref(true)
 
 const stats = ref([
-    { label: 'Total de Vendas', value: '...', icon: 'mdi:currency-usd', color: '#4caf50' },
+    { label: 'Vendas Pagas', value: '...', icon: 'mdi:currency-usd', color: '#4caf50' },
     { label: 'Pedidos Realizados', value: '...', icon: 'mdi:cart-outline', color: '#2196f3' },
     { label: 'Novos Usuários', value: '...', icon: 'mdi:account-group', color: '#ff9800' },
     { label: 'Skins Ativas', value: '...', icon: 'mdi:sword', color: '#9c27b0' },
@@ -29,7 +29,7 @@ const fetchDashboardData = async () => {
 
         if (statsRes.data) {
             stats.value = [
-                { label: 'Total de Vendas', value: statsRes.data[0].value, icon: 'mdi:currency-usd', color: '#4caf50' },
+                { label: 'Vendas Pagas', value: statsRes.data[0].value, icon: 'mdi:currency-usd', color: '#4caf50' },
                 { label: 'Pedidos Realizados', value: statsRes.data[1].value, icon: 'mdi:cart-outline', color: '#2196f3' },
                 { label: 'Novos Usuários', value: statsRes.data[2].value, icon: 'mdi:account-group', color: '#ff9800' },
                 { label: 'Skins Ativas', value: statsRes.data[3].value, icon: 'mdi:sword', color: '#9c27b0' },

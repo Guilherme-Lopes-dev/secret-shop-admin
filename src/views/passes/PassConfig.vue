@@ -31,6 +31,8 @@ interface PassConfig {
     points_per_brl:        number
     decay_inactivity_days: number
     decay_points_per_week: number
+    season_start:          string
+    season_end:            string
 }
 
 const TIER_COLORS: Record<number, string> = {
@@ -55,6 +57,8 @@ const config = reactive<PassConfig>({
     points_per_brl:        1,
     decay_inactivity_days: 30,
     decay_points_per_week: 50,
+    season_start:          '',
+    season_end:            '',
 })
 
 const scheduleFrom  = ref('')
@@ -103,6 +107,8 @@ const loadData = async () => {
             config.points_per_brl        = cfgRes.data.points_per_brl
             config.decay_inactivity_days = cfgRes.data.decay_inactivity_days
             config.decay_points_per_week = cfgRes.data.decay_points_per_week
+            config.season_start          = toInputValue(cfgRes.data.season_start)
+            config.season_end            = toInputValue(cfgRes.data.season_end)
             scheduleFrom.value           = toInputValue(cfgRes.data.inactive_from)
             scheduleUntil.value          = toInputValue(cfgRes.data.inactive_until)
         }
@@ -118,10 +124,34 @@ onMounted(loadData)
 
 // ── config ─────────────────────────────────────────────────────
 
+const seasonValidation = computed<{ ok: boolean; reason: string | null }>(() => {
+    if (!config.pass_active) return { ok: true, reason: null }
+    if (!config.season_start) return { ok: false, reason: 'Defina a data de início da season.' }
+    if (!config.season_end)   return { ok: false, reason: 'Defina a data de fim da season.' }
+    if (new Date(config.season_start) >= new Date(config.season_end)) {
+        return { ok: false, reason: 'A data de início deve ser anterior à data de fim.' }
+    }
+    return { ok: true, reason: null }
+})
+
+const canSaveConfig = computed(() => !savingConfig.value && seasonValidation.value.ok)
+
 const saveConfig = async () => {
+    if (!seasonValidation.value.ok) {
+        toast.error(seasonValidation.value.reason ?? 'Preencha os campos obrigatórios.')
+        return
+    }
+
     savingConfig.value = true
     try {
-        await adminService.setPassConfig({ ...config })
+        await adminService.setPassConfig({
+            pass_active:           config.pass_active,
+            points_per_brl:        config.points_per_brl,
+            decay_inactivity_days: config.decay_inactivity_days,
+            decay_points_per_week: config.decay_points_per_week,
+            season_start:          config.season_start ? toISOValue(config.season_start) : null,
+            season_end:            config.season_end   ? toISOValue(config.season_end)   : null,
+        })
         toast.success(config.pass_active ? 'Passe ativado e configuração salva.' : 'Passe desativado e configuração salva.')
     } catch (err) {
         toast.error(errorMessage(err, 'Erro ao salvar configuração.'))
@@ -290,6 +320,38 @@ const saveThreshold = async (tier: Tier) => {
                         </button>
                     </div>
                     <div class="config-field">
+                        <label class="field-label">
+                            Início da season
+                            <span v-if="config.pass_active" class="field-required">*</span>
+                        </label>
+                        <input
+                            v-model="config.season_start"
+                            type="datetime-local"
+                            class="field-input field-input--wide"
+                            :class="{ 'field-input--invalid': config.pass_active && !config.season_start }"
+                            :required="config.pass_active"
+                        />
+                    </div>
+                    <div class="config-field">
+                        <label class="field-label">
+                            Fim da season
+                            <span v-if="config.pass_active" class="field-required">*</span>
+                        </label>
+                        <input
+                            v-model="config.season_end"
+                            type="datetime-local"
+                            class="field-input field-input--wide"
+                            :class="{ 'field-input--invalid': config.pass_active && !config.season_end }"
+                            :required="config.pass_active"
+                        />
+                    </div>
+                    <div v-if="seasonValidation.reason" class="config-field config-field--full">
+                        <p class="field-error">
+                            <Icon icon="mdi:alert-circle-outline" />
+                            {{ seasonValidation.reason }}
+                        </p>
+                    </div>
+                    <div class="config-field">
                         <label class="field-label">Pontos por R$ 1,00</label>
                         <input v-model.number="config.points_per_brl" type="number" min="0.1" step="0.1" class="field-input" />
                     </div>
@@ -302,7 +364,7 @@ const saveThreshold = async (tier: Tier) => {
                         <input v-model.number="config.decay_points_per_week" type="number" min="0" class="field-input" />
                     </div>
                     <div class="config-field config-field--action">
-                        <button class="btn-save" :disabled="savingConfig" @click="saveConfig">
+                        <button class="btn-save" :disabled="!canSaveConfig" @click="saveConfig">
                             <Icon v-if="savingConfig" icon="mdi:loading" class="spin" />
                             <Icon v-else icon="mdi:content-save-outline" />
                             {{ savingConfig ? 'Salvando...' : 'Salvar' }}
@@ -521,9 +583,24 @@ const saveThreshold = async (tier: Tier) => {
     &:focus
         border-color rgba(99,102,241,0.5)
 
+    &--invalid
+        border-color rgba(244,63,94,0.5)
+
     &::-webkit-outer-spin-button,
     &::-webkit-inner-spin-button
         -webkit-appearance none
+
+.field-required
+    color #f43f5e
+    margin-left 0.2rem
+
+.field-error
+    display flex
+    align-items center
+    gap 0.35rem
+    font-size 0.78rem
+    color #f43f5e
+    margin 0
 
 .config-field--full
     width 100%

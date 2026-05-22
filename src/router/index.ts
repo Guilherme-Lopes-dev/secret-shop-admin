@@ -98,6 +98,11 @@ const routes = [
         name: 'passes',
         component: () => import('@/views/passes/PassConfig.vue'),
       },
+      {
+        path: 'reports',
+        name: 'reports',
+        component: () => import('@/views/reports/Reports.vue'),
+      },
     ],
   },
   {

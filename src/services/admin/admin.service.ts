@@ -15,8 +15,49 @@ export const adminService = {
     return api.get('/dashboard/recent-orders')
   },
 
-  async getAllSales(page: number = 1, limit: number = 20) {
-    return api.get(`/admin/sales?page=${page}&limit=${limit}`)
+  async getAllSales(
+    page: number = 1,
+    limit: number = 20,
+    filters: { from?: string; to?: string; paymentStatus?: string } = {},
+  ) {
+    const params = new URLSearchParams({ page: String(page), limit: String(limit) })
+    if (filters.from) params.append('from', filters.from)
+    if (filters.to) params.append('to', filters.to)
+    if (filters.paymentStatus) params.append('payment_status', filters.paymentStatus)
+    return api.get(`/admin/sales?${params}`)
+  },
+
+  async exportSalesReport(filters: { from?: string; to?: string; paymentStatus?: string }) {
+    const params = new URLSearchParams()
+    if (filters.from) params.append('from', filters.from)
+    if (filters.to) params.append('to', filters.to)
+    if (filters.paymentStatus) params.append('payment_status', filters.paymentStatus)
+    return api.get<{ data: any[]; total: number; returned: number; capped: boolean }>(
+      `/admin/sales/reports/export?${params}`,
+    )
+  },
+
+  async getBulkAsaasReceipts(filters: { from?: string; to?: string }) {
+    const params = new URLSearchParams()
+    if (filters.from) params.append('from', filters.from)
+    if (filters.to) params.append('to', filters.to)
+    return api.get<{
+      data: Array<{
+        sale_uuid: string
+        order_number: string
+        username: string | null
+        total_amount: number
+        created_at: string
+        asaas_payment_id: string
+        receipt_url: string | null
+        invoice_url: string | null
+        bank_slip_url: string | null
+        customer_cpf_cnpj: string | null
+        customer_name: string | null
+        error: string | null
+      }>
+      total: number
+    }>(`/admin/sales/reports/receipts?${params}`)
   },
 
   async getSaleById(id: string | number) {
@@ -247,6 +288,8 @@ export const adminService = {
       decay_points_per_week: number
       inactive_from: string | null
       inactive_until: string | null
+      season_start: string | null
+      season_end: string | null
     }>('/admin/passes/config')
   },
 
@@ -255,8 +298,10 @@ export const adminService = {
     points_per_brl?: number
     decay_inactivity_days?: number
     decay_points_per_week?: number
-    inactive_from?: string
-    inactive_until?: string
+    inactive_from?: string | null
+    inactive_until?: string | null
+    season_start?: string | null
+    season_end?: string | null
   }) {
     return api.put('/admin/passes/config', dto)
   },

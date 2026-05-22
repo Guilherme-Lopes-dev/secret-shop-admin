@@ -20,6 +20,7 @@ const navItems = [
     { label: 'Catálogo Col.', icon: 'mdi:trophy-variant-outline', to: '/collectors/catalog', name: 'collectors-catalog', exact: false },
     { label: 'Pedidos Collector', icon: 'mdi:receipt-text-outline', to: '/collector-orders', name: 'collector-orders' },
     { label: 'Secret Pass', icon: 'mdi:shield-star-outline', to: '/passes', name: 'passes' },
+    { label: 'Relatórios', icon: 'mdi:file-chart-outline', to: '/reports', name: 'reports' },
     // { label: 'Add Produto', icon: 'mdi:plus-circle-outline', to: '/products/create', name: 'create-product' },
 ]
 

@@ -7,7 +7,6 @@ interface AuthUser {
   username?: string
   avatar?: string
   email?: string
-  admin?: boolean
 }
 
 interface AuthState {
@@ -25,7 +24,6 @@ export const useAuthStore = defineStore('auth', {
 
   getters: {
     isAuthenticated: (state) => state.user !== null,
-    isAdmin: (state) => state.user?.admin === true,
   },
 
   actions: {

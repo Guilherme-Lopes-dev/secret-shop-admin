@@ -16,7 +16,7 @@ const routes = [
   {
     path: '/',
     component: () => import('@/components/layout/AdminLayout.vue'),
-    meta: { requiresAuth: true, requiresAdmin: true },
+    meta: { requiresAuth: true },
     children: [
       {
         path: '',
@@ -137,11 +137,7 @@ router.beforeEach(async (to, _from, next) => {
     return next('/login')
   }
 
-  if (to.meta.requiresAdmin && !authStore.isAdmin) {
-    return next('/login')
-  }
-
-  if (to.name === 'login' && authStore.isAuthenticated && authStore.isAdmin) {
+  if (to.name === 'login' && authStore.isAuthenticated) {
     return next('/')
   }
 

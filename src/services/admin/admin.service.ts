@@ -1,4 +1,5 @@
 import { api } from '@/lib/api/api'
+import type { PassProgressDto } from './types'
 
 const collectorNotificationTypes = 'COLLECTOR_PURCHASE,COLLECTOR_SHIPPING_REMINDER'
 
@@ -329,6 +330,10 @@ export const adminService = {
 
   async setTierThreshold(rank: number, minPoints: number) {
     return api.put(`/admin/passes/tiers/${rank}/threshold`, { min_points: minPoints })
+  },
+
+  async getUserPassProgress(uuid: string) {
+    return api.get<PassProgressDto>(`/admin/passes/users/${uuid}/progress`)
   },
 
   // Collector Sales (admin)

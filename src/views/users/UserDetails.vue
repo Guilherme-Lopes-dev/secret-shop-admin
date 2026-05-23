@@ -5,6 +5,7 @@ import { adminService } from '@/services/admin/admin.service'
 import { formatCurrency } from '@/utils/formatCurrency'
 import { Icon } from '@iconify/vue'
 import { toast } from 'vue3-toastify'
+import UserPassCard from '@/components/passes/UserPassCard.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -128,6 +129,8 @@ onMounted(fetchUser)
                     </div>
                 </div>
             </div>
+
+            <UserPassCard :user-uuid="user.id" />
 
             <div class="details-grid">
                 <div class="section">

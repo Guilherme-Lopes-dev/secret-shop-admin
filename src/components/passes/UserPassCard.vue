@@ -3,7 +3,14 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 import { adminService } from '@/services/admin/admin.service'
 import type { PassProgressDto } from '@/services/admin/types'
-import { formatCurrency } from '@/utils/formatCurrency'
+
+const formatBrl = (value: number | null | undefined): string => {
+  if (value == null) return 'R$ 0,00'
+  return new Intl.NumberFormat('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+  }).format(value)
+}
 
 const props = defineProps<{ userUuid: string }>()
 
@@ -90,7 +97,7 @@ watch(() => props.userUuid, fetchProgress)
         </div>
         <div class="metric">
           <span class="metric__label">Gasto acumulado</span>
-          <span class="metric__value">{{ formatCurrency(data.total_spent_brl) }}</span>
+          <span class="metric__value">{{ formatBrl(data.total_spent_brl) }}</span>
         </div>
         <div class="metric">
           <span class="metric__label">Cashback ativo</span>
@@ -120,7 +127,7 @@ watch(() => props.userUuid, fetchProgress)
 
         <div class="progress-block__footer">
           <span v-if="data.points_to_next_tier !== null">
-            Faltam <strong>{{ formatCurrency(data.points_to_next_tier) }}</strong> em compras p/ próximo tier
+            Faltam <strong>{{ formatBrl(data.points_to_next_tier) }}</strong> em compras p/ próximo tier
             ({{ progressPct }}%)
           </span>
           <span v-else>Tier máximo atingido</span>
@@ -148,7 +155,7 @@ watch(() => props.userUuid, fetchProgress)
             <Icon v-else-if="tier.is_current" icon="mdi:star" width="12" />
           </div>
           <span class="ladder__name">{{ tier.name }}</span>
-          <span class="ladder__min">{{ formatCurrency(tier.min_spent_brl) }}</span>
+          <span class="ladder__min">{{ formatBrl(tier.min_spent_brl) }}</span>
         </div>
       </div>
 

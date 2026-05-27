@@ -54,8 +54,9 @@ const prevPage = () => { if (currentPage.value > 1) fetchSales(currentPage.value
 
 const goToDetail = (uuid: string) => router.push(`/collector-orders/${uuid}`)
 
-const itemName  = (s: any) => s.snapshot_data?.name ?? s.collectors?.name ?? '-'
-const itemImage = (s: any) => s.snapshot_data?.icon_url_large ?? s.collectors?.icon_url_large ?? null
+const line      = (s: any) => s.collector_sales?.[0] ?? null
+const itemName  = (s: any) => line(s)?.snapshot_data?.name ?? line(s)?.collectors?.name ?? '-'
+const itemImage = (s: any) => line(s)?.snapshot_data?.icon_url_large ?? line(s)?.collectors?.icon_url_large ?? null
 
 const paymentBadgeClass = (s: string) => ({
     PENDING:          'badge-pending',
@@ -186,16 +187,16 @@ onMounted(() => fetchSales(1))
                                         <span class="customer-email">{{ sale.users?.email ?? '-' }}</span>
                                     </div>
                                 </td>
-                                <td class="qty-cell">{{ sale.quantity }} × {{ formatCurrency(sale.unit_price) }}</td>
-                                <td class="price-col">{{ formatCurrency(sale.total_price) }}</td>
+                                <td class="qty-cell">{{ line(sale)?.quantity ?? '-' }} × {{ line(sale) ? formatCurrency(line(sale).unit_price) : '-' }}</td>
+                                <td class="price-col">{{ line(sale) ? formatCurrency(line(sale).total_price) : '-' }}</td>
                                 <td>
                                     <span class="status-badge" :class="paymentBadgeClass(sale.payment_status)">
                                         {{ paymentLabel(sale.payment_status) }}
                                     </span>
                                 </td>
                                 <td>
-                                    <span v-if="sale.delivery_status" class="status-badge" :class="deliveryBadgeClass(sale.delivery_status)">
-                                        {{ deliveryLabel(sale.delivery_status) }}
+                                    <span v-if="line(sale)?.delivery_status" class="status-badge" :class="deliveryBadgeClass(line(sale)?.delivery_status ?? null)">
+                                        {{ deliveryLabel(line(sale)?.delivery_status ?? null) }}
                                     </span>
                                     <span v-else class="muted">-</span>
                                 </td>

@@ -403,11 +403,21 @@ onMounted(fetchSale)
                         <div v-if="friendship?.available" class="kv-grid friendship-meta">
                             <div class="kv">
                                 <span class="kv-label">Steam ID Bot</span>
-                                <span class="kv-value mono small">{{ friendship.bot_steamid }}</span>
+                                <a
+                                    :href="`https://steamcommunity.com/profiles/${friendship.bot_steamid}`"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    class="kv-value mono small steam-link"
+                                >{{ friendship.bot_steamid }}</a>
                             </div>
                             <div class="kv">
                                 <span class="kv-label">Steam ID Comprador</span>
-                                <span class="kv-value mono small">{{ friendship.buyer_steamid }}</span>
+                                <a
+                                    :href="`https://steamcommunity.com/profiles/${friendship.buyer_steamid}`"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    class="kv-value mono small steam-link"
+                                >{{ friendship.buyer_steamid }}</a>
                             </div>
                         </div>
                     </div>
@@ -819,6 +829,15 @@ onMounted(fetchSale)
 
     &:hover
         color #818cf8
+
+.steam-link
+    color #a5b4fc
+    text-decoration none
+    transition color 0.15s
+
+    &:hover
+        color #60a5fa
+        text-decoration underline
 
 // ── Notes ─────────────────────────────────────────────────────────────────────
 .notes-text

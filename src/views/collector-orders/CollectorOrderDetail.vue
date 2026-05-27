@@ -47,7 +47,7 @@ const fetchFriendship = async () => {
     friendshipLoading.value = true
     try {
         const res = await adminService.getCollectorSaleFriendship(route.params.uuid as string)
-        friendship.value = res.data
+        friendship.value = res.data?.bots?.[0] ?? null
     } catch {
         friendship.value = null
     } finally {

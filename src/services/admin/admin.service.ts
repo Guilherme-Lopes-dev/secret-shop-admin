@@ -352,7 +352,7 @@ export const adminService = {
   },
 
   async updateCollectorDelivery(uuid: string, deliveryStatus: string, notes?: string) {
-    return api.patch(`/collector-sales/admin/${uuid}/delivery`, {
+    return api.patch(`/collector-sales/admin/lines/${uuid}/delivery`, {
       delivery_status: deliveryStatus,
       ...(notes ? { notes } : {}),
     })

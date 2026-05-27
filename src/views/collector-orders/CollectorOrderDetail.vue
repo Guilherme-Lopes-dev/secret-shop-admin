@@ -11,6 +11,7 @@ const router = useRouter()
 
 const sale    = ref<any>(null)
 const loading = ref(true)
+const line    = computed(() => sale.value?.collector_sales?.[0] ?? null)
 
 // ── Delivery modal ────────────────────────────────────────────────────────────
 const deliveryModal   = ref(false)
@@ -94,8 +95,8 @@ const friendshipDuration = (days: number | null) => {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-const itemName  = () => sale.value?.snapshot_data?.name ?? sale.value?.collectors?.name ?? '-'
-const itemImage = () => sale.value?.snapshot_data?.icon_url_large ?? sale.value?.collectors?.icon_url_large ?? null
+const itemName  = () => line.value?.snapshot_data?.name ?? line.value?.collectors?.name ?? '-'
+const itemImage = () => line.value?.snapshot_data?.icon_url_large ?? line.value?.collectors?.icon_url_large ?? null
 
 const paymentBadgeClass = (s: string) => ({
     PENDING:          'badge-pending',
@@ -135,7 +136,7 @@ const nextDeliveryAction = (): { label: string; status: string } | null => {
     return ({
         AWAITING_SHIPPING: { label: 'Marcar como Enviado',  status: 'SHIPPED'   },
         SHIPPED:           { label: 'Marcar como Entregue', status: 'DELIVERED' },
-    } as Record<string, { label: string; status: string }>)[sale.value.delivery_status] ?? null
+    } as Record<string, { label: string; status: string }>)[line.value?.delivery_status ?? ''] ?? null
 }
 
 const canCancel = () =>
@@ -164,7 +165,7 @@ const confirmDelivery = async () => {
     deliveryLoading.value = true
     try {
         await adminService.updateCollectorDelivery(
-            sale.value.id,
+            line.value?.id ?? '',
             deliveryStatus.value,
             deliveryNotes.value || undefined,
         )
@@ -222,8 +223,8 @@ onMounted(fetchSale)
                             <span class="status-badge" :class="paymentBadgeClass(sale.payment_status)">
                                 {{ paymentLabel(sale.payment_status) }}
                             </span>
-                            <span v-if="sale.delivery_status" class="status-badge" :class="deliveryBadgeClass(sale.delivery_status)">
-                                {{ deliveryLabel(sale.delivery_status) }}
+                            <span v-if="line?.delivery_status" class="status-badge" :class="deliveryBadgeClass(line?.delivery_status ?? null)">
+                                {{ deliveryLabel(line?.delivery_status ?? null) }}
                             </span>
                         </div>
                     </div>
@@ -270,21 +271,21 @@ onMounted(fetchSale)
                             </div>
                             <div class="item-info">
                                 <div class="item-name">{{ itemName() }}</div>
-                                <div class="item-hash">{{ sale.snapshot_data?.market_hash_name }}</div>
+                                <div class="item-hash">{{ line?.snapshot_data?.market_hash_name }}</div>
                             </div>
                         </div>
                         <div class="kv-grid">
                             <div class="kv">
                                 <span class="kv-label">Steam ID</span>
-                                <span class="kv-value mono">{{ sale.snapshot_data?.steam_id ?? '-' }}</span>
+                                <span class="kv-value mono">{{ line?.snapshot_data?.steam_id ?? '-' }}</span>
                             </div>
                             <div class="kv">
                                 <span class="kv-label">Asset ID</span>
-                                <span class="kv-value mono">{{ sale.snapshot_data?.asset_id ?? '-' }}</span>
+                                <span class="kv-value mono">{{ line?.snapshot_data?.asset_id ?? '-' }}</span>
                             </div>
                             <div class="kv">
                                 <span class="kv-label">Collector UUID</span>
-                                <span class="kv-value mono small">{{ sale.collectors?.id ?? '-' }}</span>
+                                <span class="kv-value mono small">{{ line?.collectors?.id ?? '-' }}</span>
                             </div>
                         </div>
                     </div>
@@ -295,15 +296,15 @@ onMounted(fetchSale)
                         <div class="kv-grid">
                             <div class="kv">
                                 <span class="kv-label">Quantidade</span>
-                                <span class="kv-value">{{ sale.quantity }}</span>
+                                <span class="kv-value">{{ line?.quantity ?? '-' }}</span>
                             </div>
                             <div class="kv">
                                 <span class="kv-label">Preço Unitário</span>
-                                <span class="kv-value">{{ formatCurrency(sale.unit_price) }}</span>
+                                <span class="kv-value">{{ line ? formatCurrency(line.unit_price) : '-' }}</span>
                             </div>
                             <div class="kv">
                                 <span class="kv-label">Total</span>
-                                <span class="kv-value price-highlight">{{ formatCurrency(sale.total_price) }}</span>
+                                <span class="kv-value price-highlight">{{ line ? formatCurrency(line.total_price) : '-' }}</span>
                             </div>
                             <div class="kv">
                                 <span class="kv-label">Método de Pagamento</span>
@@ -443,18 +444,18 @@ onMounted(fetchSale)
                                     <span class="tl-date">{{ $dayjs(sale.paid_at).format('DD/MM/YYYY HH:mm:ss') }}</span>
                                 </div>
                             </div>
-                            <div class="timeline-item" v-if="sale.shipped_at">
+                            <div class="timeline-item" v-if="line?.shipped_at">
                                 <Icon icon="mdi:truck-outline" class="tl-icon tl-shipped" />
                                 <div>
                                     <span class="tl-label">Enviado</span>
-                                    <span class="tl-date">{{ $dayjs(sale.shipped_at).format('DD/MM/YYYY HH:mm:ss') }}</span>
+                                    <span class="tl-date">{{ $dayjs(line?.shipped_at).format('DD/MM/YYYY HH:mm:ss') }}</span>
                                 </div>
                             </div>
-                            <div class="timeline-item" v-if="sale.delivered_at">
+                            <div class="timeline-item" v-if="line?.delivered_at">
                                 <Icon icon="mdi:package-variant-closed-check" class="tl-icon tl-delivered" />
                                 <div>
                                     <span class="tl-label">Entregue</span>
-                                    <span class="tl-date">{{ $dayjs(sale.delivered_at).format('DD/MM/YYYY HH:mm:ss') }}</span>
+                                    <span class="tl-date">{{ $dayjs(line?.delivered_at).format('DD/MM/YYYY HH:mm:ss') }}</span>
                                 </div>
                             </div>
                             <div class="timeline-item" v-if="sale.cancelled_at">

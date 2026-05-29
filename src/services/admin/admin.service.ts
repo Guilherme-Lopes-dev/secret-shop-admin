@@ -1,5 +1,27 @@
 import { api } from '@/lib/api/api'
-import type { PassProgressDto } from './types'
+import type {
+  DiscordAssignRolePayload,
+  DiscordBotChannelDto,
+  DiscordAuditLogDto,
+  DiscordBotGuildDto,
+  DiscordChannelDto,
+  DiscordCreateChannelPayload,
+  DiscordCreateRolePayload,
+  DiscordCreateWebhookPayload,
+  DiscordGuildDto,
+  DiscordHealthDto,
+  DiscordMeDto,
+  DiscordMemberDto,
+  DiscordModerationPayload,
+  DiscordQueuedResponse,
+  DiscordRoleDto,
+  DiscordSendMessagePayload,
+  DiscordSlashCommandPayload,
+  DiscordUpdateChannelPayload,
+  DiscordUpdateRolePayload,
+  DiscordWebhookCreatedDto,
+  PassProgressDto,
+} from './types'
 
 const collectorNotificationTypes = 'COLLECTOR_PURCHASE,COLLECTOR_SHIPPING_REMINDER'
 
@@ -189,6 +211,10 @@ export const adminService = {
 
   async getSteamInventoryBySteamId(steamId: string) {
     return api.get(`/steam/admin/skins/${steamId}`)
+  },
+
+  async getSteamTradeHistory(apiKey: string, cursor?: string) {
+    return api.post('/steam/admin/trade-history', { apiKey, cursor }, { timeout: 120_000 })
   },
 
   // Collector notifications
@@ -390,5 +416,122 @@ export const adminService = {
     trade_cooldown_until?: string
   }) {
     return api.post('/skins/admin/products', dto)
+  },
+
+  // Discord
+  async getDiscordHealth() {
+    return api.get<DiscordHealthDto>('/discord/health')
+  },
+
+  async getDiscordMe() {
+    return api.get<DiscordMeDto>('/discord/me')
+  },
+
+  async unlinkDiscordMe() {
+    return api.delete<{ ok: boolean }>('/discord/me')
+  },
+
+  async getDiscordGuilds() {
+    return api.get<DiscordGuildDto[]>('/admin/discord/guilds')
+  },
+
+  async getDiscordBotGuilds() {
+    return api.get<DiscordBotGuildDto[]>('/admin/discord/bot/guilds')
+  },
+
+  async getDiscordBotChannels(guildId: string) {
+    return api.get<DiscordBotChannelDto[]>(`/admin/discord/bot/guilds/${guildId}/channels`)
+  },
+
+  async getDiscordAllChannels(guildId?: string) {
+    const params = new URLSearchParams()
+    if (guildId) params.append('guildId', guildId)
+    return api.get<DiscordChannelDto[]>(
+      `/admin/discord/channels${params.toString() ? `?${params}` : ''}`,
+    )
+  },
+
+  async getDiscordChannels(guildId: string) {
+    return api.get<DiscordChannelDto[]>(`/admin/discord/guilds/${guildId}/channels`)
+  },
+
+  async getDiscordRoles(guildId: string) {
+    return api.get<DiscordRoleDto[]>(`/admin/discord/guilds/${guildId}/roles`)
+  },
+
+  async getDiscordMembers(guildId: string, search?: string) {
+    const params = new URLSearchParams()
+    if (search) params.append('search', search)
+    return api.get<DiscordMemberDto[]>(
+      `/admin/discord/guilds/${guildId}/members${params.toString() ? `?${params}` : ''}`,
+    )
+  },
+
+  async syncDiscordGuild(guildId: string, queue = true) {
+    return api.post<DiscordQueuedResponse>(`/admin/discord/guilds/${guildId}/sync?queue=${queue}`)
+  },
+
+  async sendDiscordMessage(payload: DiscordSendMessagePayload) {
+    return api.post<DiscordQueuedResponse>('/admin/discord/messages', payload)
+  },
+
+  async createDiscordChannel(payload: DiscordCreateChannelPayload) {
+    return api.post<DiscordChannelDto>('/admin/discord/channels', payload)
+  },
+
+  async updateDiscordChannel(channelId: string, payload: DiscordUpdateChannelPayload) {
+    return api.patch<DiscordChannelDto>(`/admin/discord/channels/${channelId}`, payload)
+  },
+
+  async deleteDiscordChannel(channelId: string) {
+    return api.delete<{ ok: boolean }>(`/admin/discord/channels/${channelId}`)
+  },
+
+  async createDiscordRole(payload: DiscordCreateRolePayload) {
+    return api.post<DiscordRoleDto>('/admin/discord/roles', payload)
+  },
+
+  async updateDiscordRole(guildId: string, roleId: string, payload: DiscordUpdateRolePayload) {
+    return api.patch<DiscordRoleDto>(`/admin/discord/guilds/${guildId}/roles/${roleId}`, payload)
+  },
+
+  async deleteDiscordRole(guildId: string, roleId: string) {
+    return api.delete<{ ok: boolean }>(`/admin/discord/guilds/${guildId}/roles/${roleId}`)
+  },
+
+  async assignDiscordRole(payload: DiscordAssignRolePayload) {
+    return api.post<{ ok: boolean }>('/admin/discord/roles/assign', payload)
+  },
+
+  async removeDiscordRole(payload: DiscordAssignRolePayload) {
+    return api.post<{ ok: boolean }>('/admin/discord/roles/remove', payload)
+  },
+
+  async moderateDiscordMember(payload: DiscordModerationPayload) {
+    return api.post<DiscordQueuedResponse>('/admin/discord/moderation', payload)
+  },
+
+  async registerDiscordSlashCommand(payload: DiscordSlashCommandPayload) {
+    return api.post<{ ok: boolean; registered: unknown[] }>('/admin/discord/slash-commands', payload)
+  },
+
+  async registerDiscordCommandScope(guildId?: string) {
+    const params = new URLSearchParams()
+    if (guildId) params.append('guildId', guildId)
+    return api.post<DiscordQueuedResponse>(
+      `/admin/discord/slash-commands/register-scope${params.toString() ? `?${params}` : ''}`,
+    )
+  },
+
+  async createDiscordWebhook(payload: DiscordCreateWebhookPayload) {
+    return api.post<DiscordWebhookCreatedDto>('/admin/discord/webhooks', payload)
+  },
+
+  async getDiscordAudit(limit = 50) {
+    return api.get<DiscordAuditLogDto[]>(`/admin/discord/audit?limit=${limit}`)
+  },
+
+  async getDiscordMetrics() {
+    return api.get<string>('/admin/discord/metrics')
   },
 }

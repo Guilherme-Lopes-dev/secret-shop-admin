@@ -99,9 +99,19 @@ const routes = [
         component: () => import('@/views/passes/PassConfig.vue'),
       },
       {
+        path: 'discord',
+        name: 'discord',
+        component: () => import('@/views/discord/Discord.vue'),
+      },
+      {
         path: 'reports',
         name: 'reports',
         component: () => import('@/views/reports/Reports.vue'),
+      },
+      {
+        path: 'historico',
+        name: 'historico',
+        component: () => import('@/views/historico/Historico.vue'),
       },
     ],
   },

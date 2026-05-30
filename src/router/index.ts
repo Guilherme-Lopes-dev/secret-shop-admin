@@ -29,6 +29,11 @@ const routes = [
         component: () => import('@/views/sales/SalesList.vue'),
       },
       {
+        path: 'sales/summary',
+        name: 'sales-summary',
+        component: () => import('@/views/sales/SalesSummary.vue'),
+      },
+      {
         path: 'sales/:id',
         name: 'sale-details',
         component: () => import('@/views/sales/SaleDetails.vue'),
@@ -112,6 +117,26 @@ const routes = [
         path: 'historico',
         name: 'historico',
         component: () => import('@/views/historico/Historico.vue'),
+      },
+      {
+        path: 'coupons',
+        name: 'coupons',
+        component: () => import('@/views/coupons/CouponsList.vue'),
+      },
+      {
+        path: 'coupons/new',
+        name: 'coupon-new',
+        component: () => import('@/views/coupons/CouponForm.vue'),
+      },
+      {
+        path: 'coupons/:uuid/edit',
+        name: 'coupon-edit',
+        component: () => import('@/views/coupons/CouponForm.vue'),
+      },
+      {
+        path: 'whatsapp/blast',
+        name: 'whatsapp-blast',
+        component: () => import('@/views/whatsapp/WhatsappBlast.vue'),
       },
     ],
   },

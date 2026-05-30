@@ -12,7 +12,8 @@ const sidebarOpen = ref(true)
 
 const navItems = [
     { label: 'Dashboard', icon: 'mdi:view-dashboard-outline', to: '/', name: 'dashboard' },
-    { label: 'Vendas', icon: 'mdi:cart-outline', to: '/sales', name: 'sales' },
+    { label: 'Vendas', icon: 'mdi:cart-outline', to: '/sales', name: 'sales', exact: true },
+    { label: 'Resumo Vendas', icon: 'mdi:chart-bar', to: '/sales/summary', name: 'sales-summary' },
     { label: 'Usuários', icon: 'mdi:account-group-outline', to: '/users', name: 'users' },
     { label: 'Trade Offers', icon: 'mdi:swap-horizontal', to: '/trade-offers', name: 'trade-offers' },
     { label: 'Inventário', icon: 'mdi:sword', to: '/inventory', name: 'inventory' },
@@ -23,6 +24,8 @@ const navItems = [
     { label: 'Discord', icon: 'mdi:discord', to: '/discord', name: 'discord' },
     { label: 'Relatórios', icon: 'mdi:file-chart-outline', to: '/reports', name: 'reports' },
     { label: 'Histórico', icon: 'mdi:history', to: '/historico', name: 'historico' },
+    { label: 'Cupons', icon: 'mdi:ticket-percent-outline', to: '/coupons', name: 'coupons' },
+    { label: 'WhatsApp Blast', icon: 'mdi:whatsapp', to: '/whatsapp/blast', name: 'whatsapp-blast' },
     // { label: 'Add Produto', icon: 'mdi:plus-circle-outline', to: '/products/create', name: 'create-product' },
 ]
 

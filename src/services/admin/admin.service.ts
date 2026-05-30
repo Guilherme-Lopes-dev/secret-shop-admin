@@ -124,6 +124,7 @@ export const adminService = {
     maxOrders?: number,
     minSpent?: number,
     maxSpent?: number,
+    tierRank?: number,
   ) {
     const params = new URLSearchParams({ page: String(page), limit: String(limit) })
     if (search) params.append('search', search)
@@ -132,6 +133,7 @@ export const adminService = {
     if (maxOrders !== undefined) params.append('maxOrders', String(maxOrders))
     if (minSpent !== undefined) params.append('minSpent', String(minSpent))
     if (maxSpent !== undefined) params.append('maxSpent', String(maxSpent))
+    if (tierRank !== undefined) params.append('tierRank', String(tierRank))
     return api.get(`/admin/users?${params}`)
   },
 
@@ -533,5 +535,51 @@ export const adminService = {
 
   async getDiscordMetrics() {
     return api.get<string>('/admin/discord/metrics')
+  },
+
+  // ── Coupons ─────────────────────────────────────────────────────────────────
+
+  async getCoupons() {
+    return api.get('/coupons')
+  },
+
+  async getCoupon(uuid: string) {
+    return api.get(`/coupons/${uuid}`)
+  },
+
+  async getCouponRedemptions(uuid: string) {
+    return api.get(`/coupons/${uuid}/redemptions`)
+  },
+
+  async createCoupon(data: Record<string, unknown>) {
+    return api.post('/coupons', data)
+  },
+
+  async updateCoupon(uuid: string, data: Record<string, unknown>) {
+    return api.patch(`/coupons/${uuid}`, data)
+  },
+
+  async deleteCoupon(uuid: string) {
+    return api.delete(`/coupons/${uuid}`)
+  },
+
+  // WhatsApp Blast
+  async previewWhatsappBlast(segment: string, limit: number, tierRank?: number) {
+    const params = new URLSearchParams({ segment, limit: String(limit) })
+    if (tierRank !== undefined) params.append('tierRank', String(tierRank))
+    return api.get<Array<{
+      id: string
+      username: string | null
+      email: string | null
+      contact: string
+      sales_count: number
+      total_spent: number
+      tier_rank: number
+      tier_name: string
+    }>>(`/admin/whatsapp/blast/preview?${params}`)
+  },
+
+  async sendWhatsappBlast(userUuids: string[], message: string) {
+    return api.post<{ queued: number }>('/admin/whatsapp/blast', { userUuids, message })
   },
 }

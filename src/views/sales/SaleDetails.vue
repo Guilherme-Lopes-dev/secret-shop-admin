@@ -227,6 +227,22 @@ onBeforeUnmount(() => {
                             <label>Criado em</label>
                             <p>{{ $dayjs(sale.created_at).format('DD/MM/YYYY HH:mm:ss') }}</p>
                         </div>
+                        <div v-if="sale.coupon" class="info-group coupon-group">
+                            <label>Cupom usado</label>
+                            <div class="coupon-card">
+                                <div class="coupon-header">
+                                    <code class="coupon-code">{{ sale.coupon.code }}</code>
+                                    <span class="coupon-discount">
+                                        {{ sale.coupon.discount_type === 'percentage' ? `${sale.coupon.discount_value}% off` : `${formatCurrency(sale.coupon.discount_value)} off` }}
+                                    </span>
+                                </div>
+                                <p v-if="sale.coupon.description" class="coupon-description">{{ sale.coupon.description }}</p>
+                                <div class="coupon-meta">
+                                    <span class="coupon-meta-label">Desconto aplicado</span>
+                                    <span class="coupon-meta-value">{{ formatCurrency(sale.coupon_discount_amount) }}</span>
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
                     <div
@@ -563,6 +579,65 @@ onBeforeUnmount(() => {
     &.highlight p
         color #4caf50
         font-size 1.35rem
+
+.coupon-group
+    grid-column 1 / -1
+
+.coupon-card
+    background rgba(76,175,80,0.06)
+    border 1px solid rgba(76,175,80,0.18)
+    border-radius 10px
+    padding 0.85rem 1rem
+    display flex
+    flex-direction column
+    gap 0.55rem
+
+.coupon-header
+    display flex
+    align-items center
+    gap 0.65rem
+    flex-wrap wrap
+
+.coupon-code
+    font-family monospace
+    font-size 0.95rem
+    font-weight 700
+    color #f8fafc
+    background rgba(255,255,255,0.07)
+    padding 0.2rem 0.55rem
+    border-radius 6px
+    letter-spacing 0.05em
+
+.coupon-discount
+    display inline-block
+    font-size 0.78rem
+    font-weight 600
+    padding 0.15rem 0.55rem
+    border-radius 999px
+    color #4ade80
+    background rgba(76,175,80,0.14)
+    border 1px solid rgba(76,175,80,0.25)
+
+.coupon-description
+    margin 0
+    font-size 0.82rem
+    color #94a3b8
+    line-height 1.45
+
+.coupon-meta
+    display flex
+    align-items center
+    justify-content space-between
+    padding-top 0.45rem
+    border-top 1px solid rgba(76,175,80,0.12)
+    font-size 0.82rem
+
+.coupon-meta-label
+    color #64748b
+
+.coupon-meta-value
+    font-weight 600
+    color #4ade80
 
 .collector-reminder-card
     margin-top 1.5rem

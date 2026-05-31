@@ -582,4 +582,8 @@ export const adminService = {
   async sendWhatsappBlast(userUuids: string[], message: string) {
     return api.post<{ queued: number }>('/admin/whatsapp/blast', { userUuids, message })
   },
+
+  async sendWhatsappBlastByPhones(phones: string[], message: string) {
+    return api.post<{ queued: number; skipped: number; invalid: string[] }>('/admin/whatsapp/blast/by-phones', { phones, message })
+  },
 }

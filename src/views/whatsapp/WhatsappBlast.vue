@@ -1,8 +1,11 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import Papa from 'papaparse'
 import { Icon } from '@iconify/vue'
 import { toast } from 'vue3-toastify'
 import { adminService } from '@/services/admin/admin.service'
+
+// ── Types ────────────────────────────────────────────────────────────────────
 
 interface BlastUser {
   id: string
@@ -15,6 +18,19 @@ interface BlastUser {
   tier_name: string
 }
 
+interface CsvContact {
+  id: string
+  phone: string
+  name: string
+}
+
+// ── LocalStorage keys ────────────────────────────────────────────────────────
+
+const LS_CSV_CONTACTS = 'wpp_blast_csv_contacts'
+const LS_SENT_PHONES  = 'wpp_blast_sent_phones'
+
+// ── Constants ────────────────────────────────────────────────────────────────
+
 const TIERS = [
   { rank: 0, name: 'Common',    color: '#B0C3D9' },
   { rank: 1, name: 'Uncommon',  color: '#5E98D9' },
@@ -26,42 +42,43 @@ const TIERS = [
 ]
 
 const SEGMENTS = [
-  { value: 'all', label: 'Todos com WhatsApp', icon: 'mdi:whatsapp' },
-  { value: 'no_purchases', label: 'Sem compras', icon: 'mdi:cart-off' },
-  { value: 'top_buyers', label: 'Maiores compradores', icon: 'mdi:trending-up' },
-  { value: 'low_buyers', label: 'Menores compradores', icon: 'mdi:trending-down' },
+  { value: 'all',          label: 'Todos com WhatsApp',   icon: 'mdi:whatsapp'     },
+  { value: 'no_purchases', label: 'Sem compras',           icon: 'mdi:cart-off'     },
+  { value: 'top_buyers',   label: 'Maiores compradores',   icon: 'mdi:trending-up'  },
+  { value: 'low_buyers',   label: 'Menores compradores',   icon: 'mdi:trending-down'},
 ]
 
-const segment = ref('all')
+// ── Mode ─────────────────────────────────────────────────────────────────────
+
+const mode = ref<'filters' | 'csv'>('filters')
+
+function switchMode(next: 'filters' | 'csv') {
+  mode.value = next
+  selectedIds.value = new Set()
+  result.value = null
+  error.value = null
+}
+
+// ── Filters mode state ───────────────────────────────────────────────────────
+
+const segment      = ref('all')
 const previewLimit = ref(500)
-const tierRank = ref<number | ''>('')
-const message = ref('')
-
-const users = ref<BlastUser[]>([])
-const selectedUuids = ref<Set<string>>(new Set())
+const tierRank     = ref<number | ''>('')
+const users        = ref<BlastUser[]>([])
 const loadingPreview = ref(false)
-const sending = ref(false)
-const result = ref<{ queued: number } | null>(null)
-const error = ref<string | null>(null)
-
-const allSelected = computed(() =>
-  users.value.length > 0 && users.value.every((u) => selectedUuids.value.has(u.id)),
-)
-
-const selectedCount = computed(() => selectedUuids.value.size)
-
-const canSend = computed(() =>
-  selectedCount.value > 0 && message.value.trim().length > 0 && !sending.value,
-)
 
 async function loadPreview() {
   loadingPreview.value = true
   error.value = null
   result.value = null
-  selectedUuids.value = new Set()
+  selectedIds.value = new Set()
 
   try {
-    const res = await adminService.previewWhatsappBlast(segment.value, previewLimit.value, tierRank.value === '' ? undefined : tierRank.value)
+    const res = await adminService.previewWhatsappBlast(
+      segment.value,
+      previewLimit.value,
+      tierRank.value === '' ? undefined : tierRank.value,
+    )
     users.value = res.data
   } catch (e: any) {
     error.value = e?.message ?? 'Erro ao buscar usuários.'
@@ -70,20 +87,184 @@ async function loadPreview() {
   }
 }
 
+// ── Sent phones history ──────────────────────────────────────────────────────
+
+const sentPhones = ref<Set<string>>(new Set())
+
+function loadSentPhones() {
+  try {
+    const raw = localStorage.getItem(LS_SENT_PHONES)
+    if (raw) sentPhones.value = new Set(JSON.parse(raw) as string[])
+  } catch {}
+}
+
+function stripCsvNoise(phone: string): string {
+  return phone.replace(/^'+/, '').trim()
+}
+
+function markPhonesAsSent(phones: string[]) {
+  const next = new Set(sentPhones.value)
+  phones.forEach((p) => next.add(stripCsvNoise(p)))
+  sentPhones.value = next
+  localStorage.setItem(LS_SENT_PHONES, JSON.stringify([...next]))
+}
+
+// ── Shared selection (declared early — used by CSV parse + reset below) ───────
+
+const selectedIds = ref<Set<string>>(new Set())
+
+// ── CSV mode state ───────────────────────────────────────────────────────────
+
+const fileInput       = ref<HTMLInputElement | null>(null)
+const csvFileName     = ref('')
+const csvHeaders      = ref<string[]>([])
+const csvPreviewRows  = ref<Record<string, string>[]>([])
+const csvAllRows      = ref<Record<string, string>[]>([])
+const csvPhoneCol1    = ref('')
+const csvPhoneCol2    = ref('')
+const csvNameColumn   = ref('')
+const csvContacts     = ref<CsvContact[]>([])
+const csvMapped       = ref(false)
+
+function triggerFileInput() {
+  fileInput.value?.click()
+}
+
+function handleDragOver(e: DragEvent) {
+  e.preventDefault()
+}
+
+function handleDrop(e: DragEvent) {
+  e.preventDefault()
+  const file = e.dataTransfer?.files?.[0]
+  if (file) parseCsvFile(file)
+}
+
+function handleFileChange(e: Event) {
+  const file = (e.target as HTMLInputElement).files?.[0]
+  if (file) parseCsvFile(file)
+}
+
+function parseCsvFile(file: File) {
+  csvFileName.value = file.name
+  csvHeaders.value = []
+  csvPreviewRows.value = []
+  csvAllRows.value = []
+  csvPhoneCol1.value = ''
+  csvPhoneCol2.value = ''
+  csvNameColumn.value = ''
+  csvContacts.value = []
+  csvMapped.value = false
+  selectedIds.value = new Set()
+
+  Papa.parse<Record<string, string>>(file, {
+    header: true,
+    skipEmptyLines: true,
+    complete(results) {
+      csvHeaders.value = results.meta.fields ?? []
+      csvAllRows.value = results.data
+      csvPreviewRows.value = results.data.slice(0, 5)
+
+      const phoneRe = /phone|telefone|celular|whatsapp|contato|contact|number|numero/i
+      const phoneCols = csvHeaders.value.filter((h) => phoneRe.test(h))
+      if (phoneCols[0]) csvPhoneCol1.value = phoneCols[0]
+      if (phoneCols[1]) csvPhoneCol2.value = phoneCols[1]
+
+      const nameLike = csvHeaders.value.find((h) =>
+        /name|nome|usuario|username|client|cliente/i.test(h),
+      )
+      if (nameLike) csvNameColumn.value = nameLike
+    },
+    error(err) {
+      error.value = `Erro ao ler CSV: ${err.message}`
+    },
+  })
+}
+
+function confirmCsvImport() {
+  if (!csvPhoneCol1.value) return
+
+  const contacts: CsvContact[] = []
+  let idx = 0
+
+  for (const row of csvAllRows.value) {
+    const name  = csvNameColumn.value ? (row[csvNameColumn.value] ?? '').trim() : ''
+    const p1    = (row[csvPhoneCol1.value] ?? '').trim()
+    const p2    = csvPhoneCol2.value ? (row[csvPhoneCol2.value] ?? '').trim() : ''
+
+    if (p1) contacts.push({ id: String(idx++), phone: p1, name })
+    if (p2 && p2 !== p1) contacts.push({ id: String(idx++), phone: p2, name })
+  }
+
+  csvContacts.value = contacts
+  csvMapped.value = true
+  selectedIds.value = new Set(contacts.map((c) => c.id))
+  error.value = null
+  result.value = null
+
+  localStorage.setItem(LS_CSV_CONTACTS, JSON.stringify({
+    fileName: csvFileName.value,
+    contacts,
+  }))
+}
+
+function resetCsv() {
+  csvFileName.value = ''
+  csvHeaders.value = []
+  csvPreviewRows.value = []
+  csvAllRows.value = []
+  csvPhoneCol1.value = ''
+  csvPhoneCol2.value = ''
+  csvNameColumn.value = ''
+  csvContacts.value = []
+  csvMapped.value = false
+  selectedIds.value = new Set()
+  if (fileInput.value) fileInput.value.value = ''
+  localStorage.removeItem(LS_CSV_CONTACTS)
+}
+
+// ── Shared selection (continued) ─────────────────────────────────────────────
+
+const activeList = computed<Array<{ id: string }>>(() =>
+  mode.value === 'csv' ? csvContacts.value : users.value,
+)
+
+const allSelected = computed(() =>
+  activeList.value.length > 0 && activeList.value.every((u) => selectedIds.value.has(u.id)),
+)
+
+const selectedCount = computed(() => selectedIds.value.size)
+
 function toggleAll() {
   if (allSelected.value) {
-    selectedUuids.value = new Set()
+    selectedIds.value = new Set()
   } else {
-    selectedUuids.value = new Set(users.value.map((u) => u.id))
+    selectedIds.value = new Set(activeList.value.map((u) => u.id))
   }
 }
 
-function toggleUser(uuid: string) {
-  const next = new Set(selectedUuids.value)
-  if (next.has(uuid)) next.delete(uuid)
-  else next.add(uuid)
-  selectedUuids.value = next
+function toggleItem(id: string) {
+  const next = new Set(selectedIds.value)
+  if (next.has(id)) next.delete(id)
+  else next.add(id)
+  selectedIds.value = next
 }
+
+// ── Message & send ───────────────────────────────────────────────────────────
+
+const message        = ref('')
+const sending        = ref(false)
+const result         = ref<{ queued: number; skipped?: number; invalid?: string[] } | null>(null)
+const error          = ref<string | null>(null)
+
+const showTable = computed(() =>
+  mode.value === 'filters' ? users.value.length > 0
+                           : csvMapped.value && csvContacts.value.length > 0,
+)
+
+const canSend = computed(() =>
+  selectedCount.value > 0 && message.value.trim().length > 0 && !sending.value,
+)
 
 async function sendBlast() {
   if (!canSend.value) return
@@ -92,14 +273,25 @@ async function sendBlast() {
   sending.value = true
 
   try {
-    const res = await adminService.sendWhatsappBlast(
-      Array.from(selectedUuids.value),
-      message.value.trim(),
-    )
-    result.value = res.data
-    selectedUuids.value = new Set()
+    if (mode.value === 'csv') {
+      const phones = csvContacts.value
+        .filter((c) => selectedIds.value.has(c.id))
+        .map((c) => c.phone)
+
+      const res = await adminService.sendWhatsappBlastByPhones(phones, message.value.trim())
+      result.value = res.data
+      markPhonesAsSent(phones)
+    } else {
+      const res = await adminService.sendWhatsappBlast(
+        Array.from(selectedIds.value),
+        message.value.trim(),
+      )
+      result.value = res.data
+    }
+
+    selectedIds.value = new Set()
     message.value = ''
-    toast.success(`${res.data.queued} mensagem(ns) enfileirada(s) com sucesso!`)
+    toast.success(`${result.value?.queued ?? 0} mensagem(ns) enfileirada(s) com sucesso!`)
   } catch (e: any) {
     error.value = e?.message ?? 'Erro ao enviar.'
     toast.error(error.value ?? 'Erro ao enviar.')
@@ -111,6 +303,21 @@ async function sendBlast() {
 function formatCurrency(cents: number) {
   return `R$ ${(cents / 100).toFixed(2)}`
 }
+
+onMounted(() => {
+  loadSentPhones()
+
+  try {
+    const raw = localStorage.getItem(LS_CSV_CONTACTS)
+    if (!raw) return
+    const saved = JSON.parse(raw) as { fileName: string; contacts: CsvContact[] }
+    csvContacts.value = saved.contacts
+    csvFileName.value = saved.fileName
+    csvMapped.value = true
+    selectedIds.value = new Set(saved.contacts.map((c) => c.id))
+    mode.value = 'csv'
+  } catch {}
+})
 </script>
 
 <template>
@@ -121,63 +328,182 @@ function formatCurrency(cents: number) {
           <Icon icon="mdi:whatsapp" style="color:#25d366;vertical-align:-3px;margin-right:6px" />
           Disparo em Massa — WhatsApp
         </h1>
-        <p class="page-subtitle">Filtre usuários com WhatsApp cadastrado e envie mensagem via Z-API.</p>
+        <p class="page-subtitle">Filtre usuários ou importe um CSV e envie mensagem via Z-API.</p>
       </div>
     </header>
 
-    <!-- Filters -->
-    <div class="section">
-      <h2 class="section-title">Segmento</h2>
-      <div class="segment-grid">
-        <button
-          v-for="s in SEGMENTS"
-          :key="s.value"
-          class="segment-card"
-          :class="{ active: segment === s.value }"
-          @click="segment = s.value"
-        >
-          <Icon :icon="s.icon" width="20" />
-          <span>{{ s.label }}</span>
-        </button>
-      </div>
-
-      <div class="filter-row">
-        <div class="field-inline">
-          <label>Nível de passe</label>
-          <select v-model="tierRank" class="form-input input-tier">
-            <option value="">Todos os níveis</option>
-            <option v-for="t in TIERS" :key="t.rank" :value="t.rank">
-              {{ t.name }}
-            </option>
-          </select>
-        </div>
-        <div class="field-inline">
-          <label>Limite de usuários</label>
-          <input v-model.number="previewLimit" type="number" min="1" max="5000" class="form-input input-sm" />
-        </div>
-        <button class="btn-primary" :disabled="loadingPreview" @click="loadPreview">
-          <Icon icon="mdi:magnify" width="16" />
-          {{ loadingPreview ? 'Buscando...' : 'Buscar usuários' }}
-        </button>
-      </div>
+    <!-- Mode tabs -->
+    <div class="mode-tabs">
+      <button
+        class="mode-tab"
+        :class="{ active: mode === 'filters' }"
+        @click="switchMode('filters')"
+      >
+        <Icon icon="mdi:filter-outline" width="16" />
+        Filtros
+      </button>
+      <button
+        class="mode-tab"
+        :class="{ active: mode === 'csv' }"
+        @click="switchMode('csv')"
+      >
+        <Icon icon="mdi:file-delimited-outline" width="16" />
+        Importar CSV
+      </button>
     </div>
 
-    <!-- Error -->
+    <!-- ── Filters mode ── -->
+    <template v-if="mode === 'filters'">
+      <div class="section">
+        <h2 class="section-title">Segmento</h2>
+        <div class="segment-grid">
+          <button
+            v-for="s in SEGMENTS"
+            :key="s.value"
+            class="segment-card"
+            :class="{ active: segment === s.value }"
+            @click="segment = s.value"
+          >
+            <Icon :icon="s.icon" width="20" />
+            <span>{{ s.label }}</span>
+          </button>
+        </div>
+
+        <div class="filter-row">
+          <div class="field-inline">
+            <label>Nível de passe</label>
+            <select v-model="tierRank" class="form-input input-tier">
+              <option value="">Todos os níveis</option>
+              <option v-for="t in TIERS" :key="t.rank" :value="t.rank">{{ t.name }}</option>
+            </select>
+          </div>
+          <div class="field-inline">
+            <label>Limite de usuários</label>
+            <input v-model.number="previewLimit" type="number" min="1" max="5000" class="form-input input-sm" />
+          </div>
+          <button class="btn-primary" :disabled="loadingPreview" @click="loadPreview">
+            <Icon icon="mdi:magnify" width="16" />
+            {{ loadingPreview ? 'Buscando...' : 'Buscar usuários' }}
+          </button>
+        </div>
+      </div>
+    </template>
+
+    <!-- ── CSV mode ── -->
+    <template v-if="mode === 'csv'">
+      <div class="section">
+        <h2 class="section-title">Importar CSV</h2>
+
+        <!-- Upload area -->
+        <div
+          class="csv-dropzone"
+          :class="{ 'has-file': csvFileName }"
+          @click="triggerFileInput"
+          @dragover="handleDragOver"
+          @drop="handleDrop"
+        >
+          <Icon :icon="csvFileName ? 'mdi:file-check-outline' : 'mdi:file-upload-outline'" width="32" />
+          <p v-if="!csvFileName">Clique ou arraste um arquivo <strong>.csv</strong> aqui</p>
+          <p v-else class="csv-filename">{{ csvFileName }}</p>
+          <span v-if="csvFileName" class="csv-row-count">{{ csvAllRows.length }} linhas</span>
+        </div>
+        <input
+          ref="fileInput"
+          type="file"
+          accept=".csv,text/csv"
+          style="display:none"
+          @change="handleFileChange"
+        />
+
+        <!-- Column picker (shown after file is loaded) -->
+        <div v-if="csvHeaders.length > 0" class="column-picker">
+          <div class="column-picker-header">
+            <h3 class="column-picker-title">Mapeamento de colunas</h3>
+            <button class="btn-ghost btn-sm" @click="resetCsv">
+              <Icon icon="mdi:close" width="14" /> Trocar arquivo
+            </button>
+          </div>
+
+          <!-- Preview table -->
+          <div class="csv-preview-wrap">
+            <table class="csv-preview-table">
+              <thead>
+                <tr>
+                  <th v-for="h in csvHeaders" :key="h">{{ h }}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(row, i) in csvPreviewRows" :key="i">
+                  <td v-for="h in csvHeaders" :key="h">{{ row[h] }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="column-selects">
+            <div class="field-inline">
+              <label>Telefone 1 <span class="required">*</span></label>
+              <select v-model="csvPhoneCol1" class="form-input input-tier">
+                <option value="">— selecione —</option>
+                <option v-for="h in csvHeaders" :key="h" :value="h">{{ h }}</option>
+              </select>
+            </div>
+            <div class="field-inline">
+              <label>Telefone 2 <span class="optional">(opcional)</span></label>
+              <select v-model="csvPhoneCol2" class="form-input input-tier">
+                <option value="">— não usar —</option>
+                <option v-for="h in csvHeaders" :key="h" :value="h" :disabled="h === csvPhoneCol1">{{ h }}</option>
+              </select>
+            </div>
+            <div class="field-inline">
+              <label>Coluna de nome <span class="optional">(opcional)</span></label>
+              <select v-model="csvNameColumn" class="form-input input-tier">
+                <option value="">— não usar —</option>
+                <option v-for="h in csvHeaders" :key="h" :value="h">{{ h }}</option>
+              </select>
+            </div>
+            <button class="btn-primary" :disabled="!csvPhoneCol1" @click="confirmCsvImport">
+              <Icon icon="mdi:check" width="16" />
+              Confirmar importação
+            </button>
+          </div>
+        </div>
+      </div>
+    </template>
+
+    <!-- ── Shared: error / result alerts ── -->
     <div v-if="error" class="alert alert-error">
       <Icon icon="mdi:alert-circle-outline" width="16" /> {{ error }}
     </div>
-
-    <!-- Result -->
     <div v-if="result" class="alert alert-success">
       <Icon icon="mdi:check-circle-outline" width="16" />
       {{ result.queued }} mensagem(ns) enfileirada(s) com sucesso!
+      <template v-if="result.skipped">
+        &nbsp;·&nbsp;
+        <span class="skipped-warn">{{ result.skipped }} número(s) inválido(s) ignorado(s)</span>
+      </template>
     </div>
 
-    <!-- Users table -->
-    <div v-if="users.length > 0" class="section">
+    <div v-if="result?.invalid?.length" class="invalid-phones">
+      <div class="invalid-phones-header">
+        <Icon icon="mdi:alert-circle-outline" width="14" />
+        Números que não puderam ser enviados:
+      </div>
+      <ul>
+        <li v-for="p in result.invalid" :key="p" class="mono">{{ p }}</li>
+      </ul>
+    </div>
+
+    <!-- ── Shared: users/contacts table ── -->
+    <div v-if="showTable" class="section">
       <div class="table-header">
         <h2 class="section-title">
-          {{ users.length }} usuário(s) encontrado(s)
+          <template v-if="mode === 'filters'">
+            {{ users.length }} usuário(s) encontrado(s)
+          </template>
+          <template v-else>
+            {{ csvContacts.length }} contato(s) importado(s)
+          </template>
           <span v-if="selectedCount > 0" class="badge-selected">{{ selectedCount }} selecionado(s)</span>
         </h2>
         <div class="table-actions">
@@ -187,7 +513,8 @@ function formatCurrency(cents: number) {
         </div>
       </div>
 
-      <div class="table-wrapper">
+      <!-- Filters table -->
+      <div v-if="mode === 'filters'" class="table-wrapper">
         <table>
           <thead>
             <tr>
@@ -205,15 +532,11 @@ function formatCurrency(cents: number) {
             <tr
               v-for="user in users"
               :key="user.id"
-              :class="{ selected: selectedUuids.has(user.id) }"
-              @click="toggleUser(user.id)"
+              :class="{ selected: selectedIds.has(user.id) }"
+              @click="toggleItem(user.id)"
             >
               <td class="col-check" @click.stop>
-                <input
-                  type="checkbox"
-                  :checked="selectedUuids.has(user.id)"
-                  @change="toggleUser(user.id)"
-                />
+                <input type="checkbox" :checked="selectedIds.has(user.id)" @change="toggleItem(user.id)" />
               </td>
               <td>
                 <div class="user-info">
@@ -236,17 +559,59 @@ function formatCurrency(cents: number) {
           </tbody>
         </table>
       </div>
+
+      <!-- CSV table -->
+      <div v-else class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th class="col-check">
+                <input type="checkbox" :checked="allSelected" @change="toggleAll" />
+              </th>
+              <th>#</th>
+              <th v-if="csvNameColumn">Nome</th>
+              <th>Telefone</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="contact in csvContacts"
+              :key="contact.id"
+              :class="{ selected: selectedIds.has(contact.id) }"
+              @click="toggleItem(contact.id)"
+            >
+              <td class="col-check" @click.stop>
+                <input type="checkbox" :checked="selectedIds.has(contact.id)" @change="toggleItem(contact.id)" />
+              </td>
+              <td class="row-num">{{ Number(contact.id) + 1 }}</td>
+              <td v-if="csvNameColumn" class="user-name">{{ contact.name || '—' }}</td>
+              <td class="mono">
+                {{ contact.phone }}
+                <span
+                  v-if="sentPhones.has(stripCsvNoise(contact.phone))"
+                  class="sent-flag"
+                  title="Já enviado anteriormente"
+                >
+                  <Icon icon="mdi:check-circle" width="13" />
+                  enviado
+                </span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
 
-    <div v-else-if="!loadingPreview && users.length === 0 && !error" class="empty-state">
-      <Icon icon="mdi:account-search-outline" width="48" />
-      <p>Selecione um segmento e clique em "Buscar usuários".</p>
+    <div v-else-if="!loadingPreview && !showTable && !error" class="empty-state">
+      <Icon :icon="mode === 'csv' ? 'mdi:file-delimited-outline' : 'mdi:account-search-outline'" width="48" />
+      <p v-if="mode === 'filters'">Selecione um segmento e clique em "Buscar usuários".</p>
+      <p v-else>Faça upload de um CSV e mapeie a coluna de telefone.</p>
     </div>
 
-    <!-- Message + Send -->
-    <div v-if="users.length > 0" class="section">
+    <!-- ── Shared: message + send ── -->
+    <div v-if="showTable" class="section">
       <h2 class="section-title">Mensagem</h2>
-      <p class="section-hint">Será enviada para os {{ selectedCount }} usuário(s) selecionado(s).</p>
+      <p class="section-hint">Será enviada para os {{ selectedCount }} contato(s) selecionado(s).</p>
 
       <div class="field">
         <textarea
@@ -260,16 +625,12 @@ function formatCurrency(cents: number) {
       </div>
 
       <div class="send-row">
-        <button
-          class="btn-send"
-          :disabled="!canSend"
-          @click="sendBlast"
-        >
+        <button class="btn-send" :disabled="!canSend" @click="sendBlast">
           <Icon :icon="sending ? 'mdi:loading' : 'mdi:send'" width="18" :class="{ spin: sending }" />
-          {{ sending ? 'Enviando...' : `Enviar para ${selectedCount} usuário(s)` }}
+          {{ sending ? 'Enviando...' : `Enviar para ${selectedCount} contato(s)` }}
         </button>
         <p v-if="selectedCount === 0" class="field-hint field-hint--warn">
-          Selecione ao menos um usuário.
+          Selecione ao menos um contato.
         </p>
       </div>
     </div>
@@ -286,7 +647,7 @@ function formatCurrency(cents: number) {
   display flex
   justify-content space-between
   align-items flex-start
-  margin-bottom 2rem
+  margin-bottom 1.5rem
 
 .page-title
   font-size 1.5rem
@@ -298,6 +659,41 @@ function formatCurrency(cents: number) {
   font-size 0.875rem
   color #64748b
   margin 0
+
+// ── Mode tabs ────────────────────────────────────────────────────────────────
+
+.mode-tabs
+  display flex
+  gap 0.5rem
+  margin-bottom 1.25rem
+  background #16181d
+  border 1px solid rgba(255,255,255,0.06)
+  border-radius 10px
+  padding 0.35rem
+  width fit-content
+
+.mode-tab
+  display inline-flex
+  align-items center
+  gap 0.4rem
+  padding 0.45rem 1rem
+  border-radius 7px
+  font-size 0.85rem
+  font-weight 500
+  color #64748b
+  background transparent
+  border none
+  cursor pointer
+  transition all 0.15s
+
+  &:hover
+    color #cbd5e1
+
+  &.active
+    background rgba(99,102,241,0.15)
+    color #a5b4fc
+
+// ── Sections ─────────────────────────────────────────────────────────────────
 
 .section
   background #16181d
@@ -316,6 +712,8 @@ function formatCurrency(cents: number) {
   font-size 0.8rem
   color #64748b
   margin -0.5rem 0 1rem
+
+// ── Segments (filters mode) ───────────────────────────────────────────────────
 
 .segment-grid
   display grid
@@ -350,6 +748,114 @@ function formatCurrency(cents: number) {
   align-items flex-end
   gap 1rem
   flex-wrap wrap
+
+// ── CSV dropzone ─────────────────────────────────────────────────────────────
+
+.csv-dropzone
+  display flex
+  flex-direction column
+  align-items center
+  justify-content center
+  gap 0.5rem
+  border 2px dashed rgba(255,255,255,0.1)
+  border-radius 10px
+  padding 2rem 1rem
+  cursor pointer
+  transition all 0.2s
+  color #64748b
+  text-align center
+
+  &:hover
+    border-color rgba(99,102,241,0.4)
+    background rgba(99,102,241,0.04)
+    color #a5b4fc
+
+  &.has-file
+    border-color rgba(37,211,102,0.35)
+    background rgba(37,211,102,0.04)
+    color #86efac
+
+  p
+    margin 0
+    font-size 0.875rem
+
+.csv-filename
+  font-weight 600
+  font-size 0.9rem !important
+
+.csv-row-count
+  font-size 0.78rem
+  color #64748b
+
+// ── Column picker ─────────────────────────────────────────────────────────────
+
+.column-picker
+  margin-top 1.25rem
+  padding-top 1.25rem
+  border-top 1px solid rgba(255,255,255,0.06)
+
+.column-picker-header
+  display flex
+  justify-content space-between
+  align-items center
+  margin-bottom 0.875rem
+
+.column-picker-title
+  font-size 0.875rem
+  font-weight 600
+  color #e2e8f0
+  margin 0
+
+.csv-preview-wrap
+  overflow-x auto
+  border-radius 7px
+  border 1px solid rgba(255,255,255,0.06)
+  margin-bottom 1rem
+
+.csv-preview-table
+  width 100%
+  border-collapse collapse
+  font-size 0.8rem
+
+  thead tr
+    background rgba(255,255,255,0.03)
+
+  th
+    padding 0.5rem 0.75rem
+    color #64748b
+    font-weight 500
+    text-align left
+    border-bottom 1px solid rgba(255,255,255,0.06)
+    white-space nowrap
+
+  td
+    padding 0.45rem 0.75rem
+    border-bottom 1px solid rgba(255,255,255,0.04)
+    color #94a3b8
+    max-width 200px
+    overflow hidden
+    text-overflow ellipsis
+    white-space nowrap
+
+  tbody tr:last-child td
+    border-bottom none
+
+.column-selects
+  display flex
+  align-items flex-end
+  gap 1rem
+  flex-wrap wrap
+
+.required
+  color #f87171
+  font-size 0.75rem
+
+.optional
+  color #64748b
+  font-size 0.75rem
+  font-weight 400
+
+// ── Shared form inputs ────────────────────────────────────────────────────────
 
 .field-inline
   display flex
@@ -390,6 +896,8 @@ function formatCurrency(cents: number) {
   resize vertical
   font-family inherit
 
+// ── Buttons ───────────────────────────────────────────────────────────────────
+
 .btn-primary
   display inline-flex
   align-items center
@@ -424,6 +932,12 @@ function formatCurrency(cents: number) {
   &:hover
     border-color rgba(255,255,255,0.2)
     color #cbd5e1
+
+.btn-sm
+  padding 0.3rem 0.65rem
+  font-size 0.75rem
+
+// ── Table ────────────────────────────────────────────────────────────────────
 
 .table-header
   display flex
@@ -486,6 +1000,12 @@ tbody tr
 .col-check
   width 40px
 
+.row-num
+  color #475569
+  font-size 0.78rem
+  text-align center
+  width 40px
+
 .user-info
   display flex
   flex-direction column
@@ -503,6 +1023,22 @@ tbody tr
   font-family monospace
   font-size 0.82rem
 
+.sent-flag
+  display inline-flex
+  align-items center
+  gap 0.2rem
+  margin-left 0.5rem
+  font-size 0.7rem
+  font-family inherit
+  font-weight 600
+  color #22c55e
+  background rgba(34,197,94,0.1)
+  border 1px solid rgba(34,197,94,0.2)
+  border-radius 4px
+  padding 0.1rem 0.35rem
+  vertical-align middle
+  white-space nowrap
+
 .tier-badge
   font-size 0.75rem
   font-weight 600
@@ -514,6 +1050,8 @@ tbody tr
 
 .center
   text-align center
+
+// ── Field / send ─────────────────────────────────────────────────────────────
 
 .field
   display flex
@@ -556,6 +1094,8 @@ tbody tr
     opacity 0.5
     cursor not-allowed
 
+// ── Misc ─────────────────────────────────────────────────────────────────────
+
 .spin
   animation spin 1s linear infinite
 
@@ -593,4 +1133,35 @@ tbody tr
     background rgba(34,197,94,0.1)
     border 1px solid rgba(34,197,94,0.2)
     color #86efac
+
+.skipped-warn
+  color #fbbf24
+  font-weight 600
+
+.invalid-phones
+  background rgba(245,158,11,0.06)
+  border 1px solid rgba(245,158,11,0.2)
+  border-radius 8px
+  padding 0.75rem 1rem
+  margin-bottom 1rem
+  font-size 0.825rem
+  color #fcd34d
+
+  .invalid-phones-header
+    display flex
+    align-items center
+    gap 0.4rem
+    font-weight 600
+    margin-bottom 0.5rem
+    color #fbbf24
+
+  ul
+    margin 0
+    padding-left 1.25rem
+    display flex
+    flex-direction column
+    gap 0.2rem
+
+  li
+    color #94a3b8
 </style>

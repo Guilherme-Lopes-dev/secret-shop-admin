@@ -113,6 +113,34 @@ function markPhonesAsSent(phones: string[]) {
 
 const selectedIds = ref<Set<string>>(new Set())
 
+// ── CSV filter & quick-select ────────────────────────────────────────────────
+
+const csvFilter      = ref<'all' | 'sent' | 'not_sent'>('all')
+const csvSelectLimit = ref<number | ''>('')
+
+const filteredCsvContacts = computed(() => {
+  if (csvFilter.value === 'sent')
+    return csvContacts.value.filter((c) => sentPhones.value.has(stripCsvNoise(c.phone)))
+  if (csvFilter.value === 'not_sent')
+    return csvContacts.value.filter((c) => !sentPhones.value.has(stripCsvNoise(c.phone)))
+  return csvContacts.value
+})
+
+const sentCount    = computed(() => csvContacts.value.filter((c) => sentPhones.value.has(stripCsvNoise(c.phone))).length)
+const notSentCount = computed(() => csvContacts.value.filter((c) => !sentPhones.value.has(stripCsvNoise(c.phone))).length)
+
+function setCsvFilter(f: 'all' | 'sent' | 'not_sent') {
+  csvFilter.value = f
+  selectedIds.value = new Set()
+}
+
+function selectByLimit() {
+  const limit = Number(csvSelectLimit.value)
+  if (!limit || limit <= 0) return
+  const ids = filteredCsvContacts.value.slice(0, limit).map((c) => c.id)
+  selectedIds.value = new Set(ids)
+}
+
 // ── CSV mode state ───────────────────────────────────────────────────────────
 
 const fileInput       = ref<HTMLInputElement | null>(null)
@@ -155,6 +183,8 @@ function parseCsvFile(file: File) {
   csvNameColumn.value = ''
   csvContacts.value = []
   csvMapped.value = false
+  csvFilter.value = 'all'
+  csvSelectLimit.value = ''
   selectedIds.value = new Set()
 
   Papa.parse<Record<string, string>>(file, {
@@ -183,6 +213,7 @@ function parseCsvFile(file: File) {
 
 function confirmCsvImport() {
   if (!csvPhoneCol1.value) return
+  csvFilter.value = 'all'
 
   const contacts: CsvContact[] = []
   let idx = 0
@@ -218,6 +249,8 @@ function resetCsv() {
   csvNameColumn.value = ''
   csvContacts.value = []
   csvMapped.value = false
+  csvFilter.value = 'all'
+  csvSelectLimit.value = ''
   selectedIds.value = new Set()
   if (fileInput.value) fileInput.value.value = ''
   localStorage.removeItem(LS_CSV_CONTACTS)
@@ -226,7 +259,7 @@ function resetCsv() {
 // ── Shared selection (continued) ─────────────────────────────────────────────
 
 const activeList = computed<Array<{ id: string }>>(() =>
-  mode.value === 'csv' ? csvContacts.value : users.value,
+  mode.value === 'csv' ? filteredCsvContacts.value : users.value,
 )
 
 const allSelected = computed(() =>
@@ -561,7 +594,51 @@ onMounted(() => {
       </div>
 
       <!-- CSV table -->
-      <div v-else class="table-wrapper">
+      <div v-else>
+        <!-- Filter bar -->
+        <div class="csv-filter-bar">
+          <div class="csv-filter-tabs">
+            <button
+              class="csv-filter-tab"
+              :class="{ active: csvFilter === 'all' }"
+              @click="setCsvFilter('all')"
+            >
+              Todos
+              <span class="filter-count">{{ csvContacts.length }}</span>
+            </button>
+            <button
+              class="csv-filter-tab"
+              :class="{ active: csvFilter === 'not_sent' }"
+              @click="setCsvFilter('not_sent')"
+            >
+              Não enviados
+              <span class="filter-count">{{ notSentCount }}</span>
+            </button>
+            <button
+              class="csv-filter-tab csv-filter-tab--sent"
+              :class="{ active: csvFilter === 'sent' }"
+              @click="setCsvFilter('sent')"
+            >
+              Já enviados
+              <span class="filter-count">{{ sentCount }}</span>
+            </button>
+          </div>
+          <div class="csv-limit-select">
+            <input
+              v-model.number="csvSelectLimit"
+              type="number"
+              min="1"
+              class="form-input input-sm"
+              placeholder="Ex: 500"
+            />
+            <button class="btn-ghost btn-sm" @click="selectByLimit">
+              <Icon icon="mdi:cursor-default-click-outline" width="14" />
+              Selecionar
+            </button>
+          </div>
+        </div>
+
+        <div class="table-wrapper">
         <table>
           <thead>
             <tr>
@@ -575,7 +652,7 @@ onMounted(() => {
           </thead>
           <tbody>
             <tr
-              v-for="contact in csvContacts"
+              v-for="contact in filteredCsvContacts"
               :key="contact.id"
               :class="{ selected: selectedIds.has(contact.id) }"
               @click="toggleItem(contact.id)"
@@ -599,6 +676,7 @@ onMounted(() => {
             </tr>
           </tbody>
         </table>
+        </div>
       </div>
     </div>
 
@@ -936,6 +1014,60 @@ onMounted(() => {
 .btn-sm
   padding 0.3rem 0.65rem
   font-size 0.75rem
+
+// ── CSV filter bar ────────────────────────────────────────────────────────────
+
+.csv-filter-bar
+  display flex
+  align-items center
+  justify-content space-between
+  flex-wrap wrap
+  gap 0.75rem
+  margin-bottom 0.75rem
+
+.csv-filter-tabs
+  display flex
+  gap 0.35rem
+
+.csv-filter-tab
+  display inline-flex
+  align-items center
+  gap 0.4rem
+  padding 0.35rem 0.85rem
+  border-radius 6px
+  font-size 0.8rem
+  font-weight 500
+  color #64748b
+  background transparent
+  border 1px solid rgba(255,255,255,0.08)
+  cursor pointer
+  transition all 0.15s
+
+  &:hover
+    color #cbd5e1
+    border-color rgba(255,255,255,0.15)
+
+  &.active
+    background rgba(99,102,241,0.15)
+    border-color #6366f1
+    color #a5b4fc
+
+  &--sent.active
+    background rgba(34,197,94,0.1)
+    border-color rgba(34,197,94,0.4)
+    color #86efac
+
+.filter-count
+  background rgba(255,255,255,0.07)
+  border-radius 10px
+  padding 0.05rem 0.45rem
+  font-size 0.72rem
+  font-weight 600
+
+.csv-limit-select
+  display flex
+  align-items center
+  gap 0.5rem
 
 // ── Table ────────────────────────────────────────────────────────────────────
 

@@ -2,6 +2,7 @@ import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import dayjs from 'dayjs'
 import { formatCurrency } from '../formatCurrency'
+import { formatCpfCnpj } from '../formatCpfCnpj'
 
 interface SaleItem {
   skin_name?: string
@@ -32,6 +33,7 @@ interface Sale {
   anti_fraud_score?: number
   idempotency_key?: string
   asaas_payment_id?: string
+  customer_cpf_cnpj?: string | null
   users?: { username?: string; email?: string; trade_link?: string; contact?: string; uuid?: string; id?: string }
   sale_items?: SaleItem[]
   status_history?: StatusHistory[]
@@ -87,6 +89,7 @@ function renderSale(doc: jsPDF, sale: Sale, index: number, total: number) {
     head: [['Cliente', '']],
     body: [
       ['Usuario', sale.users?.username || '-'],
+      ['CPF/CNPJ', formatCpfCnpj(sale.customer_cpf_cnpj)],
       ['Email', sale.users?.email || '-'],
       ['Contato', sale.users?.contact || '-'],
       ['UUID', sale.users?.id || sale.users?.uuid || '-'],
@@ -182,11 +185,12 @@ function renderCover(doc: jsPDF, sales: Sale[], filters: PeriodFilter) {
   const startY = (doc as any).lastAutoTable.finalY + 6
   autoTable(doc, {
     startY,
-    head: [['#', 'Pedido', 'Cliente', 'Data', 'Total']],
+    head: [['#', 'Pedido', 'Cliente', 'CPF/CNPJ', 'Data', 'Total']],
     body: sales.map((s, i) => [
       String(i + 1),
       s.order_number || '-',
       s.users?.username || '-',
+      formatCpfCnpj(s.customer_cpf_cnpj),
       formatDate(s.created_at),
       formatCurrency(s.total_amount),
     ]),

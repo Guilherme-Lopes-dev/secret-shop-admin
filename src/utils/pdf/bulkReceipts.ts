@@ -2,6 +2,7 @@ import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import dayjs from 'dayjs'
 import { formatCurrency } from '../formatCurrency'
+import { formatCpfCnpj } from '../formatCpfCnpj'
 
 export interface ReceiptRow {
   sale_uuid: string
@@ -18,17 +19,6 @@ export interface ReceiptRow {
   error: string | null
 }
 
-const formatCpfCnpj = (raw: string | null): string => {
-  if (!raw) return '-'
-  const digits = raw.replace(/\D/g, '')
-  if (digits.length === 11) {
-    return digits.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4')
-  }
-  if (digits.length === 14) {
-    return digits.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5')
-  }
-  return raw
-}
 
 interface PeriodFilter {
   from?: string

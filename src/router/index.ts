@@ -138,6 +138,11 @@ const routes = [
         name: 'whatsapp-blast',
         component: () => import('@/views/whatsapp/WhatsappBlast.vue'),
       },
+      {
+        path: 'match-history',
+        name: 'match-history',
+        component: () => import('@/views/match-history/MatchHistory.vue'),
+      },
     ],
   },
   {

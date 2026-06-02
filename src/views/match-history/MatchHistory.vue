@@ -46,8 +46,8 @@ function parseSteamId(raw: string): string | null {
 
   const sciMatch = normalized.match(/^(\d+(?:\.\d+)?)[Ee]\+?(\d+)$/)
   if (sciMatch) {
-    const mantissa = sciMatch[1]
-    const exp = parseInt(sciMatch[2])
+    const mantissa = sciMatch[1]!
+    const exp = parseInt(sciMatch[2]!)
     const digits = mantissa.replace('.', '')
     const dotIdx = mantissa.indexOf('.')
     const fractLen = dotIdx === -1 ? 0 : mantissa.length - dotIdx - 1

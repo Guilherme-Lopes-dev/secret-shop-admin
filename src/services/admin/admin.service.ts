@@ -586,4 +586,10 @@ export const adminService = {
   async sendWhatsappBlastByPhones(phones: string[], message: string) {
     return api.post<{ queued: number; skipped: number; invalid: string[] }>('/admin/whatsapp/blast/by-phones', { phones, message })
   },
+
+  async getUserHeroPreferences(page = 1, limit = 20, search?: string) {
+    const params = new URLSearchParams({ page: String(page), limit: String(limit) })
+    if (search) params.append('search', search)
+    return api.get(`/admin/user-hero-preferences?${params}`)
+  },
 }

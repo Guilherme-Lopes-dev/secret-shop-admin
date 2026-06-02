@@ -143,6 +143,11 @@ const routes = [
         name: 'match-history',
         component: () => import('@/views/match-history/MatchHistory.vue'),
       },
+      {
+        path: 'recommendations',
+        name: 'recommendations',
+        component: () => import('@/views/recommendations/RecommendationsList.vue'),
+      },
     ],
   },
   {

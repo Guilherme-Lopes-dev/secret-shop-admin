@@ -11,7 +11,40 @@ const router = useRouter()
 
 const sale    = ref<any>(null)
 const loading = ref(true)
-const line    = computed(() => sale.value?.collector_sales?.[0] ?? null)
+const lines   = computed<any[]>(() => sale.value?.collector_sales ?? [])
+
+// AWAITING_SHIPPING tem prioridade: se qualquer linha está pendente, o pedido está pendente
+const aggregateDeliveryStatus = computed<string | null>(() => {
+    const ls = lines.value
+    if (!ls.length) return null
+    if (ls.every((l: any) => l.delivery_status === 'DELIVERED')) return 'DELIVERED'
+    if (ls.some((l: any) => l.delivery_status === 'AWAITING_SHIPPING')) return 'AWAITING_SHIPPING'
+    if (ls.some((l: any) => l.delivery_status === 'SHIPPED')) return 'SHIPPED'
+    return null
+})
+
+const deliveredCount   = computed(() => lines.value.filter((l: any) => l.delivery_status === 'DELIVERED').length)
+const pendingLines     = computed(() => lines.value.filter((l: any) => l.delivery_status !== 'DELIVERED'))
+const isPartiallyDelivered = computed(() => deliveredCount.value > 0 && deliveredCount.value < lines.value.length)
+
+const firstShippedAt = computed<string | null>(() => {
+    const dates = lines.value.filter((l: any) => l.shipped_at).map((l: any) => l.shipped_at)
+    if (!dates.length) return null
+    return dates.reduce((a: string, b: string) => (a < b ? a : b))
+})
+
+const firstPartialDeliveredAt = computed<string | null>(() => {
+    const dates = lines.value.filter((l: any) => l.delivered_at).map((l: any) => l.delivered_at)
+    if (!dates.length) return null
+    return dates.reduce((a: string, b: string) => (a < b ? a : b))
+})
+
+const lastDeliveredAt = computed<string | null>(() => {
+    const ls = lines.value
+    if (!ls.length || !ls.every((l: any) => l.delivered_at)) return null
+    const dates = ls.map((l: any) => l.delivered_at)
+    return dates.reduce((a: string, b: string) => (a > b ? a : b))
+})
 
 // ── Delivery modal ────────────────────────────────────────────────────────────
 const deliveryModal   = ref(false)
@@ -95,8 +128,11 @@ const friendshipDuration = (days: number | null) => {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-const itemName  = () => line.value?.snapshot_data?.name ?? line.value?.collectors?.name ?? '-'
-const itemImage = () => line.value?.snapshot_data?.icon_url_large ?? line.value?.collectors?.icon_url_large ?? null
+const lineImage = (sl: any) =>
+    sl?.snapshot_data?.icon_url_large ?? sl?.collectors?.icon_url_large ?? null
+
+const lineName = (sl: any) =>
+    sl?.snapshot_data?.name ?? sl?.collectors?.name ?? '-'
 
 const paymentBadgeClass = (s: string) => ({
     PENDING:          'badge-pending',
@@ -131,13 +167,13 @@ const deliveryLabel = (s: string | null) => ({
 const paymentMethodLabel = (m: string | null) =>
     ({ PIX: 'PIX', BOLETO: 'Boleto', CREDIT_CARD: 'Cartão de Crédito' }[m ?? ''] ?? m ?? '-')
 
-const nextDeliveryAction = (): { label: string; status: string } | null => {
+const nextAction = computed((): { label: string; status: string } | null => {
     if (!sale.value || sale.value.payment_status !== 'PAID') return null
     return ({
         AWAITING_SHIPPING: { label: 'Marcar como Enviado',  status: 'SHIPPED'   },
         SHIPPED:           { label: 'Marcar como Entregue', status: 'DELIVERED' },
-    } as Record<string, { label: string; status: string }>)[line.value?.delivery_status ?? ''] ?? null
-}
+    } as Record<string, { label: string; status: string }>)[aggregateDeliveryStatus.value ?? ''] ?? null
+})
 
 const canCancel = () =>
     sale.value && !['CANCELLED', 'REFUNDED', 'EXPIRED'].includes(sale.value.payment_status)
@@ -154,9 +190,8 @@ const formatHistoryEntry = (entry: any) => {
 
 // ── Actions ───────────────────────────────────────────────────────────────────
 const openDeliveryModal = () => {
-    const next = nextDeliveryAction()
-    if (!next) return
-    deliveryStatus.value = next.status
+    if (!nextAction.value) return
+    deliveryStatus.value = nextAction.value.status
     deliveryNotes.value  = ''
     deliveryModal.value  = true
 }
@@ -164,16 +199,23 @@ const openDeliveryModal = () => {
 const confirmDelivery = async () => {
     deliveryLoading.value = true
     try {
-        await adminService.updateCollectorDelivery(
-            line.value?.id ?? '',
-            deliveryStatus.value,
-            deliveryNotes.value || undefined,
+        const targetStatus = deliveryStatus.value
+        const toAdvance = lines.value.filter((l: any) =>
+            (targetStatus === 'SHIPPED'   && l.delivery_status === 'AWAITING_SHIPPING') ||
+            (targetStatus === 'DELIVERED' && l.delivery_status === 'SHIPPED'),
         )
-        toast.success('Status de entrega atualizado.')
+        if (!toAdvance.length) {
+            toast.warning('Nenhuma linha elegível para avançar.')
+            return
+        }
+        for (const l of toAdvance) {
+            await adminService.updateCollectorDelivery(l.id, targetStatus, deliveryNotes.value || undefined)
+        }
+        toast.success(`${toAdvance.length} item(ns) atualizado(s).`)
         deliveryModal.value = false
         fetchSale()
-    } catch {
-        toast.error('Erro ao atualizar entrega.')
+    } catch (err: any) {
+        toast.error(err?.response?.data?.message ?? 'Erro ao atualizar entrega.')
     } finally {
         deliveryLoading.value = false
     }
@@ -223,8 +265,8 @@ onMounted(fetchSale)
                             <span class="status-badge" :class="paymentBadgeClass(sale.payment_status)">
                                 {{ paymentLabel(sale.payment_status) }}
                             </span>
-                            <span v-if="line?.delivery_status" class="status-badge" :class="deliveryBadgeClass(line?.delivery_status ?? null)">
-                                {{ deliveryLabel(line?.delivery_status ?? null) }}
+                            <span v-if="aggregateDeliveryStatus" class="status-badge" :class="deliveryBadgeClass(aggregateDeliveryStatus)">
+                                {{ deliveryLabel(aggregateDeliveryStatus) }}
                             </span>
                         </div>
                     </div>
@@ -232,12 +274,13 @@ onMounted(fetchSale)
                 </div>
                 <div class="header-actions">
                     <button
-                        v-if="nextDeliveryAction()"
+                        v-if="nextAction"
                         class="btn-action-main btn-ship"
                         @click="openDeliveryModal"
                     >
                         <Icon icon="mdi:truck-outline" />
-                        {{ nextDeliveryAction()!.label }}
+                        {{ nextAction.label }}
+                        <span v-if="pendingLines.length > 1" class="btn-count">({{ pendingLines.length }})</span>
                     </button>
                     <button
                         v-if="canCancel()"
@@ -256,38 +299,62 @@ onMounted(fetchSale)
                 <!-- Coluna principal -->
                 <div class="col-main">
 
-                    <!-- Item -->
+                    <!-- Itens -->
                     <div class="card">
-                        <span class="card-title">Item Collector</span>
-                        <div class="item-row">
-                            <img
-                                v-if="itemImage()"
-                                :src="itemImage()!"
-                                class="item-img"
-                                :alt="itemName()"
-                            />
-                            <div v-else class="item-img-placeholder">
-                                <Icon icon="mdi:trophy-outline" />
-                            </div>
-                            <div class="item-info">
-                                <div class="item-name">{{ itemName() }}</div>
-                                <div class="item-hash">{{ line?.snapshot_data?.market_hash_name }}</div>
-                            </div>
+                        <div class="card-title-row">
+                            <span class="card-title">Itens Collector ({{ lines.length }})</span>
+                            <span v-if="sale.payment_status === 'PAID' && isPartiallyDelivered" class="delivery-partial-badge">
+                                {{ deliveredCount }}/{{ lines.length }} entregues · {{ pendingLines.length }} pendente(s)
+                            </span>
+                            <span v-else-if="sale.payment_status === 'PAID' && aggregateDeliveryStatus === 'AWAITING_SHIPPING'" class="delivery-partial-badge delivery-partial-badge--warn">
+                                {{ lines.length }} aguardando envio
+                            </span>
+                            <span v-else-if="sale.payment_status === 'PAID' && aggregateDeliveryStatus === 'SHIPPED'" class="delivery-partial-badge delivery-partial-badge--info">
+                                {{ lines.filter((l: any) => l.delivery_status !== 'DELIVERED').length }} enviado(s) — aguardando confirmação
+                            </span>
                         </div>
-                        <div class="kv-grid">
-                            <div class="kv">
-                                <span class="kv-label">Steam ID</span>
-                                <span class="kv-value mono">{{ line?.snapshot_data?.steam_id ?? '-' }}</span>
+                        <template v-for="(sl, index) in lines" :key="sl.id">
+                            <div class="item-row">
+                                <img
+                                    v-if="lineImage(sl)"
+                                    :src="lineImage(sl) ?? ''"
+                                    class="item-img"
+                                    :alt="lineName(sl)"
+                                />
+                                <div v-else class="item-img-placeholder">
+                                    <Icon icon="mdi:trophy-outline" />
+                                </div>
+                                <div class="item-info">
+                                    <div class="item-name">{{ lineName(sl) }}</div>
+                                    <div class="item-hash">{{ sl.snapshot_data?.market_hash_name }}</div>
+                                    <div class="line-qty-row">
+                                        <span>Qtd: {{ sl.quantity }}</span>
+                                        <span>·</span>
+                                        <span>{{ formatCurrency(sl.unit_price) }} un</span>
+                                        <span>·</span>
+                                        <span class="line-subtotal">{{ formatCurrency(sl.total_price) }}</span>
+                                    </div>
+                                </div>
+                                <span v-if="sl.delivery_status" class="status-badge" :class="deliveryBadgeClass(sl.delivery_status)">
+                                    {{ deliveryLabel(sl.delivery_status) }}
+                                </span>
                             </div>
-                            <div class="kv">
-                                <span class="kv-label">Asset ID</span>
-                                <span class="kv-value mono">{{ line?.snapshot_data?.asset_id ?? '-' }}</span>
+                            <div class="kv-grid line-meta-grid">
+                                <div class="kv">
+                                    <span class="kv-label">Steam ID</span>
+                                    <span class="kv-value mono">{{ sl.snapshot_data?.steam_id ?? '-' }}</span>
+                                </div>
+                                <div class="kv">
+                                    <span class="kv-label">Asset ID</span>
+                                    <span class="kv-value mono">{{ sl.snapshot_data?.asset_id ?? '-' }}</span>
+                                </div>
+                                <div class="kv">
+                                    <span class="kv-label">Collector UUID</span>
+                                    <span class="kv-value mono small">{{ sl.collectors?.id ?? '-' }}</span>
+                                </div>
                             </div>
-                            <div class="kv">
-                                <span class="kv-label">Collector UUID</span>
-                                <span class="kv-value mono small">{{ line?.collectors?.id ?? '-' }}</span>
-                            </div>
-                        </div>
+                            <div v-if="index < lines.length - 1" class="line-divider" />
+                        </template>
                     </div>
 
                     <!-- Financeiro -->
@@ -295,16 +362,16 @@ onMounted(fetchSale)
                         <span class="card-title">Financeiro</span>
                         <div class="kv-grid">
                             <div class="kv">
-                                <span class="kv-label">Quantidade</span>
-                                <span class="kv-value">{{ line?.quantity ?? '-' }}</span>
+                                <span class="kv-label">Subtotal</span>
+                                <span class="kv-value">{{ formatCurrency(sale.subtotal_amount) }}</span>
                             </div>
                             <div class="kv">
-                                <span class="kv-label">Preço Unitário</span>
-                                <span class="kv-value">{{ line ? formatCurrency(line.unit_price) : '-' }}</span>
+                                <span class="kv-label">Desconto</span>
+                                <span class="kv-value">{{ formatCurrency(sale.discount_amount) }}</span>
                             </div>
                             <div class="kv">
                                 <span class="kv-label">Total</span>
-                                <span class="kv-value price-highlight">{{ line ? formatCurrency(line.total_price) : '-' }}</span>
+                                <span class="kv-value price-highlight">{{ formatCurrency(sale.total_amount) }}</span>
                             </div>
                             <div class="kv">
                                 <span class="kv-label">Método de Pagamento</span>
@@ -454,18 +521,35 @@ onMounted(fetchSale)
                                     <span class="tl-date">{{ $dayjs(sale.paid_at).format('DD/MM/YYYY HH:mm:ss') }}</span>
                                 </div>
                             </div>
-                            <div class="timeline-item" v-if="line?.shipped_at">
+                            <div class="timeline-item" v-if="firstShippedAt">
                                 <Icon icon="mdi:truck-outline" class="tl-icon tl-shipped" />
                                 <div>
-                                    <span class="tl-label">Enviado</span>
-                                    <span class="tl-date">{{ $dayjs(line?.shipped_at).format('DD/MM/YYYY HH:mm:ss') }}</span>
+                                    <span class="tl-label">
+                                        Enviado
+                                        <span v-if="lines.length > 1" class="tl-count">
+                                            ({{ lines.filter((l: any) => l.shipped_at).length }}/{{ lines.length }})
+                                        </span>
+                                    </span>
+                                    <span class="tl-date">{{ $dayjs(firstShippedAt).format('DD/MM/YYYY HH:mm:ss') }}</span>
                                 </div>
                             </div>
-                            <div class="timeline-item" v-if="line?.delivered_at">
+                            <!-- Entrega parcial: alguns entregues, mas não todos -->
+                            <div class="timeline-item tl-partial-entry" v-if="isPartiallyDelivered">
+                                <Icon icon="mdi:package-variant-closed-remove" class="tl-icon tl-partial" />
+                                <div>
+                                    <span class="tl-label">Entrega parcial</span>
+                                    <span class="tl-date tl-date--warn">
+                                        {{ deliveredCount }}/{{ lines.length }} entregues
+                                        — falta {{ pendingLines.length }} item(ns)
+                                    </span>
+                                </div>
+                            </div>
+                            <!-- Todos entregues -->
+                            <div class="timeline-item" v-if="lastDeliveredAt">
                                 <Icon icon="mdi:package-variant-closed-check" class="tl-icon tl-delivered" />
                                 <div>
                                     <span class="tl-label">Entregue</span>
-                                    <span class="tl-date">{{ $dayjs(line?.delivered_at).format('DD/MM/YYYY HH:mm:ss') }}</span>
+                                    <span class="tl-date">{{ $dayjs(lastDeliveredAt).format('DD/MM/YYYY HH:mm:ss') }}</span>
                                 </div>
                             </div>
                             <div class="timeline-item" v-if="sale.cancelled_at">
@@ -679,6 +763,14 @@ onMounted(fetchSale)
     border-radius 12px
     padding 1.25rem 1.5rem
 
+.card-title-row
+    display flex
+    align-items center
+    justify-content space-between
+    gap 0.75rem
+    margin-bottom 1rem
+    flex-wrap wrap
+
 .card-title
     display block
     font-size 0.72rem
@@ -686,7 +778,33 @@ onMounted(fetchSale)
     text-transform uppercase
     letter-spacing 0.06em
     color #64748b
-    margin-bottom 1rem
+    margin-bottom 0
+
+.delivery-partial-badge
+    display inline-flex
+    align-items center
+    padding 0.18rem 0.55rem
+    border-radius 6px
+    font-size 0.7rem
+    font-weight 600
+    background rgba(239,68,68,0.1)
+    color #f87171
+    border 1px solid rgba(239,68,68,0.2)
+    white-space nowrap
+
+    &--warn
+        background rgba(245,158,11,0.1)
+        color #fbbf24
+        border-color rgba(245,158,11,0.2)
+
+    &--info
+        background rgba(59,130,246,0.1)
+        color #60a5fa
+        border-color rgba(59,130,246,0.2)
+
+.btn-count
+    font-size 0.75rem
+    opacity 0.8
 
 // ── Friendship card ───────────────────────────────────────────────────────────
 .friendship-card
@@ -778,6 +896,28 @@ onMounted(fetchSale)
     font-size 0.8rem
     color #64748b
     font-family monospace
+
+.line-qty-row
+    display flex
+    align-items center
+    gap 0.4rem
+    margin-top 0.35rem
+    font-size 0.78rem
+    color #64748b
+
+.line-subtotal
+    color #4caf50
+    font-weight 600
+
+.line-meta-grid
+    margin-top 0.6rem
+    padding-top 0.6rem
+    border-top 1px solid rgba(255,255,255,0.04)
+
+.line-divider
+    border none
+    border-top 1px dashed rgba(255,255,255,0.08)
+    margin 1rem 0
 
 // ── KV ───────────────────────────────────────────────────────────────────────
 .kv-grid
@@ -915,8 +1055,21 @@ onMounted(fetchSale)
 .tl-expires   { color #ef4444 }
 .tl-paid      { color #4caf50 }
 .tl-shipped   { color #3b82f6 }
+.tl-partial   { color #f59e0b }
 .tl-delivered { color #22c55e }
 .tl-cancelled { color #ef4444 }
+
+.tl-count
+    font-size 0.7rem
+    opacity 0.7
+    font-weight 400
+
+.tl-date--warn
+    color #f59e0b
+
+.tl-partial-entry
+    .tl-label
+        color #f59e0b
 
 .tl-label
     display block

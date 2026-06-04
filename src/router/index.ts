@@ -148,6 +148,21 @@ const routes = [
         name: 'recommendations',
         component: () => import('@/views/recommendations/RecommendationsList.vue'),
       },
+      {
+        path: 'news',
+        name: 'news',
+        component: () => import('@/views/news/NewsList.vue'),
+      },
+      {
+        path: 'news/new',
+        name: 'news-new',
+        component: () => import('@/views/news/NewsForm.vue'),
+      },
+      {
+        path: 'news/:uuid/edit',
+        name: 'news-edit',
+        component: () => import('@/views/news/NewsForm.vue'),
+      },
     ],
   },
   {

@@ -56,6 +56,20 @@ const sortOptions = [
     { label: 'Menor preço', value: 'price_asc' },
 ]
 
+const marketplaceFilter = ref('')
+const marketplaceOptions = [
+    { label: 'Todos os marketplaces', value: '' },
+    { label: 'Buff163', value: 'buff' },
+    { label: 'SkinBaron', value: 'skinbaron' },
+    { label: 'Skinport', value: 'skinport' },
+    { label: 'DMarket', value: 'dmarket' },
+    { label: 'Waxpeer', value: 'waxpeer' },
+    { label: 'BitSkins', value: 'bitskins' },
+    { label: 'CS.Money', value: 'csgotm' },
+    { label: 'Tradeit', value: 'tradeit' },
+    { label: 'Skinbid', value: 'skinbid' },
+]
+
 const fetchInventory = async (page: number) => {
     loading.value = true
     try {
@@ -70,6 +84,7 @@ const fetchInventory = async (page: number) => {
             sortFilter.value || undefined,
             minPrice,
             maxPrice,
+            marketplaceFilter.value || undefined,
         )
         if (response.data) {
             items.value = response.data.data
@@ -162,6 +177,9 @@ onMounted(() => {
             </div>
             <select v-model="sortFilter" @change="onFilterChange" class="filter-select">
                 <option v-for="opt in sortOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+            </select>
+            <select v-model="marketplaceFilter" @change="onFilterChange" class="filter-select">
+                <option v-for="opt in marketplaceOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
             </select>
             <div class="price-range">
                 <input

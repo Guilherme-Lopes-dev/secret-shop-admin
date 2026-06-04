@@ -191,6 +191,7 @@ export const adminService = {
     sort?: string,
     minPrice?: number,
     maxPrice?: number,
+    marketplace?: string,
   ) {
     const params = new URLSearchParams({ page: String(page), limit: String(limit) })
     if (botId) params.append('botId', botId)
@@ -199,6 +200,7 @@ export const adminService = {
     if (sort) params.append('sort', sort)
     if (minPrice !== undefined) params.append('minPrice', String(minPrice))
     if (maxPrice !== undefined) params.append('maxPrice', String(maxPrice))
+    if (marketplace) params.append('marketplace', marketplace)
     return api.get(`/skins/admin/inventory?${params}`)
   },
 
@@ -591,5 +593,25 @@ export const adminService = {
     const params = new URLSearchParams({ page: String(page), limit: String(limit) })
     if (search) params.append('search', search)
     return api.get(`/admin/user-hero-preferences?${params}`)
+  },
+
+  async getNewsList(page = 1, limit = 20) {
+    return api.get(`/news?page=${page}&limit=${limit}`)
+  },
+
+  async getNews(uuid: string) {
+    return api.get(`/news/${uuid}`)
+  },
+
+  async createNews(payload: Record<string, unknown>) {
+    return api.post('/news', payload)
+  },
+
+  async updateNews(uuid: string, payload: Record<string, unknown>) {
+    return api.put(`/news/${uuid}`, payload)
+  },
+
+  async deleteNews(uuid: string) {
+    return api.delete(`/news/${uuid}`)
   },
 }

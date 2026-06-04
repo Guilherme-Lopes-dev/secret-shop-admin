@@ -42,6 +42,9 @@ const form = ref({
     trade_cooldown_until: '',
 })
 
+const marketName = (mp: any) => mp.name ?? mp.source ?? mp.market ?? '—'
+const marketLogo = (mp: any) => mp.logo ?? null
+
 const parseCents = (value: string): number | undefined => {
     if (!value) return undefined
     const n = parseInt(value, 10)
@@ -300,6 +303,36 @@ onMounted(fetchItem)
                             <span v-if="pricePreview(form.lowest_price_brl)" class="field-preview">
                                 {{ pricePreview(form.lowest_price_brl) }}
                             </span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Preços por marketplace -->
+                <div v-if="item.skins?.market_prices?.length" class="form-section">
+                    <h2 class="form-section-title">
+                        <Icon icon="mdi:store-outline" /> Preços por Marketplace
+                        <span class="section-note">Somente leitura — atualizado via sync</span>
+                    </h2>
+                    <div class="market-prices-row">
+                        <div
+                            v-for="mp in item.skins.market_prices"
+                            :key="mp.source ?? mp.market"
+                            class="market-price-card"
+                        >
+                            <div class="market-price-header">
+                                <img
+                                    v-if="marketLogo(mp)"
+                                    :src="marketLogo(mp)"
+                                    class="market-price-logo"
+                                    alt=""
+                                    @error="($event.target as HTMLImageElement).style.display = 'none'"
+                                />
+                                <span class="market-price-name">{{ marketName(mp) }}</span>
+                            </div>
+                            <span class="market-price-value">
+                                {{ new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(mp.price) }}
+                            </span>
+                            <span class="market-price-qty">{{ mp.quantity }} disponíveis</span>
                         </div>
                     </div>
                 </div>
@@ -754,6 +787,50 @@ onMounted(fetchItem)
     from transform rotate(0deg)
     to transform rotate(360deg)
 
+.market-prices-row
+    display flex
+    gap 0.75rem
+    flex-wrap wrap
+
+.market-price-card
+    display flex
+    flex-direction column
+    gap 0.25rem
+    background #121214
+    border 1px solid rgba(255,255,255,0.08)
+    border-radius 10px
+    padding 0.75rem 1.1rem
+    min-width 140px
+
+.market-price-header
+    display flex
+    align-items center
+    gap 0.4rem
+    margin-bottom 0.1rem
+
+.market-price-logo
+    width 14px
+    height 14px
+    object-fit contain
+    border-radius 2px
+    flex-shrink 0
+
+.market-price-name
+    font-size 0.73rem
+    font-weight 600
+    color #64748b
+    text-transform uppercase
+    letter-spacing 0.05em
+
+.market-price-value
+    font-size 1.05rem
+    font-weight 700
+    color #e2e8f0
+
+.market-price-qty
+    font-size 0.72rem
+    color #475569
+
 @media (max-width: 800px)
     .form-row--4
         grid-template-columns 1fr 1fr
@@ -769,4 +846,7 @@ onMounted(fetchItem)
 
     .info-grid
         grid-template-columns 1fr
+
+    .market-prices-row
+        flex-direction column
 </style>

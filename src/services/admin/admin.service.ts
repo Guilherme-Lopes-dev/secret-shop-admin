@@ -614,4 +614,33 @@ export const adminService = {
   async deleteNews(uuid: string) {
     return api.delete(`/news/${uuid}`)
   },
+
+  async getSwaps(status?: string) {
+    const query = status ? `?status=${status}` : ''
+    return api.get(`/swaps${query}`)
+  },
+
+  async getSwap(uuid: string) {
+    return api.get(`/swaps/${uuid}`)
+  },
+
+  async approveSwap(uuid: string) {
+    return api.post(`/swaps/${uuid}/approve`)
+  },
+
+  async deliverSwap(uuid: string) {
+    return api.post(`/swaps/${uuid}/deliver`)
+  },
+
+  async rejectSwap(uuid: string, reason?: string) {
+    return api.post(`/swaps/${uuid}/reject`, { reason })
+  },
+
+  async getSwapMultiplier() {
+    return api.get<{ multiplier: number }>('/swaps/config/multiplier')
+  },
+
+  async setSwapMultiplier(multiplier: number) {
+    return api.post<{ multiplier: number }>('/swaps/config/multiplier', { multiplier })
+  },
 }

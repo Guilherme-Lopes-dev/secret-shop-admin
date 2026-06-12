@@ -51,6 +51,10 @@ const load = async () => {
 }
 
 const save = async () => {
+    if (!allowed.value.length && !window.confirm(
+        'Lista de países permitidos vazia: a restrição por país será desligada (nenhuma compra será forçada a PIX). Continuar?',
+    )) return
+
     saving.value = true
     try {
         const res = await adminService.setAntifraudCountryPolicy({
@@ -104,7 +108,7 @@ onMounted(load)
                         {{ labelFor(code) }}
                         <button @click="removeCountry('allowed', code)"><Icon icon="mdi:close" /></button>
                     </span>
-                    <span v-if="!allowed.length" class="empty">Nenhum país — todas as compras seriam restritas a PIX.</span>
+                    <span v-if="!allowed.length" class="empty">Lista vazia — restrição por país desligada (nada é forçado a PIX).</span>
                 </div>
 
                 <div class="add-row">

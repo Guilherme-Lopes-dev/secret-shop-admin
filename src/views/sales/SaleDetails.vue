@@ -6,6 +6,7 @@ import { adminService } from '@/services/admin/admin.service'
 import { formatCurrency } from '@/utils/formatCurrency'
 import { generateSaleReportPdf } from '@/utils/pdf/saleReport'
 import { Icon } from '@iconify/vue'
+import { countryName } from '@/utils/countries'
 
 const route = useRoute()
 const router = useRouter()
@@ -299,6 +300,10 @@ onBeforeUnmount(() => {
                         <div class="info-row">
                             <span class="label">IP</span>
                             <span class="value">{{ sale.ip_address || 'N/A' }}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="label">País do IP</span>
+                            <span class="value">{{ sale.ip_country ? `${sale.ip_country} — ${countryName(sale.ip_country)}` : 'N/A' }}</span>
                         </div>
                         <div class="info-row">
                             <span class="label">Anti-fraude</span>

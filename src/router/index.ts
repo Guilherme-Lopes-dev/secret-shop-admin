@@ -104,6 +104,11 @@ const routes = [
         component: () => import('@/views/passes/PassConfig.vue'),
       },
       {
+        path: 'antifraud',
+        name: 'antifraud-policy',
+        component: () => import('@/views/antifraud/AntifraudPolicy.vue'),
+      },
+      {
         path: 'discord',
         name: 'discord',
         component: () => import('@/views/discord/Discord.vue'),

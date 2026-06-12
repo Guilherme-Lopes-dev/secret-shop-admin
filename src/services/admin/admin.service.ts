@@ -366,6 +366,15 @@ export const adminService = {
     return api.get<PassProgressDto>(`/admin/passes/users/${uuid}/progress`)
   },
 
+  // Antifraud — política de país (allowlist / blocklist)
+  async getAntifraudCountryPolicy() {
+    return api.get<{ allowed: string[]; blocked: string[] }>('/admin/antifraud/country-policy')
+  },
+
+  async setAntifraudCountryPolicy(dto: { allowed?: string[]; blocked?: string[] }) {
+    return api.put<{ allowed: string[]; blocked: string[] }>('/admin/antifraud/country-policy', dto)
+  },
+
   // Collector Sales (admin)
   async getCollectorSales(params: {
     page?: number

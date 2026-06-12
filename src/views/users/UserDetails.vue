@@ -6,6 +6,7 @@ import { formatCurrency } from '@/utils/formatCurrency'
 import { Icon } from '@iconify/vue'
 import { toast } from 'vue3-toastify'
 import UserPassCard from '@/components/passes/UserPassCard.vue'
+import { countryName } from '@/utils/countries'
 
 const route = useRoute()
 const router = useRouter()
@@ -155,7 +156,7 @@ onMounted(fetchUser)
                         </div>
                         <div class="info-row">
                             <span class="info-label">País</span>
-                            <span class="info-value">{{ user.country || '—' }}</span>
+                            <span class="info-value">{{ user.country ? `${user.country} — ${countryName(user.country)}` : '—' }}</span>
                         </div>
                         <div class="info-row">
                             <span class="info-label">Último IP</span>

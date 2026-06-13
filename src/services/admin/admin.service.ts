@@ -590,12 +590,12 @@ export const adminService = {
     }>>(`/admin/whatsapp/blast/preview?${params}`)
   },
 
-  async sendWhatsappBlast(userUuids: string[], message: string) {
-    return api.post<{ queued: number }>('/admin/whatsapp/blast', { userUuids, message })
+  async sendWhatsappBlast(userUuids: string[], message: string, spacingMs?: number) {
+    return api.post<{ queued: number; spacingMs: number }>('/admin/whatsapp/blast', { userUuids, message, spacingMs })
   },
 
-  async sendWhatsappBlastByPhones(phones: string[], message: string) {
-    return api.post<{ queued: number; skipped: number; invalid: string[] }>('/admin/whatsapp/blast/by-phones', { phones, message })
+  async sendWhatsappBlastByPhones(phones: string[], message: string, spacingMs?: number) {
+    return api.post<{ queued: number; skipped: number; invalid: string[]; spacingMs: number }>('/admin/whatsapp/blast/by-phones', { phones, message, spacingMs })
   },
 
   async getUserHeroPreferences(page = 1, limit = 20, search?: string) {

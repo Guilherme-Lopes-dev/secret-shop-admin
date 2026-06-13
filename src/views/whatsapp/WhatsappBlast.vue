@@ -286,6 +286,7 @@ function toggleItem(id: string) {
 // ── Message & send ───────────────────────────────────────────────────────────
 
 const message        = ref('')
+const spacingSeconds = ref(60)
 const sending        = ref(false)
 const result         = ref<{ queued: number; skipped?: number; invalid?: string[] } | null>(null)
 const error          = ref<string | null>(null)
@@ -299,11 +300,36 @@ const canSend = computed(() =>
   selectedCount.value > 0 && message.value.trim().length > 0 && !sending.value,
 )
 
+// Segundos efetivos: campo vazio → 1 min (padrão do backend).
+const effectiveSpacingSeconds = computed(() => {
+  const s = spacingSeconds.value
+  return Number.isFinite(s) && s >= 0 ? Math.floor(s) : 60
+})
+
+function formatDuration(totalSeconds: number): string {
+  if (totalSeconds <= 0) return 'imediato'
+  const h = Math.floor(totalSeconds / 3600)
+  const m = Math.floor((totalSeconds % 3600) / 60)
+  const s = totalSeconds % 60
+  return [h ? `${h}h` : '', m ? `${m}min` : '', s ? `${s}s` : ''].filter(Boolean).join(' ')
+}
+
+const spacingHuman = computed(() => formatDuration(effectiveSpacingSeconds.value))
+const blastTotalHuman = computed(() =>
+  formatDuration(effectiveSpacingSeconds.value * Math.max(0, selectedCount.value - 1)),
+)
+
 async function sendBlast() {
   if (!canSend.value) return
   error.value = null
   result.value = null
   sending.value = true
+
+  // Campo vazio (NaN) → undefined: o backend aplica o padrão de 1 min.
+  const rawSeconds = spacingSeconds.value
+  const spacingMs = Number.isFinite(rawSeconds) && rawSeconds >= 0
+    ? Math.floor(rawSeconds) * 1000
+    : undefined
 
   try {
     if (mode.value === 'csv') {
@@ -311,13 +337,14 @@ async function sendBlast() {
         .filter((c) => selectedIds.value.has(c.id))
         .map((c) => c.phone)
 
-      const res = await adminService.sendWhatsappBlastByPhones(phones, message.value.trim())
+      const res = await adminService.sendWhatsappBlastByPhones(phones, message.value.trim(), spacingMs)
       result.value = res.data
       markPhonesAsSent(phones)
     } else {
       const res = await adminService.sendWhatsappBlast(
         Array.from(selectedIds.value),
         message.value.trim(),
+        spacingMs,
       )
       result.value = res.data
     }
@@ -700,6 +727,22 @@ onMounted(() => {
           rows="6"
         />
         <p class="field-hint">{{ message.length }}/4096</p>
+
+        <div class="spacing-field">
+          <label class="spacing-label">Intervalo entre mensagens (segundos)</label>
+          <input
+            v-model.number="spacingSeconds"
+            type="number"
+            min="0"
+            max="86400"
+            class="form-input input-sm"
+          />
+          <span class="field-hint">Vazio = 1 min padrão · 0 = sem intervalo</span>
+          <span class="field-hint spacing-convert">
+            Intervalo: <strong>{{ spacingHuman }}</strong>
+            <template v-if="selectedCount > 1"> · Tempo total p/ {{ selectedCount }} envios: <strong>~{{ blastTotalHuman }}</strong></template>
+          </span>
+        </div>
       </div>
 
       <div class="send-row">
@@ -973,6 +1016,22 @@ onMounted(() => {
   width 100%
   resize vertical
   font-family inherit
+
+.spacing-field
+  margin-top 12px
+  display flex
+  flex-direction column
+  gap 4px
+
+.spacing-label
+  font-size 0.82rem
+  color #cbd5e1
+  font-weight 500
+
+.spacing-convert
+  color #60a5fa
+  strong
+    color #93c5fd
 
 // ── Buttons ───────────────────────────────────────────────────────────────────
 

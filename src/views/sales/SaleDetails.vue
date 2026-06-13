@@ -20,6 +20,11 @@ let copyTimer: ReturnType<typeof setTimeout> | null = null
 const exportingPdf = ref(false)
 const fetchingReceipt = ref(false)
 
+const safeTradeLink = computed(() => {
+    const url = sale.value?.users?.trade_link
+    return typeof url === 'string' && /^https:\/\/steamcommunity\.com\//i.test(url) ? url : null
+})
+
 function copyTradeLink() {
     if (!sale.value?.users?.trade_link) return
     navigator.clipboard.writeText(sale.value.users.trade_link)
@@ -326,7 +331,14 @@ onBeforeUnmount(() => {
                         <div class="info-row trade-link-row">
                             <span class="label">Trade Link</span>
                             <div v-if="sale.users?.trade_link" class="trade-link-value">
-                                <span class="trade-link-text">{{ sale.users.trade_link }}</span>
+                                <a
+                                    v-if="safeTradeLink"
+                                    class="trade-link-text"
+                                    :href="safeTradeLink"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                >{{ sale.users.trade_link }}</a>
+                                <span v-else class="trade-link-text">{{ sale.users.trade_link }}</span>
                                 <button
                                     class="copy-btn"
                                     :title="tradeLinkCopied ? 'Copiado!' : 'Copiar'"
@@ -949,10 +961,14 @@ table
 
 .trade-link-text
     font-size 0.8rem
-    color #94a3b8
+    color #60a5fa
     word-break break-all
     line-height 1.4
     flex 1
+    cursor pointer
+    text-decoration none
+    &:hover
+        text-decoration underline
 
 .copy-btn
     flex-shrink 0

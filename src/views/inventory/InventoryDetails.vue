@@ -590,7 +590,7 @@ onMounted(fetchItem)
         grid-template-columns 1fr 1fr 1fr
 
     &--4
-        grid-template-columns 1fr 1fr 1fr 1fr
+        grid-template-columns 1fr 1fr
 
 .field
     display flex

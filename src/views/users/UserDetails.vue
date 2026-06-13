@@ -139,7 +139,14 @@ onMounted(fetchUser)
                     <div class="info-list">
                         <div class="info-row">
                             <span class="info-label">Steam ID</span>
-                            <code class="info-value mono">{{ user.steam_id || '—' }}</code>
+                            <a
+                                v-if="user.steam_id"
+                                class="info-value mono steam-link"
+                                :href="`https://steamcommunity.com/profiles/${encodeURIComponent(user.steam_id)}`"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                            >{{ user.steam_id }}</a>
+                            <code v-else class="info-value mono">—</code>
                         </div>
                         <div class="info-row">
                             <span class="info-label">E-mail</span>
@@ -388,6 +395,13 @@ onMounted(fetchUser)
         padding 1px 5px
         border-radius 4px
         font-size 0.78rem
+
+    &.steam-link
+        color #60a5fa
+        cursor pointer
+        text-decoration none
+        &:hover
+            text-decoration underline
 
     &.muted
         color #64748b

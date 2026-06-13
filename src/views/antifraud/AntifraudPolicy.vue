@@ -4,6 +4,7 @@ import { Icon } from '@iconify/vue'
 import { toast } from 'vue3-toastify'
 import { adminService } from '@/services/admin/admin.service'
 import { COUNTRIES, countryName } from '@/utils/countries'
+import CountryPicker from './CountryPicker.vue'
 
 const errorMessage = (err: unknown, fallback: string): string => {
     const e = err as { response?: { data?: { message?: string } } }
@@ -14,10 +15,8 @@ const loading = ref(true)
 const saving = ref(false)
 const allowed = ref<string[]>([])
 const blocked = ref<string[]>([])
-const allowedSelect = ref('')
-const blockedSelect = ref('')
 
-// Opções do select, escondendo o que já está na respectiva lista.
+// Opções do picker, escondendo o que já está na respectiva lista.
 const allowedOptions = computed(() => COUNTRIES.filter((c) => !allowed.value.includes(c.code)))
 const blockedOptions = computed(() => COUNTRIES.filter((c) => !blocked.value.includes(c.code)))
 
@@ -26,8 +25,6 @@ const addCountry = (list: 'allowed' | 'blocked', code: string) => {
     const target = list === 'allowed' ? allowed : blocked
     if (target.value.includes(code)) return
     target.value = [...target.value, code]
-    if (list === 'allowed') allowedSelect.value = ''
-    else blockedSelect.value = ''
 }
 
 const removeCountry = (list: 'allowed' | 'blocked', code: string) => {
@@ -112,12 +109,7 @@ onMounted(load)
                 </div>
 
                 <div class="add-row">
-                    <select v-model="allowedSelect" @change="addCountry('allowed', allowedSelect)">
-                        <option value="" disabled>Selecione um país…</option>
-                        <option v-for="c in allowedOptions" :key="c.code" :value="c.code">
-                            {{ c.code }} — {{ c.name }}
-                        </option>
-                    </select>
+                    <CountryPicker :options="allowedOptions" @select="addCountry('allowed', $event)" />
                 </div>
             </article>
 
@@ -140,12 +132,7 @@ onMounted(load)
                 </div>
 
                 <div class="add-row">
-                    <select v-model="blockedSelect" @change="addCountry('blocked', blockedSelect)">
-                        <option value="" disabled>Selecione um país…</option>
-                        <option v-for="c in blockedOptions" :key="c.code" :value="c.code">
-                            {{ c.code }} — {{ c.name }}
-                        </option>
-                    </select>
+                    <CountryPicker :options="blockedOptions" @select="addCountry('blocked', $event)" />
                 </div>
             </article>
         </div>

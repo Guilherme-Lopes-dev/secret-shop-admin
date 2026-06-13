@@ -194,7 +194,7 @@ onMounted(() => fetchUsers(1))
                             </tr>
                         </template>
                         <template v-else>
-                            <tr v-for="user in users" :key="user.id">
+                            <tr v-for="user in users" :key="user.id" class="clickable-row" @click="router.push(`/users/${user.id}`)">
                                 <td>
                                     <div class="user-cell">
                                         <img v-if="user.avatar" :src="user.avatar" class="user-avatar" alt="" />
@@ -224,7 +224,7 @@ onMounted(() => fetchUsers(1))
                                 </td>
                                 <td>{{ $dayjs(user.created_at).format('DD/MM/YYYY') }}</td>
                                 <td>
-                                    <button class="btn-view" @click="router.push(`/users/${user.id}`)">Ver</button>
+                                    <button class="btn-view" @click.stop="router.push(`/users/${user.id}`)">Ver</button>
                                 </td>
                             </tr>
                             <tr v-if="users.length === 0">
@@ -459,6 +459,12 @@ table
 .status-user
     background rgba(148,163,184,0.08)
     color #94a3b8
+
+.clickable-row
+    cursor pointer
+    transition background 0.15s
+    &:hover
+        background rgba(255,255,255,0.04)
 
 .btn-view
     background rgba(99,102,241,0.1)

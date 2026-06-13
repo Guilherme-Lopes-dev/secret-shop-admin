@@ -296,7 +296,12 @@ onBeforeUnmount(() => {
                     <div class="info-list">
                         <div class="info-row">
                             <span class="label">Usuario</span>
-                            <span class="value">{{ sale.users?.username || 'N/A' }}</span>
+                            <a
+                                v-if="sale.users?.id || sale.users?.uuid"
+                                class="value user-link"
+                                @click="router.push(`/users/${sale.users.id || sale.users.uuid}`)"
+                            >{{ sale.users?.username || 'N/A' }}</a>
+                            <span v-else class="value">{{ sale.users?.username || 'N/A' }}</span>
                         </div>
                         <div class="info-row">
                             <span class="label">UUID</span>
@@ -775,6 +780,14 @@ onBeforeUnmount(() => {
         padding 1px 5px
         border-radius 4px
         font-size 0.78rem
+
+    &.user-link
+        color #6366f1
+        cursor pointer
+        text-decoration underline
+
+        &:hover
+            color #818cf8
 
     &.truncate
         white-space nowrap

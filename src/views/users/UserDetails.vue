@@ -14,6 +14,16 @@ const user = ref<any>(null)
 const loading = ref(true)
 const error = ref('')
 
+// Link de trade só se for steamcommunity https (evita href perigoso).
+const tradeHref = (url?: string | null): string | null =>
+    typeof url === 'string' && /^https:\/\/steamcommunity\.com\//i.test(url) ? url : null
+
+// WhatsApp: wa.me com só dígitos do telefone.
+const whatsappHref = (phone?: string | null): string | null => {
+    const digits = (phone || '').replace(/\D/g, '')
+    return digits.length >= 10 ? `https://wa.me/${digits}` : null
+}
+
 const fetchUser = async () => {
     loading.value = true
     error.value = ''
@@ -154,11 +164,25 @@ onMounted(fetchUser)
                         </div>
                         <div class="info-row">
                             <span class="info-label">Contato</span>
-                            <span class="info-value">{{ user.contact || '—' }}</span>
+                            <a
+                                v-if="whatsappHref(user.contact)"
+                                class="info-value steam-link"
+                                :href="whatsappHref(user.contact)!"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                            >{{ user.contact }}</a>
+                            <span v-else class="info-value">{{ user.contact || '—' }}</span>
                         </div>
                         <div class="info-row info-row--wrap">
                             <span class="info-label">Trade Link</span>
-                            <code v-if="user.trade_link" class="info-value mono trade-link-text">{{ user.trade_link }}</code>
+                            <a
+                                v-if="tradeHref(user.trade_link)"
+                                class="info-value mono trade-link-text steam-link"
+                                :href="tradeHref(user.trade_link)!"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                            >{{ user.trade_link }}</a>
+                            <code v-else-if="user.trade_link" class="info-value mono trade-link-text">{{ user.trade_link }}</code>
                             <span v-else class="info-value muted">—</span>
                         </div>
                         <div class="info-row">

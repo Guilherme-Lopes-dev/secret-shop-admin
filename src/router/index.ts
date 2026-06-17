@@ -154,6 +154,11 @@ const routes = [
         component: () => import('@/views/recommendations/RecommendationsList.vue'),
       },
       {
+        path: 'swaps',
+        name: 'swaps',
+        component: () => import('@/views/swaps/SwapsList.vue'),
+      },
+      {
         path: 'news',
         name: 'news',
         component: () => import('@/views/news/NewsList.vue'),

@@ -16,6 +16,7 @@ const navItems = [
     { label: 'Resumo Vendas', icon: 'mdi:chart-bar', to: '/sales/summary', name: 'sales-summary' },
     { label: 'Usuários', icon: 'mdi:account-group-outline', to: '/users', name: 'users' },
     { label: 'Trade Offers', icon: 'mdi:swap-horizontal', to: '/trade-offers', name: 'trade-offers' },
+    { label: 'Trocas (Swaps)', icon: 'mdi:swap-horizontal-bold', to: '/swaps', name: 'swaps' },
     { label: 'Inventário', icon: 'mdi:sword', to: '/inventory', name: 'inventory' },
     { label: 'Collectors', icon: 'mdi:trophy-outline', to: '/collectors', name: 'collectors', exact: true },
     { label: 'Catálogo Col.', icon: 'mdi:trophy-variant-outline', to: '/collectors/catalog', name: 'collectors-catalog', exact: false },

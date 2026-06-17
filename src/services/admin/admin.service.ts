@@ -623,4 +623,57 @@ export const adminService = {
   async deleteNews(uuid: string) {
     return api.delete(`/news/${uuid}`)
   },
+
+  async getSwaps(status?: string) {
+    const query = status ? `?status=${status}` : ''
+    return api.get(`/swaps${query}`)
+  },
+
+  async getSwap(uuid: string) {
+    return api.get(`/swaps/${uuid}`)
+  },
+
+  async approveSwap(uuid: string) {
+    return api.post(`/swaps/${uuid}/approve`)
+  },
+
+  async deliverSwap(uuid: string) {
+    return api.post(`/swaps/${uuid}/deliver`)
+  },
+
+  async rejectSwap(uuid: string, reason?: string) {
+    return api.post(`/swaps/${uuid}/reject`, { reason })
+  },
+
+  async refreshSwapCompensation(uuid: string) {
+    return api.post(`/swaps/${uuid}/compensation/refresh`)
+  },
+
+  async simulateSwapCompensationPaid(uuid: string) {
+    return api.post(`/swaps/${uuid}/compensation/simulate-paid`)
+  },
+
+  async getSwapMultiplier() {
+    return api.get<{ multiplier: number }>('/swaps/config/multiplier')
+  },
+
+  async setSwapMultiplier(multiplier: number) {
+    return api.post<{ multiplier: number }>('/swaps/config/multiplier', { multiplier })
+  },
+
+  async getSwapCompensationConfig() {
+    return api.get<SwapCompensationConfig>('/swaps/config/compensation')
+  },
+
+  async setSwapCompensationConfig(config: Partial<SwapCompensationConfig>) {
+    return api.post<SwapCompensationConfig>('/swaps/config/compensation', config)
+  },
+}
+
+export interface SwapCompensationConfig {
+  enabled: boolean
+  max: number
+  tolerance: number
+  margin: number
+  maxUserItems: number
 }

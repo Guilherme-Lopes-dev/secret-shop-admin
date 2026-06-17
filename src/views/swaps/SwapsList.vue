@@ -5,17 +5,60 @@
         <h1 class="page-title">Trocas (Swaps)</h1>
         <p class="page-subtitle">{{ swaps.length }} trocas listadas</p>
       </div>
-      <div class="multiplier-card">
+    </header>
+
+    <section class="config-panel">
+      <div class="config-block">
         <label>Multiplicador de preço</label>
-        <div class="multiplier-row">
-          <input v-model.number="multiplier" type="number" step="0.01" min="0" />
+        <div class="config-fields">
+          <div class="field">
+            <small>Multiplicador</small>
+            <input v-model.number="multiplier" type="number" step="0.01" min="0" />
+          </div>
           <button class="btn-primary" :disabled="savingMultiplier" @click="saveMultiplier">
             {{ savingMultiplier ? 'Salvando...' : 'Salvar' }}
           </button>
         </div>
-        <span class="multiplier-hint">preço exibido = preço SteamWebAPI × multiplicador</span>
+        <span class="config-hint">preço exibido = preço SteamWebAPI × multiplicador</span>
       </div>
-    </header>
+
+      <div class="config-divider"></div>
+
+      <div class="config-block grow">
+        <label>Compensação em dinheiro (swap)</label>
+        <div class="config-fields">
+          <div class="field toggle-field">
+            <small>Ativada</small>
+            <label class="switch">
+              <input v-model="comp.enabled" type="checkbox" />
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div class="field">
+            <small>Teto (R$)</small>
+            <input v-model.number="compMaxReais" type="number" step="0.01" min="0" />
+          </div>
+          <div class="field">
+            <small>Margem-alvo (fator)</small>
+            <input v-model.number="comp.margin" type="number" step="0.01" min="0" />
+          </div>
+          <div class="field">
+            <small>Tolerância (%)</small>
+            <input v-model.number="comp.tolerance" type="number" step="0.1" min="0" />
+          </div>
+          <div class="field">
+            <small>Máx. itens do usuário</small>
+            <input v-model.number="comp.maxUserItems" type="number" step="1" min="0" />
+          </div>
+          <button class="btn-primary" :disabled="savingComp" @click="saveComp">
+            {{ savingComp ? 'Salvando...' : 'Salvar config' }}
+          </button>
+        </div>
+        <span class="config-hint">
+          comp = recebe − oferece (&gt;0 user paga PIX). Acima do teto bloqueia; off exige troca exata. Máx. itens 0 = sem limite.
+        </span>
+      </div>
+    </section>
 
     <div class="filters">
       <button
@@ -140,6 +183,40 @@
           </div>
         </div>
 
+        <div v-if="detail.compensation_amount > 0 || detail.value_flag" class="comp-block">
+          <div class="comp-block-head">
+            <h4>Compensação</h4>
+            <span v-if="detail.value_flag" class="flag-badge" :class="'flag-' + detail.value_flag">
+              {{ detail.value_flag === 'green' ? '🟢 Dentro da margem' : '🟡 Abaixo da margem' }}
+            </span>
+          </div>
+
+          <div class="comp-grid">
+            <div><span>Valor</span> {{ formatCurrency(detail.compensation_amount) }}</div>
+            <div>
+              <span>Status</span>
+              <span class="status-badge" :class="compStatusClass(detail.compensation_status)">
+                {{ compStatusLabel(detail.compensation_status) }}
+              </span>
+            </div>
+            <div v-if="detail.payment_provider"><span>Gateway</span> {{ detail.payment_provider }}</div>
+          </div>
+
+          <div v-if="detail.compensation_qr_payload" class="qr-block">
+            <img
+              v-if="detail.compensation_qr_image"
+              :src="'data:image/png;base64,' + detail.compensation_qr_image"
+              alt="QR PIX"
+              class="qr-img"
+            />
+            <div class="qr-copy">
+              <span>Copia e cola</span>
+              <code>{{ detail.compensation_qr_payload }}</code>
+              <button class="btn-view" @click="copyPix(detail.compensation_qr_payload)">Copiar</button>
+            </div>
+          </div>
+        </div>
+
         <div class="detail-meta">
           <div><span>Multiplicador</span> {{ detail.price_multiplier }}</div>
           <div v-if="detail.expires_at"><span>Reserva até</span> {{ $dayjs(detail.expires_at).format('DD/MM/YY HH:mm') }}</div>
@@ -150,6 +227,22 @@
 
         <div class="modal-actions">
           <button class="btn-ghost" @click="detail = null">Fechar</button>
+          <button
+            v-if="detail.compensation_amount > 0 && detail.compensation_status !== 'paid'"
+            class="btn-ghost"
+            :disabled="acting"
+            @click="refreshCompensation"
+          >
+            {{ acting ? '...' : 'Reconciliar pagamento' }}
+          </button>
+          <button
+            v-if="detail.compensation_amount > 0 && detail.compensation_status !== 'paid'"
+            class="btn-ghost btn-dev"
+            :disabled="acting"
+            @click="simulatePaid"
+          >
+            DEV: Simular PIX pago
+          </button>
           <button v-if="canReject(detail.status)" class="btn-danger" :disabled="acting" @click="reject">
             Rejeitar
           </button>
@@ -166,8 +259,9 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
-import { adminService } from '@/services/admin/admin.service'
+import { computed, onMounted, ref } from 'vue'
+import { toast } from 'vue3-toastify'
+import { adminService, type SwapCompensationConfig } from '@/services/admin/admin.service'
 import { formatCurrency } from '@/utils/formatCurrency'
 
 const swaps = ref<any[]>([])
@@ -178,6 +272,26 @@ const actionError = ref('')
 const multiplier = ref(1)
 const savingMultiplier = ref(false)
 const activeStatus = ref('')
+
+const comp = ref<SwapCompensationConfig>({ enabled: true, max: 100000, tolerance: 0, margin: 1, maxUserItems: 10 })
+const savingComp = ref(false)
+const compMaxReais = computed({
+  get: () => Math.round((comp.value.max / 100) * 100) / 100,
+  set: (v: number) => { comp.value.max = Math.round((Number(v) || 0) * 100) },
+})
+
+const compStatusMeta: Record<string, { label: string; cls: string }> = {
+  pending: { label: 'Aguardando PIX', cls: 'status-scheduled' },
+  paid: { label: 'Pago', cls: 'status-active' },
+  refunded: { label: 'Estornado', cls: 'status-inactive' },
+  not_required: { label: 'Sem cobrança', cls: 'status-draft' },
+}
+const compStatusLabel = (s: string | null) => (s ? compStatusMeta[s]?.label ?? s : '—')
+const compStatusClass = (s: string | null) => (s ? compStatusMeta[s]?.cls ?? 'status-draft' : 'status-draft')
+
+const copyPix = (payload: string) => {
+  navigator.clipboard?.writeText(payload)
+}
 
 const statusFilters = [
   { value: '', label: 'Todos' },
@@ -247,6 +361,24 @@ const fetchMultiplier = async () => {
   multiplier.value = res.data.multiplier
 }
 
+const fetchComp = async () => {
+  const res = await adminService.getSwapCompensationConfig()
+  comp.value = res.data
+}
+
+const saveComp = async () => {
+  savingComp.value = true
+  try {
+    const res = await adminService.setSwapCompensationConfig(comp.value)
+    comp.value = res.data
+    toast.success('Configuração de compensação salva.')
+  } catch (err: any) {
+    toast.error(err.response?.data?.message ?? 'Erro ao salvar configuração.')
+  } finally {
+    savingComp.value = false
+  }
+}
+
 const setStatus = (status: string) => {
   activeStatus.value = status
   fetchSwaps()
@@ -257,6 +389,9 @@ const saveMultiplier = async () => {
   try {
     const res = await adminService.setSwapMultiplier(multiplier.value)
     multiplier.value = res.data.multiplier
+    toast.success('Multiplicador salvo.')
+  } catch (err: any) {
+    toast.error(err.response?.data?.message ?? 'Erro ao salvar multiplicador.')
   } finally {
     savingMultiplier.value = false
   }
@@ -293,6 +428,18 @@ const approve = () =>
 const deliver = () =>
   runAction(() => adminService.deliverSwap(detail.value.id), 'Falha ao entregar.')
 
+const refreshCompensation = () =>
+  runAction(
+    () => adminService.refreshSwapCompensation(detail.value.id),
+    'Falha ao reconciliar pagamento.',
+  )
+
+const simulatePaid = () =>
+  runAction(
+    () => adminService.simulateSwapCompensationPaid(detail.value.id),
+    'Falha ao simular pagamento (ative ALLOW_DEV_PAYMENT_SIMULATION).',
+  )
+
 const reject = () => {
   const reason = window.prompt('Motivo da rejeição (opcional):') ?? undefined
   return runAction(() => adminService.rejectSwap(detail.value.id, reason), 'Falha ao rejeitar.')
@@ -307,6 +454,7 @@ const applyUpdate = (updated: any) => {
 onMounted(() => {
   fetchSwaps()
   fetchMultiplier()
+  fetchComp()
 })
 </script>
 
@@ -333,15 +481,26 @@ onMounted(() => {
   color rgba(255,255,255,0.45)
   margin 0
 
-.multiplier-card
+.config-panel
+  display flex
+  align-items stretch
+  gap 1.5rem
+  width 100%
   background #16161a
   border 1px solid rgba(255,255,255,0.06)
   border-radius 12px
-  padding 0.9rem 1.1rem
+  padding 1.1rem 1.25rem
+  margin-bottom 1.5rem
+  flex-wrap wrap
+
+.config-block
   display flex
   flex-direction column
-  gap 6px
-  min-width 240px
+  gap 0.75rem
+
+  &.grow
+    flex 1
+    min-width 320px
 
   label
     font-size 0.72rem
@@ -349,12 +508,28 @@ onMounted(() => {
     letter-spacing 0.04em
     color rgba(255,255,255,0.45)
 
-.multiplier-row
+.config-divider
+  width 1px
+  align-self stretch
+  background rgba(255,255,255,0.07)
+
+.config-fields
   display flex
-  gap 8px
+  align-items flex-end
+  gap 1rem
+  flex-wrap wrap
+
+.field
+  display flex
+  flex-direction column
+  gap 5px
+
+  small
+    font-size 0.7rem
+    color rgba(255,255,255,0.5)
 
   input
-    flex 1
+    width 120px
     background #0e0e11
     border 1px solid rgba(255,255,255,0.12)
     border-radius 8px
@@ -362,9 +537,131 @@ onMounted(() => {
     color #fff
     font-size 0.9rem
 
-.multiplier-hint
+.toggle-field
+  justify-content space-between
+  min-height 56px
+
+.config-hint
   font-size 0.72rem
   color rgba(255,255,255,0.35)
+
+.config-fields .btn-primary
+  height 38px
+
+.switch
+  position relative
+  display inline-block
+  width 40px
+  height 22px
+
+  input
+    opacity 0
+    width 0
+    height 0
+
+.slider
+  position absolute
+  cursor pointer
+  inset 0
+  background rgba(255,255,255,0.18)
+  border-radius 999px
+  transition 0.2s
+  &::before
+    content ''
+    position absolute
+    height 16px
+    width 16px
+    left 3px
+    bottom 3px
+    background #fff
+    border-radius 50%
+    transition 0.2s
+
+.switch input:checked + .slider
+  background #6366f1
+.switch input:checked + .slider::before
+  transform translateX(18px)
+
+.comp-block
+  margin-top 1.25rem
+  padding-top 1rem
+  border-top 1px solid rgba(255,255,255,0.06)
+
+.comp-block-head
+  display flex
+  align-items center
+  justify-content space-between
+  margin-bottom 0.75rem
+
+  h4
+    margin 0
+    font-size 0.85rem
+    color rgba(255,255,255,0.75)
+
+.flag-badge
+  padding 2px 10px
+  border-radius 999px
+  font-size 0.75rem
+  font-weight 600
+
+.flag-green
+  background rgba(46,220,138,0.12)
+  color #4ade80
+
+.flag-yellow
+  background rgba(251,191,36,0.12)
+  color #fbbf24
+
+.comp-grid
+  display flex
+  flex-wrap wrap
+  gap 1.25rem
+  font-size 0.82rem
+
+  div span
+    display block
+    font-size 0.7rem
+    text-transform uppercase
+    letter-spacing 0.03em
+    color rgba(255,255,255,0.4)
+    margin-bottom 4px
+
+.qr-block
+  display flex
+  gap 1rem
+  margin-top 1rem
+  align-items flex-start
+
+.qr-img
+  width 120px
+  height 120px
+  border-radius 8px
+  background #fff
+  padding 4px
+
+.qr-copy
+  display flex
+  flex-direction column
+  gap 6px
+  flex 1
+  min-width 0
+
+  span
+    font-size 0.7rem
+    text-transform uppercase
+    letter-spacing 0.03em
+    color rgba(255,255,255,0.4)
+
+  code
+    font-size 0.72rem
+    word-break break-all
+    color rgba(255,255,255,0.7)
+    background #0e0e11
+    border 1px solid rgba(255,255,255,0.08)
+    border-radius 6px
+    padding 0.5rem
+    max-height 90px
+    overflow-y auto
 
 .filters
   display flex
@@ -541,6 +838,13 @@ tbody tr:hover td
   cursor pointer
   &:hover
     background rgba(255,255,255,0.06)
+
+.btn-dev
+  border-style dashed
+  border-color rgba(251,191,36,0.4)
+  color #fbbf24
+  &:hover
+    background rgba(251,191,36,0.08)
 
 .empty-state
   text-align center

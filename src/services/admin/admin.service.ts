@@ -636,6 +636,14 @@ export const adminService = {
     return api.post(`/swaps/${uuid}/reject`, { reason })
   },
 
+  async refreshSwapCompensation(uuid: string) {
+    return api.post(`/swaps/${uuid}/compensation/refresh`)
+  },
+
+  async simulateSwapCompensationPaid(uuid: string) {
+    return api.post(`/swaps/${uuid}/compensation/simulate-paid`)
+  },
+
   async getSwapMultiplier() {
     return api.get<{ multiplier: number }>('/swaps/config/multiplier')
   },
@@ -643,4 +651,20 @@ export const adminService = {
   async setSwapMultiplier(multiplier: number) {
     return api.post<{ multiplier: number }>('/swaps/config/multiplier', { multiplier })
   },
+
+  async getSwapCompensationConfig() {
+    return api.get<SwapCompensationConfig>('/swaps/config/compensation')
+  },
+
+  async setSwapCompensationConfig(config: Partial<SwapCompensationConfig>) {
+    return api.post<SwapCompensationConfig>('/swaps/config/compensation', config)
+  },
+}
+
+export interface SwapCompensationConfig {
+  enabled: boolean
+  max: number
+  tolerance: number
+  margin: number
+  maxUserItems: number
 }

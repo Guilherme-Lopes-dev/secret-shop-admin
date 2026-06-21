@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { adminService } from '@/services/admin/admin.service'
 import { formatCurrency } from '@/utils/formatCurrency'
 import { Icon } from '@iconify/vue'
+import { toast } from 'vue3-toastify'
 
 const router = useRouter()
 const users = ref<any[]>([])
@@ -79,6 +80,22 @@ const onFilterInput = () => {
 const onSearchInput = () => {
     if (searchTimeout) clearTimeout(searchTimeout)
     searchTimeout = setTimeout(() => fetchUsers(1), 200)
+}
+
+const swapBusy = ref<string | null>(null)
+const toggleSwap = async (user: any) => {
+    if (swapBusy.value) return
+    swapBusy.value = user.id
+    try {
+        const { data } = await adminService.toggleUserSwap(user.id)
+        user.swap_enabled = data.swap_enabled
+        toast.success(data.swap_enabled ? 'Trade liberado para o usuário.' : 'Trade bloqueado para o usuário.')
+    } catch (error) {
+        console.error('Erro ao alternar acesso ao trade:', error)
+        toast.error('Falha ao alterar o acesso ao trade.')
+    } finally {
+        swapBusy.value = null
+    }
 }
 
 const nextPage = () => { if (currentPage.value < totalPages.value) fetchUsers(currentPage.value + 1) }
@@ -168,6 +185,7 @@ onMounted(() => fetchUsers(1))
                             <th>Pedidos</th>
                             <th>Valor Gasto</th>
                             <th>Role</th>
+                            <th>Trade</th>
                             <th>Cadastro</th>
                             <th>Ações</th>
                         </tr>
@@ -190,6 +208,7 @@ onMounted(() => fetchUsers(1))
                                 <td><div class="skeleton skeleton-line" style="width: 70px" /></td>
                                 <td><div class="skeleton skeleton-line" style="width: 50px" /></td>
                                 <td><div class="skeleton skeleton-line" style="width: 80px" /></td>
+                                <td><div class="skeleton skeleton-line" style="width: 90px" /></td>
                                 <td><div class="skeleton skeleton-line" style="width: 40px" /></td>
                             </tr>
                         </template>
@@ -222,13 +241,29 @@ onMounted(() => fetchUsers(1))
                                         {{ user.admin ? 'Admin' : 'User' }}
                                     </span>
                                 </td>
+                                <td @click.stop>
+                                    <span v-if="user.admin" class="swap-static">
+                                        <Icon icon="mdi:shield-check" />
+                                        Liberado
+                                    </span>
+                                    <button
+                                        v-else
+                                        class="swap-toggle"
+                                        :class="user.swap_enabled ? 'swap-on' : 'swap-off'"
+                                        :disabled="swapBusy === user.id"
+                                        @click.stop="toggleSwap(user)"
+                                    >
+                                        <Icon :icon="user.swap_enabled ? 'mdi:check-circle' : 'mdi:cancel'" />
+                                        {{ user.swap_enabled ? 'Liberado' : 'Bloqueado' }}
+                                    </button>
+                                </td>
                                 <td>{{ $dayjs(user.created_at).format('DD/MM/YYYY') }}</td>
                                 <td>
                                     <button class="btn-view" @click.stop="router.push(`/users/${user.id}`)">Ver</button>
                                 </td>
                             </tr>
                             <tr v-if="users.length === 0">
-                                <td colspan="9" class="empty-state">Nenhum usuário encontrado.</td>
+                                <td colspan="10" class="empty-state">Nenhum usuário encontrado.</td>
                             </tr>
                         </template>
                     </tbody>
@@ -459,6 +494,48 @@ table
 .status-user
     background rgba(148,163,184,0.08)
     color #94a3b8
+
+.swap-toggle
+    display inline-flex
+    align-items center
+    gap 0.35rem
+    border none
+    padding 0.35rem 0.7rem
+    border-radius 6px
+    font-size 0.76rem
+    font-weight 600
+    cursor pointer
+    transition all 0.2s
+    white-space nowrap
+
+    &:disabled
+        opacity 0.5
+        cursor not-allowed
+
+.swap-on
+    background rgba(76,175,80,0.14)
+    color #4caf50
+
+    &:hover:not(:disabled)
+        background rgba(76,175,80,0.24)
+
+.swap-off
+    background rgba(148,163,184,0.1)
+    color #94a3b8
+
+    &:hover:not(:disabled)
+        background rgba(148,163,184,0.18)
+
+.swap-static
+    display inline-flex
+    align-items center
+    gap 0.35rem
+    padding 0.35rem 0.7rem
+    border-radius 6px
+    font-size 0.76rem
+    font-weight 600
+    background rgba(76,175,80,0.14)
+    color #4caf50
 
 .clickable-row
     cursor pointer

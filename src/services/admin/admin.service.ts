@@ -145,6 +145,14 @@ export const adminService = {
     return api.patch(`/admin/users/${uuid}/toggle-active`)
   },
 
+  async toggleUserSwap(uuid: string) {
+    return api.patch<{ id: string; swap_enabled: boolean }>(`/admin/users/${uuid}/toggle-swap`)
+  },
+
+  async setAllUsersSwap(enabled: boolean) {
+    return api.post<{ updated: number; enabled: boolean }>('/admin/users/swap-access', { enabled })
+  },
+
   // Trade offers
   async getTradeOffers(page: number = 1, limit: number = 20, status?: string) {
     const params = new URLSearchParams({ page: String(page), limit: String(limit) })
@@ -654,11 +662,14 @@ export const adminService = {
   },
 
   async getSwapMultiplier() {
-    return api.get<{ multiplier: number }>('/swaps/config/multiplier')
+    return api.get<{ multiplier: number; storeMultiplier: number }>('/swaps/config/multiplier')
   },
 
-  async setSwapMultiplier(multiplier: number) {
-    return api.post<{ multiplier: number }>('/swaps/config/multiplier', { multiplier })
+  async setSwapMultiplier(payload: { multiplier?: number; storeMultiplier?: number }) {
+    return api.post<{ multiplier: number; storeMultiplier: number }>(
+      '/swaps/config/multiplier',
+      payload,
+    )
   },
 
   async getSwapCompensationConfig() {

@@ -9,17 +9,21 @@
 
     <section class="config-panel">
       <div class="config-block">
-        <label>Multiplicador de preço</label>
+        <label>Multiplicadores de preço</label>
         <div class="config-fields">
           <div class="field">
-            <small>Multiplicador</small>
+            <small>Itens do usuário</small>
             <input v-model.number="multiplier" type="number" step="0.01" min="0" />
+          </div>
+          <div class="field">
+            <small>Itens da loja</small>
+            <input v-model.number="storeMultiplier" type="number" step="0.01" min="0" />
           </div>
           <button class="btn-primary" :disabled="savingMultiplier" @click="saveMultiplier">
             {{ savingMultiplier ? 'Salvando...' : 'Salvar' }}
           </button>
         </div>
-        <span class="config-hint">preço exibido = preço SteamWebAPI × multiplicador</span>
+        <span class="config-hint">usuário = preço SteamWebAPI × mult · loja = preço do catálogo × mult</span>
       </div>
 
       <div class="config-divider"></div>
@@ -57,6 +61,21 @@
         <span class="config-hint">
           comp = recebe − oferece (&gt;0 user paga PIX). Acima do teto bloqueia; off exige troca exata. Máx. itens 0 = sem limite.
         </span>
+      </div>
+
+      <div class="config-divider"></div>
+
+      <div class="config-block">
+        <label>Acesso ao trade (todos)</label>
+        <div class="config-fields">
+          <button class="btn-primary" :disabled="settingAllSwap" @click="setAllSwap(true)">
+            {{ settingAllSwap ? 'Aplicando...' : 'Liberar p/ todos' }}
+          </button>
+          <button class="btn-danger" :disabled="settingAllSwap" @click="setAllSwap(false)">
+            Bloquear p/ todos
+          </button>
+        </div>
+        <span class="config-hint">aplica a todos de uma vez; o ajuste 1 a 1 fica na tela de Usuários.</span>
       </div>
     </section>
 
@@ -167,6 +186,22 @@
           </section>
         </div>
 
+        <div class="value-summary">
+          <div class="vs-cell">
+            <span>Usuário oferece</span>
+            <strong class="value-give">{{ formatCurrency(detail.user_items_value) }}</strong>
+          </div>
+          <Icon icon="mdi:arrow-right" width="18" class="vs-arrow" />
+          <div class="vs-cell">
+            <span>Loja envia</span>
+            <strong class="value-get">{{ formatCurrency(detail.store_items_value) }}</strong>
+          </div>
+          <div class="vs-cell vs-diff">
+            <span>Diferença (loja − usuário)</span>
+            <strong>{{ formatCurrency(detail.store_items_value - detail.user_items_value) }}</strong>
+          </div>
+        </div>
+
         <div v-if="detail.offers && detail.offers.length > 0" class="offers-block">
           <h4 class="offers-title">
             Ofertas por bot
@@ -200,6 +235,9 @@
               </span>
             </div>
             <div v-if="detail.payment_provider"><span>Gateway</span> {{ detail.payment_provider }}</div>
+            <div v-if="detail.compensation_paid_at">
+              <span>Pago em</span> {{ $dayjs(detail.compensation_paid_at).format('DD/MM/YY HH:mm') }}
+            </div>
           </div>
 
           <div v-if="detail.compensation_qr_payload" class="qr-block">
@@ -218,7 +256,12 @@
         </div>
 
         <div class="detail-meta">
-          <div><span>Multiplicador</span> {{ detail.price_multiplier }}</div>
+          <div><span>Mult. usuário</span> {{ detail.price_multiplier }}×</div>
+          <div><span>Mult. loja</span> {{ detail.store_price_multiplier ?? 1 }}×</div>
+          <div><span>Steam ID</span> {{ detail.users?.steam_id || '—' }}</div>
+          <div><span>Criada</span> {{ $dayjs(detail.created_at).format('DD/MM/YY HH:mm') }}</div>
+          <div v-if="detail.approved_at"><span>Aprovada</span> {{ $dayjs(detail.approved_at).format('DD/MM/YY HH:mm') }}</div>
+          <div v-if="detail.items_received_at"><span>Itens recebidos</span> {{ $dayjs(detail.items_received_at).format('DD/MM/YY HH:mm') }}</div>
           <div v-if="detail.expires_at"><span>Reserva até</span> {{ $dayjs(detail.expires_at).format('DD/MM/YY HH:mm') }}</div>
           <div v-if="detail.rejection_reason" class="reason"><span>Motivo</span> {{ detail.rejection_reason }}</div>
         </div>
@@ -270,6 +313,7 @@ const detail = ref<any>(null)
 const acting = ref(false)
 const actionError = ref('')
 const multiplier = ref(1)
+const storeMultiplier = ref(1)
 const savingMultiplier = ref(false)
 const activeStatus = ref('')
 
@@ -359,6 +403,7 @@ const fetchSwaps = async () => {
 const fetchMultiplier = async () => {
   const res = await adminService.getSwapMultiplier()
   multiplier.value = res.data.multiplier
+  storeMultiplier.value = res.data.storeMultiplier ?? 1
 }
 
 const fetchComp = async () => {
@@ -379,6 +424,21 @@ const saveComp = async () => {
   }
 }
 
+const settingAllSwap = ref(false)
+const setAllSwap = async (enabled: boolean) => {
+  const verb = enabled ? 'liberar' : 'bloquear'
+  if (!window.confirm(`Tem certeza que deseja ${verb} o trade para TODOS os usuários?`)) return
+  settingAllSwap.value = true
+  try {
+    const { data } = await adminService.setAllUsersSwap(enabled)
+    toast.success(`Trade ${enabled ? 'liberado' : 'bloqueado'} para ${data.updated} usuário(s).`)
+  } catch (err: any) {
+    toast.error(err.response?.data?.message ?? 'Falha ao atualizar acesso em massa.')
+  } finally {
+    settingAllSwap.value = false
+  }
+}
+
 const setStatus = (status: string) => {
   activeStatus.value = status
   fetchSwaps()
@@ -387,11 +447,15 @@ const setStatus = (status: string) => {
 const saveMultiplier = async () => {
   savingMultiplier.value = true
   try {
-    const res = await adminService.setSwapMultiplier(multiplier.value)
+    const res = await adminService.setSwapMultiplier({
+      multiplier: multiplier.value,
+      storeMultiplier: storeMultiplier.value,
+    })
     multiplier.value = res.data.multiplier
-    toast.success('Multiplicador salvo.')
+    storeMultiplier.value = res.data.storeMultiplier
+    toast.success('Multiplicadores salvos.')
   } catch (err: any) {
-    toast.error(err.response?.data?.message ?? 'Erro ao salvar multiplicador.')
+    toast.error(err.response?.data?.message ?? 'Erro ao salvar multiplicadores.')
   } finally {
     savingMultiplier.value = false
   }
@@ -545,7 +609,8 @@ onMounted(() => {
   font-size 0.72rem
   color rgba(255,255,255,0.35)
 
-.config-fields .btn-primary
+.config-fields .btn-primary,
+.config-fields .btn-danger
   height 38px
 
 .switch
@@ -1005,6 +1070,42 @@ tbody tr:hover td
   .reason
     flex-basis 100%
     color #fc8181
+
+.value-summary
+  display flex
+  align-items center
+  gap 1rem
+  flex-wrap wrap
+  margin-top 1.25rem
+  padding 0.9rem 1rem
+  background #16161a
+  border 1px solid rgba(255,255,255,0.06)
+  border-radius 10px
+
+.vs-cell
+  display flex
+  flex-direction column
+  gap 3px
+
+  span
+    font-size 0.68rem
+    text-transform uppercase
+    letter-spacing 0.03em
+    color rgba(255,255,255,0.4)
+
+  strong
+    font-size 1rem
+    font-weight 700
+
+.vs-arrow
+  color rgba(255,255,255,0.3)
+
+.vs-diff
+  margin-left auto
+  text-align right
+
+  strong
+    color #a5b4fc
 
 .phase-hint
   margin 0 0 1rem

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import { useAuthStore } from '@/stores/auth.store'
@@ -9,6 +9,8 @@ const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
 const sidebarOpen = ref(true)
+
+const NAV_ORDER_STORAGE_KEY = 'admin.sidebar.order'
 
 const navItems = [
     { label: 'Dashboard', icon: 'mdi:view-dashboard-outline', to: '/', name: 'dashboard' },
@@ -34,7 +36,74 @@ const navItems = [
     // { label: 'Add Produto', icon: 'mdi:plus-circle-outline', to: '/products/create', name: 'create-product' },
 ]
 
-const isActive = (item: typeof navItems[0]) => {
+type NavItem = typeof navItems[0]
+
+const orderedItems = ref<NavItem[]>([...navItems])
+const dragIndex = ref<number | null>(null)
+const dragOverIndex = ref<number | null>(null)
+
+const parseSavedOrder = (raw: string): string[] => {
+    try {
+        const parsed = JSON.parse(raw)
+        return Array.isArray(parsed) ? parsed : []
+    } catch {
+        return []
+    }
+}
+
+const sortBySavedOrder = (savedNames: string[]): NavItem[] => {
+    const rank = (name: string) => {
+        const index = savedNames.indexOf(name)
+        return index === -1 ? Number.MAX_SAFE_INTEGER : index
+    }
+    return [...navItems].sort((a, b) => rank(a.name) - rank(b.name))
+}
+
+const loadOrder = () => {
+    const raw = localStorage.getItem(NAV_ORDER_STORAGE_KEY)
+    if (!raw) return
+
+    const savedNames = parseSavedOrder(raw)
+    if (!savedNames.length) return
+
+    orderedItems.value = sortBySavedOrder(savedNames)
+}
+
+const persistOrder = () => {
+    const names = orderedItems.value.map(item => item.name)
+    localStorage.setItem(NAV_ORDER_STORAGE_KEY, JSON.stringify(names))
+}
+
+const onDragStart = (index: number) => {
+    dragIndex.value = index
+}
+
+const onDragEnter = (index: number) => {
+    dragOverIndex.value = index
+}
+
+const onDragEnd = () => {
+    dragIndex.value = null
+    dragOverIndex.value = null
+}
+
+const onDrop = (index: number) => {
+    const from = dragIndex.value
+    onDragEnd()
+    if (from === null) return
+    if (from === index) return
+
+    const items = [...orderedItems.value]
+    const [moved] = items.splice(from, 1)
+    if (!moved) return
+
+    items.splice(index, 0, moved)
+
+    orderedItems.value = items
+    persistOrder()
+}
+
+const isActive = (item: NavItem) => {
     if (item.name === 'dashboard') return route.path === '/'
     if ((item as any).exact) return route.path === item.to || route.path === item.to + '/'
     return route.path.startsWith(item.to)
@@ -44,6 +113,8 @@ const logout = async () => {
     await authService.logout()
     router.push('/login')
 }
+
+onMounted(loadOrder)
 </script>
 
 <template>
@@ -58,12 +129,23 @@ const logout = async () => {
 
             <nav class="sidebar-nav">
                 <router-link
-                    v-for="item in navItems"
+                    v-for="(item, index) in orderedItems"
                     :key="item.name"
                     :to="item.to"
                     class="nav-item"
-                    :class="{ active: isActive(item) }"
+                    :class="{
+                        active: isActive(item),
+                        dragging: dragIndex === index,
+                        'drag-over': dragOverIndex === index && dragIndex !== index,
+                    }"
+                    draggable="true"
+                    @dragstart="onDragStart(index)"
+                    @dragenter.prevent="onDragEnter(index)"
+                    @dragover.prevent
+                    @drop.prevent="onDrop(index)"
+                    @dragend="onDragEnd"
                 >
+                    <Icon icon="mdi:drag-vertical" class="nav-drag-handle" />
                     <Icon :icon="item.icon" class="nav-icon" />
                     <span v-if="sidebarOpen" class="nav-label">{{ item.label }}</span>
                 </router-link>
@@ -112,6 +194,9 @@ const logout = async () => {
     &.collapsed
         width 60px
         min-width 60px
+
+        .nav-drag-handle
+            display none
 
 .sidebar-header
     display flex
@@ -215,12 +300,32 @@ const logout = async () => {
         background rgba(99, 102, 241, 0.08)
         border-left-color #6366f1
 
+    &.dragging
+        opacity 0.4
+
+    &.drag-over
+        border-top 2px solid #6366f1
+
+    &:hover .nav-drag-handle
+        opacity 1
+
     &--logout
         color #64748b
 
         &:hover
             color #f44336
             background rgba(244,67,54,0.06)
+
+.nav-drag-handle
+    font-size 1rem
+    flex-shrink 0
+    color #475569
+    cursor grab
+    opacity 0
+    transition opacity 0.15s
+
+    &:active
+        cursor grabbing
 
 .nav-icon
     font-size 1.25rem
@@ -240,6 +345,6 @@ const logout = async () => {
         width 60px
         min-width 60px
 
-        .nav-label, .sidebar-brand, .user-info
+        .nav-label, .sidebar-brand, .user-info, .nav-drag-handle
             display none
 </style>

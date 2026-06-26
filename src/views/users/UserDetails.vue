@@ -60,6 +60,22 @@ const toggleActive = async () => {
     }
 }
 
+const resettingCooldown = ref(false)
+
+const resetInventoryCooldown = async () => {
+    if (!user.value) return
+    resettingCooldown.value = true
+    try {
+        await adminService.resetInventoryCooldown(route.params.uuid as string)
+        user.value = { ...user.value, last_inventory_fetch_at: null }
+        toast.success('Atualização de inventário liberada.')
+    } catch (e: any) {
+        toast.error(e?.response?.data?.message || 'Erro ao liberar atualização de inventário.')
+    } finally {
+        resettingCooldown.value = false
+    }
+}
+
 const getStatusClass = (status: string) => {
     if (!status) return ''
     const s = status.toLowerCase()
@@ -115,6 +131,15 @@ onMounted(fetchUser)
                             @click="confirmingToggle = false"
                         >
                             Cancelar
+                        </button>
+                        <button
+                            class="btn-toggle-active btn-cooldown"
+                            :disabled="resettingCooldown || !user.last_inventory_fetch_at"
+                            :title="user.last_inventory_fetch_at ? 'Zera o cooldown de 12h para o usuário poder atualizar o inventário no trocador' : 'Usuário já pode atualizar o inventário'"
+                            @click="resetInventoryCooldown"
+                        >
+                            <Icon icon="mdi:refresh" />
+                            {{ resettingCooldown ? 'Aguarde...' : !user.last_inventory_fetch_at ? 'Inventário já liberado' : 'Liberar atualização de inventário' }}
                         </button>
                     </div>
                 </div>
@@ -198,6 +223,10 @@ onMounted(fetchUser)
                             <span class="info-value" :style="{ color: user.risk_score > 50 ? '#f44336' : '#4caf50' }">
                                 {{ user.risk_score ?? 0 }}
                             </span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">Última busca de inventário (swap)</span>
+                            <span class="info-value">{{ user.last_inventory_fetch_at ? $dayjs(user.last_inventory_fetch_at).format('DD/MM/YYYY HH:mm') : '—' }}</span>
                         </div>
                         <div class="info-row">
                             <span class="info-label">Cadastro</span>
@@ -544,6 +573,13 @@ table
 
     &:hover
         background rgba(148,163,184,0.14)
+
+.btn-cooldown
+    background rgba(33,150,243,0.12)
+    color #2196f3
+
+    &:hover:not(:disabled)
+        background rgba(33,150,243,0.22)
 
 .status-completed
     background rgba(76,175,80,0.1)

@@ -149,6 +149,12 @@ export const adminService = {
     return api.patch<{ id: string; swap_enabled: boolean }>(`/admin/users/${uuid}/toggle-swap`)
   },
 
+  async resetInventoryCooldown(uuid: string) {
+    return api.patch<{ id: string; last_inventory_fetch_at: string | null }>(
+      `/admin/users/${uuid}/reset-inventory-cooldown`,
+    )
+  },
+
   async setAllUsersSwap(enabled: boolean) {
     return api.post<{ updated: number; enabled: boolean }>('/admin/users/swap-access', { enabled })
   },

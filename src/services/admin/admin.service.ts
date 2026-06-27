@@ -685,6 +685,18 @@ export const adminService = {
   async setSwapCompensationConfig(config: Partial<SwapCompensationConfig>) {
     return api.post<SwapCompensationConfig>('/swaps/config/compensation', config)
   },
+
+  async getRarityMultipliers() {
+    return api.get<RarityMultiplier[]>('/swaps/config/rarity-multipliers')
+  },
+
+  async upsertRarityMultiplier(payload: RarityMultiplierInput) {
+    return api.post<RarityMultiplier[]>('/swaps/config/rarity-multipliers', payload)
+  },
+
+  async deleteRarityMultiplier(rarity: string) {
+    return api.post<RarityMultiplier[]>('/swaps/config/rarity-multipliers/delete', { rarity })
+  },
 }
 
 export interface SwapCompensationConfig {
@@ -693,4 +705,18 @@ export interface SwapCompensationConfig {
   tolerance: number
   margin: number
   maxUserItems: number
+}
+
+export interface RarityMultiplier {
+  rarity: string
+  userMultiplier: number
+  storeMultiplier: number
+  active: boolean
+}
+
+export interface RarityMultiplierInput {
+  rarity: string
+  userMultiplier?: number
+  storeMultiplier?: number
+  active?: boolean
 }

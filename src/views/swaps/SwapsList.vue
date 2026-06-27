@@ -77,6 +77,56 @@
         </div>
         <span class="config-hint">aplica a todos de uma vez; o ajuste 1 a 1 fica na tela de Usuários.</span>
       </div>
+
+      <div class="config-divider"></div>
+
+      <div class="config-block grow">
+        <label>Multiplicador por raridade</label>
+        <div class="rarity-grid">
+          <div class="rarity-row rarity-head">
+            <span>Raridade</span>
+            <span>Usuário</span>
+            <span>Loja</span>
+            <span>Ativo</span>
+            <span></span>
+          </div>
+          <div v-for="row in rarityMultipliers" :key="row.rarity" class="rarity-row">
+            <span class="rarity-name">{{ row.rarity }}</span>
+            <input v-model.number="row.userMultiplier" type="number" step="0.01" min="0" />
+            <input v-model.number="row.storeMultiplier" type="number" step="0.01" min="0" />
+            <label class="switch sm">
+              <input v-model="row.active" type="checkbox" />
+              <span class="slider"></span>
+            </label>
+            <div class="rarity-actions">
+              <button class="btn-primary sm" :disabled="savingRarity === row.rarity" @click="saveRarity(row)">
+                {{ savingRarity === row.rarity ? '...' : 'Salvar' }}
+              </button>
+              <button class="btn-danger sm" :disabled="savingRarity === row.rarity" @click="removeRarity(row.rarity)">
+                Remover
+              </button>
+            </div>
+          </div>
+
+          <div class="rarity-row rarity-add">
+            <select v-model="newRarity.rarity">
+              <option value="">Adicionar raridade…</option>
+              <option v-for="r in availableRarities" :key="r" :value="r">{{ r }}</option>
+            </select>
+            <input v-model.number="newRarity.userMultiplier" type="number" step="0.01" min="0" />
+            <input v-model.number="newRarity.storeMultiplier" type="number" step="0.01" min="0" />
+            <span></span>
+            <button
+              class="btn-primary sm"
+              :disabled="!newRarity.rarity || savingRarity === newRarity.rarity"
+              @click="addRarity"
+            >
+              Adicionar
+            </button>
+          </div>
+        </div>
+        <span class="config-hint">raridade na lista usa estes multiplicadores; o resto cai no multiplicador global acima.</span>
+      </div>
     </section>
 
     <div class="filters">
@@ -304,7 +354,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { toast } from 'vue3-toastify'
-import { adminService, type SwapCompensationConfig } from '@/services/admin/admin.service'
+import { adminService, type SwapCompensationConfig, type RarityMultiplier } from '@/services/admin/admin.service'
 import { formatCurrency } from '@/utils/formatCurrency'
 
 const swaps = ref<any[]>([])
@@ -316,6 +366,16 @@ const multiplier = ref(1)
 const storeMultiplier = ref(1)
 const savingMultiplier = ref(false)
 const activeStatus = ref('')
+
+const KNOWN_RARITIES = ['Common', 'Uncommon', 'Rare', 'Mythical', 'Legendary', 'Ancient', 'Immortal', 'Arcana']
+const rarityMultipliers = ref<RarityMultiplier[]>([])
+const savingRarity = ref('')
+const newRarity = ref({ rarity: '', userMultiplier: 1, storeMultiplier: 1 })
+const availableRarities = computed(() =>
+  KNOWN_RARITIES.filter(
+    (r) => !rarityMultipliers.value.some((m) => m.rarity.toLowerCase() === r.toLowerCase()),
+  ),
+)
 
 const comp = ref<SwapCompensationConfig>({ enabled: true, max: 100000, tolerance: 0, margin: 1, maxUserItems: 10 })
 const savingComp = ref(false)
@@ -515,10 +575,70 @@ const applyUpdate = (updated: any) => {
   detail.value = updated
 }
 
+const fetchRarityMultipliers = async () => {
+  try {
+    const res = await adminService.getRarityMultipliers()
+    rarityMultipliers.value = res.data
+  } catch {
+    /* opcional */
+  }
+}
+
+const saveRarity = async (row: RarityMultiplier) => {
+  savingRarity.value = row.rarity
+  try {
+    const res = await adminService.upsertRarityMultiplier({
+      rarity: row.rarity,
+      userMultiplier: row.userMultiplier,
+      storeMultiplier: row.storeMultiplier,
+      active: row.active,
+    })
+    rarityMultipliers.value = res.data
+    toast.success('Multiplicador salvo.')
+  } catch (err: any) {
+    toast.error(err.response?.data?.message ?? 'Erro ao salvar.')
+  } finally {
+    savingRarity.value = ''
+  }
+}
+
+const addRarity = async () => {
+  const next = newRarity.value
+  if (!next.rarity) return
+  savingRarity.value = next.rarity
+  try {
+    const res = await adminService.upsertRarityMultiplier({
+      rarity: next.rarity,
+      userMultiplier: next.userMultiplier,
+      storeMultiplier: next.storeMultiplier,
+    })
+    rarityMultipliers.value = res.data
+    newRarity.value = { rarity: '', userMultiplier: 1, storeMultiplier: 1 }
+    toast.success('Raridade adicionada.')
+  } catch (err: any) {
+    toast.error(err.response?.data?.message ?? 'Erro ao adicionar.')
+  } finally {
+    savingRarity.value = ''
+  }
+}
+
+const removeRarity = async (rarity: string) => {
+  savingRarity.value = rarity
+  try {
+    const res = await adminService.deleteRarityMultiplier(rarity)
+    rarityMultipliers.value = res.data
+  } catch (err: any) {
+    toast.error(err.response?.data?.message ?? 'Erro ao remover.')
+  } finally {
+    savingRarity.value = ''
+  }
+}
+
 onMounted(() => {
   fetchSwaps()
   fetchMultiplier()
   fetchComp()
+  fetchRarityMultipliers()
 })
 </script>
 
@@ -608,6 +728,47 @@ onMounted(() => {
 .config-hint
   font-size 0.72rem
   color rgba(255,255,255,0.35)
+
+.rarity-grid
+  display flex
+  flex-direction column
+  gap 6px
+  margin-top 4px
+
+.rarity-row
+  display grid
+  grid-template-columns 110px 90px 90px 50px 1fr
+  align-items center
+  gap 10px
+
+  input, select
+    width 100%
+    background #0e0e11
+    border 1px solid rgba(255,255,255,0.12)
+    border-radius 8px
+    padding 0.4rem 0.55rem
+    color #fff
+    font-size 0.85rem
+
+.rarity-head
+  font-size 0.7rem
+  color rgba(255,255,255,0.45)
+  text-transform uppercase
+  letter-spacing 0.04em
+
+.rarity-name
+  font-weight 600
+  font-size 0.9rem
+
+.rarity-actions
+  display flex
+  gap 6px
+
+.btn-primary.sm,
+.btn-danger.sm
+  height 32px
+  padding 0 10px
+  font-size 0.78rem
 
 .config-fields .btn-primary,
 .config-fields .btn-danger

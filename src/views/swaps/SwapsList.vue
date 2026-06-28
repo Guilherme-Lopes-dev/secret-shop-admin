@@ -436,7 +436,7 @@ const offerStatusMeta: Record<string, string> = {
 const phaseHints: Record<string, string> = {
   pending_admin: 'Aprovar pede os itens do usuário (escrow). Nada é enviado da loja ainda.',
   awaiting_user_items: 'Oferta enviada — aguardando o usuário depositar os itens.',
-  items_received: 'Itens recebidos e conferidos na conta do bot. Revise e clique em Entregar.',
+  items_received: 'Itens recebidos e conferidos. A entrega é automática — o bot já está enviando. Use o botão abaixo só se a entrega automática falhar.',
   review: 'Itens recebidos com divergência (nome/valor). Decida manualmente entregar ou devolver.',
   store_sent: 'Itens da loja enviados ao usuário. Aguardando aceite na Steam.',
 }

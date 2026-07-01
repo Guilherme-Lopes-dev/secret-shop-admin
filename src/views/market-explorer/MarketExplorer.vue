@@ -5,24 +5,14 @@ import { adminService, type MarketExplorerItem } from '@/services/admin/admin.se
 import { formatCurrency } from '@/utils/formatCurrency'
 import { Icon } from '@iconify/vue'
 import { toast } from 'vue3-toastify'
+import {
+  items, rarities, hasFetched, fetchedAt,
+  currentPage, totalPages, totalItems, pageSize,
+  searchQuery, rarityFilter, priceFilter, sortValue,
+} from './explorerState'
 
 const router = useRouter()
-const items = ref<MarketExplorerItem[]>([])
-const rarities = ref<string[]>([])
 const loading = ref(false)
-const hasFetched = ref(false)
-const fetchedAt = ref<string | null>(null)
-
-const currentPage = ref(1)
-const totalPages = ref(1)
-const totalItems = ref(0)
-const pageSize = ref(50)
-
-const searchQuery = ref('')
-const rarityFilter = ref('')
-const priceFilter = ref<'all' | 'with' | 'without'>('all')
-const sortBy = ref<'price' | 'name' | 'rarity'>('name')
-const sortDir = ref<'asc' | 'desc'>('asc')
 
 let searchTimeout: ReturnType<typeof setTimeout> | null = null
 
@@ -39,14 +29,11 @@ const sortOptions = [
   { label: 'Maior preço', by: 'price', dir: 'desc' },
   { label: 'Raridade', by: 'rarity', dir: 'asc' },
 ]
-const sortValue = ref('name:asc')
 
 const load = async (page: number, refresh = false) => {
   loading.value = true
   try {
     const [by, dir] = sortValue.value.split(':') as ['price' | 'name' | 'rarity', 'asc' | 'desc']
-    sortBy.value = by
-    sortDir.value = dir
     const res = await adminService.getMarketExplorer({
       page,
       pageSize: pageSize.value,

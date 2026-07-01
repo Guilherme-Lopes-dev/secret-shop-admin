@@ -57,6 +57,9 @@ const cancelModal   = ref(false)
 const cancelRefund  = ref(false)
 const cancelLoading = ref(false)
 
+// ── Asaas receipt ─────────────────────────────────────────────────────────────
+const fetchingReceipt = ref(false)
+
 // ── Friendship Steam ──────────────────────────────────────────────────────────
 const friendship        = ref<any>(null)
 const friendshipLoading = ref(false)
@@ -240,6 +243,27 @@ const confirmCancel = async () => {
     }
 }
 
+const openAsaasReceipt = async () => {
+    if (!sale.value?.payment_id) {
+        toast.warning('Pedido não possui cobrança Asaas vinculada.')
+        return
+    }
+    fetchingReceipt.value = true
+    try {
+        const { data } = await adminService.getCollectorSaleAsaasPayment(route.params.uuid as string)
+        const url = data?.invoiceUrl || data?.bankSlipUrl || data?.transactionReceiptUrl
+        if (!url) {
+            toast.warning('Asaas não retornou URL de pagamento.')
+            return
+        }
+        window.open(url, '_blank', 'noopener,noreferrer')
+    } catch (err: any) {
+        toast.error(err?.response?.data?.message || 'Falha ao buscar cobrança no Asaas.')
+    } finally {
+        fetchingReceipt.value = false
+    }
+}
+
 onMounted(fetchSale)
 </script>
 
@@ -273,6 +297,16 @@ onMounted(fetchSale)
                     <p class="page-sub">Criado em {{ $dayjs(sale.created_at).format('DD/MM/YYYY [às] HH:mm:ss') }}</p>
                 </div>
                 <div class="header-actions">
+                    <button
+                        v-if="sale.payment_status === 'PAID'"
+                        class="btn-action-main btn-neutral-soft"
+                        :disabled="fetchingReceipt || !sale.payment_id"
+                        :title="!sale.payment_id ? 'Pedido sem cobrança Asaas' : ''"
+                        @click="openAsaasReceipt"
+                    >
+                        <Icon icon="mdi:receipt-text-outline" />
+                        {{ fetchingReceipt ? 'Buscando...' : 'Comprovante Asaas' }}
+                    </button>
                     <button
                         v-if="nextAction"
                         class="btn-action-main btn-ship"
@@ -379,7 +413,7 @@ onMounted(fetchSale)
                             </div>
                             <div class="kv" style="grid-column: span 2">
                                 <span class="kv-label">Asaas Payment ID</span>
-                                <span class="kv-value mono">{{ sale.asaas_payment_id ?? '-' }}</span>
+                                <span class="kv-value mono">{{ sale.payment_id ?? '-' }}</span>
                             </div>
                         </div>
                     </div>
@@ -570,9 +604,9 @@ onMounted(fetchSale)
                                 <span class="kv-label">UUID do Pedido</span>
                                 <span class="kv-value mono small">{{ sale.id }}</span>
                             </div>
-                            <div class="kv" v-if="sale.asaas_payment_id">
+                            <div class="kv" v-if="sale.payment_id">
                                 <span class="kv-label">ID Asaas</span>
-                                <span class="kv-value mono small">{{ sale.asaas_payment_id }}</span>
+                                <span class="kv-value mono small">{{ sale.payment_id }}</span>
                             </div>
                         </div>
                     </div>
@@ -735,6 +769,18 @@ onMounted(fetchSale)
 
     &:hover
         background rgba(239,68,68,0.2)
+
+.btn-action-main.btn-neutral-soft
+    background rgba(148,163,184,0.12)
+    color #cbd5e1
+    border 1px solid rgba(148,163,184,0.25)
+
+    &:hover
+        background rgba(148,163,184,0.22)
+
+    &:disabled
+        opacity 0.5
+        cursor not-allowed
 
 // ── Content grid ──────────────────────────────────────────────────────────────
 .content-grid

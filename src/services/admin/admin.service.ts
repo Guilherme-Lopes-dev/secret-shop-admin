@@ -423,6 +423,21 @@ export const adminService = {
     return api.get(`/collector-sales/${uuid}/friendship/admin`)
   },
 
+  async getCollectorSaleAsaasPayment(uuid: string) {
+    return api.get<{
+      id: string
+      status: string
+      billingType: string
+      value: number
+      netValue?: number | null
+      dueDate: string
+      description?: string | null
+      invoiceUrl?: string | null
+      bankSlipUrl?: string | null
+      transactionReceiptUrl?: string | null
+    }>(`/collector-sales/admin/${uuid}/asaas-payment`)
+  },
+
   // Products
   async createProduct(dto: {
     name: string

@@ -64,6 +64,16 @@ const routes = [
         component: () => import('@/views/inventory/InventoryList.vue'),
       },
       {
+        path: 'market-explorer',
+        name: 'market-explorer',
+        component: () => import('@/views/market-explorer/MarketExplorer.vue'),
+      },
+      {
+        path: 'market-explorer/item',
+        name: 'market-explorer-item',
+        component: () => import('@/views/market-explorer/MarketExplorerItemDetail.vue'),
+      },
+      {
         path: 'inventory/:uuid',
         name: 'inventory-details',
         component: () => import('@/views/inventory/InventoryDetails.vue'),

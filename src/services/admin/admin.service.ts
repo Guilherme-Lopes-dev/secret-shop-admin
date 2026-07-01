@@ -222,6 +222,41 @@ export const adminService = {
     return api.post('/skins/admin/sync')
   },
 
+  // Market Explorer — catálogo cru do steamwebapi /items (paginado no back)
+  async getMarketExplorer(params: {
+    page?: number
+    pageSize?: number
+    search?: string
+    rarity?: string
+    priceFilter?: 'all' | 'with' | 'without'
+    sortBy?: 'price' | 'name' | 'rarity'
+    sortDir?: 'asc' | 'desc'
+    refresh?: boolean
+  } = {}) {
+    const p = new URLSearchParams({
+      page: String(params.page ?? 1),
+      pageSize: String(params.pageSize ?? 50),
+    })
+    if (params.search) p.append('search', params.search)
+    if (params.rarity) p.append('rarity', params.rarity)
+    if (params.priceFilter) p.append('priceFilter', params.priceFilter)
+    if (params.sortBy) p.append('sortBy', params.sortBy)
+    if (params.sortDir) p.append('sortDir', params.sortDir)
+    if (params.refresh) p.append('refresh', 'true')
+    // refresh dispara busca de até 50k itens no steamwebapi (server: 120s) → timeout maior.
+    return api.get<MarketExplorerResponse>(`/skins/admin/market-explorer?${p}`, {
+      timeout: params.refresh ? 130_000 : 20_000,
+    })
+  },
+
+  // Payload cru completo de um item do market (endpoint /item singular)
+  async getMarketItemDetail(marketHashName: string) {
+    return api.get<Record<string, any>>(
+      `/skins/admin/market-explorer/item?marketHashName=${encodeURIComponent(marketHashName)}`,
+      { timeout: 35_000 },
+    )
+  },
+
   // Bots
   async getBots() {
     return api.get('/steam-bots')
@@ -712,6 +747,26 @@ export const adminService = {
   async deleteRarityMultiplier(rarity: string) {
     return api.post<RarityMultiplier[]>('/swaps/config/rarity-multipliers/delete', { rarity })
   },
+}
+
+export interface MarketExplorerItem {
+  marketHashName: string
+  name: string | null
+  image: string | null
+  rarity: string | null
+  priceLatest: number | null
+  priceMedian: number | null
+  priceUpdatedAt: string | null
+}
+
+export interface MarketExplorerResponse {
+  data: MarketExplorerItem[]
+  total: number
+  page: number
+  pages: number
+  pageSize: number
+  fetchedAt: string
+  rarities: string[]
 }
 
 export interface SwapCompensationConfig {

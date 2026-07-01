@@ -1,3 +1,4 @@
+// build: market-explorer facetas Steam (hero/type/slot/rarity/quality) — redeploy 2026-07-01
 import { ref } from 'vue'
 import type { MarketExplorerItem } from '@/services/admin/admin.service'
 

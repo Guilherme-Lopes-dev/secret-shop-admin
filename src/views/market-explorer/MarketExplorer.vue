@@ -51,6 +51,28 @@ const clearAllFilters = () => {
   onFilterChange()
 }
 
+// Snapshot dos filtros atuais → base pro algoritmo futuro. Só campos setados.
+const currentFilters = () => {
+  const [sortBy, sortDir] = sortValue.value.split(':')
+  const f: Record<string, unknown> = { sortBy, sortDir }
+  if (searchQuery.value) f.search = searchQuery.value
+  if (heroFilter.value) f.hero = heroFilter.value
+  if (typeFilter.value) f.type = typeFilter.value
+  if (slotFilter.value) f.slot = slotFilter.value
+  if (rarityFilter.value) f.rarity = rarityFilter.value
+  if (qualityFilter.value.length) f.qualities = qualityFilter.value
+  if (priceFilter.value !== 'all') f.priceFilter = priceFilter.value
+  return f
+}
+const copyFilters = async () => {
+  try {
+    await navigator.clipboard.writeText(JSON.stringify(currentFilters(), null, 2))
+    toast.success('Filtros copiados.')
+  } catch {
+    toast.error('Não foi possível copiar.')
+  }
+}
+
 const priceOptions = [
   { label: 'Todos', value: 'all' },
   { label: 'Com preço', value: 'with' },
@@ -171,6 +193,9 @@ const openItem = (item: MarketExplorerItem) => {
       </select>
       <button class="chip chip-preset" @click="onlySkins">Só skins</button>
       <button class="chip chip-clear" @click="clearAllFilters">Limpar filtros</button>
+      <button class="chip chip-copy" @click="copyFilters">
+        <Icon icon="mdi:content-copy" /> Copiar filtros
+      </button>
     </div>
 
     <div class="quality-row" v-if="hasFetched && qualities.length">
@@ -484,6 +509,16 @@ table
 .chip-clear
     border-color rgba(244,67,54,0.3)
     color #f87171
+
+.chip-copy
+    display inline-flex
+    align-items center
+    gap 0.3rem
+    border-color rgba(34,197,94,0.35)
+    color #4ade80
+
+    &:hover
+        background rgba(34,197,94,0.1)
 
 .mono
     font-family monospace

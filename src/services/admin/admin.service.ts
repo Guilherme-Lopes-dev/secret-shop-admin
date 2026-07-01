@@ -227,9 +227,11 @@ export const adminService = {
     page?: number
     pageSize?: number
     search?: string
+    hero?: string
+    type?: string
+    slot?: string
     rarity?: string
     qualities?: string[]
-    excludeTypes?: string[]
     priceFilter?: 'all' | 'with' | 'without'
     sortBy?: 'price' | 'name' | 'rarity'
     sortDir?: 'asc' | 'desc'
@@ -240,9 +242,11 @@ export const adminService = {
       pageSize: String(params.pageSize ?? 50),
     })
     if (params.search) p.append('search', params.search)
+    if (params.hero) p.append('hero', params.hero)
+    if (params.type) p.append('type', params.type)
+    if (params.slot) p.append('slot', params.slot)
     if (params.rarity) p.append('rarity', params.rarity)
     if (params.qualities?.length) p.append('qualities', params.qualities.join(','))
-    if (params.excludeTypes?.length) p.append('excludeTypes', params.excludeTypes.join(','))
     if (params.priceFilter) p.append('priceFilter', params.priceFilter)
     if (params.sortBy) p.append('sortBy', params.sortBy)
     if (params.sortDir) p.append('sortDir', params.sortDir)
@@ -760,9 +764,19 @@ export interface MarketExplorerItem {
   rarity: string | null
   quality: string | null
   type: string | null
+  slot: string | null
+  hero: string | null
   priceLatest: number | null
   priceMedian: number | null
   priceUpdatedAt: string | null
+}
+
+export interface MarketExplorerFacets {
+  heroes: string[]
+  types: string[]
+  slots: string[]
+  rarities: string[]
+  qualities: string[]
 }
 
 export interface MarketExplorerResponse {
@@ -772,8 +786,7 @@ export interface MarketExplorerResponse {
   pages: number
   pageSize: number
   fetchedAt: string
-  rarities: string[]
-  qualities: string[]
+  facets: MarketExplorerFacets
 }
 
 export interface SwapCompensationConfig {

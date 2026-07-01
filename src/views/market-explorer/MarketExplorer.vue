@@ -6,12 +6,10 @@ import { formatCurrency } from '@/utils/formatCurrency'
 import { Icon } from '@iconify/vue'
 import { toast } from 'vue3-toastify'
 import {
-  items, rarities, qualities, hasFetched, fetchedAt,
+  items, heroes, types, slots, rarities, qualities, hasFetched, fetchedAt,
   currentPage, totalPages, totalItems, pageSize,
-  searchQuery, rarityFilter, qualityFilter, hideStickers, priceFilter, sortValue,
+  searchQuery, heroFilter, typeFilter, slotFilter, rarityFilter, qualityFilter, priceFilter, sortValue,
 } from './explorerState'
-
-const STICKER_TYPES = ['Sticker', 'Sticker Capsule']
 
 const router = useRouter()
 const loading = ref(false)
@@ -37,6 +35,22 @@ const clearQualities = () => {
   onFilterChange()
 }
 
+// "Só skins" = tipo Wearable (o que a Steam chama de itens de herói vestíveis).
+const onlySkins = () => {
+  typeFilter.value = 'Wearable'
+  onFilterChange()
+}
+const clearAllFilters = () => {
+  heroFilter.value = ''
+  typeFilter.value = ''
+  slotFilter.value = ''
+  rarityFilter.value = ''
+  qualityFilter.value = []
+  priceFilter.value = 'all'
+  searchQuery.value = ''
+  onFilterChange()
+}
+
 const priceOptions = [
   { label: 'Todos', value: 'all' },
   { label: 'Com preço', value: 'with' },
@@ -59,9 +73,11 @@ const load = async (page: number, refresh = false) => {
       page,
       pageSize: pageSize.value,
       search: searchQuery.value || undefined,
+      hero: heroFilter.value || undefined,
+      type: typeFilter.value || undefined,
+      slot: slotFilter.value || undefined,
       rarity: rarityFilter.value || undefined,
       qualities: qualityFilter.value.length ? qualityFilter.value : undefined,
-      excludeTypes: hideStickers.value ? STICKER_TYPES : undefined,
       priceFilter: priceFilter.value,
       sortBy: by,
       sortDir: dir,
@@ -73,8 +89,14 @@ const load = async (page: number, refresh = false) => {
     totalPages.value = body.pages
     currentPage.value = body.page
     fetchedAt.value = body.fetchedAt
-    if (body.rarities?.length) rarities.value = body.rarities
-    if (body.qualities?.length) qualities.value = body.qualities
+    const f = body.facets
+    if (f) {
+      if (f.heroes?.length) heroes.value = f.heroes
+      if (f.types?.length) types.value = f.types
+      if (f.slots?.length) slots.value = f.slots
+      if (f.rarities?.length) rarities.value = f.rarities
+      if (f.qualities?.length) qualities.value = f.qualities
+    }
     hasFetched.value = true
   } catch (e: any) {
     toast.error(e?.response?.data?.message || 'Erro ao buscar itens do market.')
@@ -125,6 +147,18 @@ const openItem = (item: MarketExplorerItem) => {
         <Icon icon="mdi:magnify" class="search-icon" />
         <input v-model="searchQuery" @input="onSearchInput" type="text" placeholder="Buscar por nome..." class="search-input" />
       </div>
+      <select v-model="heroFilter" @change="onFilterChange" class="filter-select">
+        <option value="">Todos os heróis</option>
+        <option v-for="h in heroes" :key="h" :value="h">{{ h }}</option>
+      </select>
+      <select v-model="typeFilter" @change="onFilterChange" class="filter-select">
+        <option value="">Todos os tipos</option>
+        <option v-for="t in types" :key="t" :value="t">{{ t }}</option>
+      </select>
+      <select v-model="slotFilter" @change="onFilterChange" class="filter-select">
+        <option value="">Todos os slots</option>
+        <option v-for="s in slots" :key="s" :value="s">{{ s }}</option>
+      </select>
       <select v-model="rarityFilter" @change="onFilterChange" class="filter-select">
         <option value="">Todas raridades</option>
         <option v-for="r in rarities" :key="r" :value="r">{{ r }}</option>
@@ -135,6 +169,8 @@ const openItem = (item: MarketExplorerItem) => {
       <select v-model="sortValue" @change="onFilterChange" class="filter-select">
         <option v-for="opt in sortOptions" :key="`${opt.by}:${opt.dir}`" :value="`${opt.by}:${opt.dir}`">{{ opt.label }}</option>
       </select>
+      <button class="chip chip-preset" @click="onlySkins">Só skins</button>
+      <button class="chip chip-clear" @click="clearAllFilters">Limpar filtros</button>
     </div>
 
     <div class="quality-row" v-if="hasFetched && qualities.length">
@@ -148,10 +184,6 @@ const openItem = (item: MarketExplorerItem) => {
       >{{ q }}</button>
       <button class="chip chip-preset" @click="applyQualityPreset">★ Exalted/Genuine/Inscribed/Standard</button>
       <button v-if="qualityFilter.length" class="chip chip-clear" @click="clearQualities">Limpar</button>
-      <label class="hide-stickers">
-        <input type="checkbox" v-model="hideStickers" @change="onFilterChange" />
-        Ocultar stickers
-      </label>
     </div>
 
     <div class="section">
@@ -452,19 +484,6 @@ table
 .chip-clear
     border-color rgba(244,67,54,0.3)
     color #f87171
-
-.hide-stickers
-    display inline-flex
-    align-items center
-    gap 0.35rem
-    color #cbd5e1
-    font-size 0.8rem
-    cursor pointer
-    margin-left 0.5rem
-
-    input
-        cursor pointer
-        accent-color #6366f1
 
 .mono
     font-family monospace

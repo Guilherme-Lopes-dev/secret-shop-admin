@@ -229,6 +229,7 @@ export const adminService = {
     search?: string
     rarity?: string
     qualities?: string[]
+    excludeTypes?: string[]
     priceFilter?: 'all' | 'with' | 'without'
     sortBy?: 'price' | 'name' | 'rarity'
     sortDir?: 'asc' | 'desc'
@@ -241,6 +242,7 @@ export const adminService = {
     if (params.search) p.append('search', params.search)
     if (params.rarity) p.append('rarity', params.rarity)
     if (params.qualities?.length) p.append('qualities', params.qualities.join(','))
+    if (params.excludeTypes?.length) p.append('excludeTypes', params.excludeTypes.join(','))
     if (params.priceFilter) p.append('priceFilter', params.priceFilter)
     if (params.sortBy) p.append('sortBy', params.sortBy)
     if (params.sortDir) p.append('sortDir', params.sortDir)
@@ -757,6 +759,7 @@ export interface MarketExplorerItem {
   image: string | null
   rarity: string | null
   quality: string | null
+  type: string | null
   priceLatest: number | null
   priceMedian: number | null
   priceUpdatedAt: string | null

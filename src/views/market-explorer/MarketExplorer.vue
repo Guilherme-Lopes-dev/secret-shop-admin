@@ -8,8 +8,10 @@ import { toast } from 'vue3-toastify'
 import {
   items, rarities, qualities, hasFetched, fetchedAt,
   currentPage, totalPages, totalItems, pageSize,
-  searchQuery, rarityFilter, qualityFilter, priceFilter, sortValue,
+  searchQuery, rarityFilter, qualityFilter, hideStickers, priceFilter, sortValue,
 } from './explorerState'
+
+const STICKER_TYPES = ['Sticker', 'Sticker Capsule']
 
 const router = useRouter()
 const loading = ref(false)
@@ -59,6 +61,7 @@ const load = async (page: number, refresh = false) => {
       search: searchQuery.value || undefined,
       rarity: rarityFilter.value || undefined,
       qualities: qualityFilter.value.length ? qualityFilter.value : undefined,
+      excludeTypes: hideStickers.value ? STICKER_TYPES : undefined,
       priceFilter: priceFilter.value,
       sortBy: by,
       sortDir: dir,
@@ -145,6 +148,10 @@ const openItem = (item: MarketExplorerItem) => {
       >{{ q }}</button>
       <button class="chip chip-preset" @click="applyQualityPreset">★ Exalted/Genuine/Inscribed/Standard</button>
       <button v-if="qualityFilter.length" class="chip chip-clear" @click="clearQualities">Limpar</button>
+      <label class="hide-stickers">
+        <input type="checkbox" v-model="hideStickers" @change="onFilterChange" />
+        Ocultar stickers
+      </label>
     </div>
 
     <div class="section">
@@ -445,6 +452,19 @@ table
 .chip-clear
     border-color rgba(244,67,54,0.3)
     color #f87171
+
+.hide-stickers
+    display inline-flex
+    align-items center
+    gap 0.35rem
+    color #cbd5e1
+    font-size 0.8rem
+    cursor pointer
+    margin-left 0.5rem
+
+    input
+        cursor pointer
+        accent-color #6366f1
 
 .mono
     font-family monospace

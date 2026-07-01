@@ -6,15 +6,34 @@ import { formatCurrency } from '@/utils/formatCurrency'
 import { Icon } from '@iconify/vue'
 import { toast } from 'vue3-toastify'
 import {
-  items, rarities, hasFetched, fetchedAt,
+  items, rarities, qualities, hasFetched, fetchedAt,
   currentPage, totalPages, totalItems, pageSize,
-  searchQuery, rarityFilter, priceFilter, sortValue,
+  searchQuery, rarityFilter, qualityFilter, priceFilter, sortValue,
 } from './explorerState'
 
 const router = useRouter()
 const loading = ref(false)
 
 let searchTimeout: ReturnType<typeof setTimeout> | null = null
+
+// Preset pedido: só qualidades cosméticas comuns.
+const QUALITY_PRESET = ['Exalted', 'Genuine', 'Inscribed', 'Standard']
+
+const toggleQuality = (q: string) => {
+  const set = new Set(qualityFilter.value)
+  set.has(q) ? set.delete(q) : set.add(q)
+  qualityFilter.value = [...set]
+  onFilterChange()
+}
+const applyQualityPreset = () => {
+  const available = QUALITY_PRESET.filter((q) => qualities.value.includes(q))
+  qualityFilter.value = available.length ? available : QUALITY_PRESET
+  onFilterChange()
+}
+const clearQualities = () => {
+  qualityFilter.value = []
+  onFilterChange()
+}
 
 const priceOptions = [
   { label: 'Todos', value: 'all' },
@@ -39,6 +58,7 @@ const load = async (page: number, refresh = false) => {
       pageSize: pageSize.value,
       search: searchQuery.value || undefined,
       rarity: rarityFilter.value || undefined,
+      qualities: qualityFilter.value.length ? qualityFilter.value : undefined,
       priceFilter: priceFilter.value,
       sortBy: by,
       sortDir: dir,
@@ -51,6 +71,7 @@ const load = async (page: number, refresh = false) => {
     currentPage.value = body.page
     fetchedAt.value = body.fetchedAt
     if (body.rarities?.length) rarities.value = body.rarities
+    if (body.qualities?.length) qualities.value = body.qualities
     hasFetched.value = true
   } catch (e: any) {
     toast.error(e?.response?.data?.message || 'Erro ao buscar itens do market.')
@@ -113,6 +134,19 @@ const openItem = (item: MarketExplorerItem) => {
       </select>
     </div>
 
+    <div class="quality-row" v-if="hasFetched && qualities.length">
+      <span class="quality-label">Qualidade:</span>
+      <button
+        v-for="q in qualities"
+        :key="q"
+        class="chip"
+        :class="{ active: qualityFilter.includes(q) }"
+        @click="toggleQuality(q)"
+      >{{ q }}</button>
+      <button class="chip chip-preset" @click="applyQualityPreset">★ Exalted/Genuine/Inscribed/Standard</button>
+      <button v-if="qualityFilter.length" class="chip chip-clear" @click="clearQualities">Limpar</button>
+    </div>
+
     <div class="section">
       <div v-if="!hasFetched && !loading" class="empty-state">
         <Icon icon="mdi:cloud-search-outline" class="empty-icon" />
@@ -125,6 +159,7 @@ const openItem = (item: MarketExplorerItem) => {
             <thead>
               <tr>
                 <th>Item</th>
+                <th>Qualidade</th>
                 <th>Raridade</th>
                 <th>Preço atual</th>
                 <th>Mediana</th>
@@ -140,6 +175,7 @@ const openItem = (item: MarketExplorerItem) => {
                     <span class="item-name">{{ item.name || item.marketHashName }}</span>
                   </div>
                 </td>
+                <td><span class="quality">{{ item.quality || '—' }}</span></td>
                 <td><span class="rarity">{{ item.rarity || '—' }}</span></td>
                 <td class="price" :class="{ 'no-price': item.priceLatest == null }">
                   {{ item.priceLatest != null ? formatCurrency(item.priceLatest) : 'Sem preço' }}
@@ -148,7 +184,7 @@ const openItem = (item: MarketExplorerItem) => {
                 <td class="mono">{{ item.priceUpdatedAt ? $dayjs(item.priceUpdatedAt).format('DD/MM/YY HH:mm') : '—' }}</td>
               </tr>
               <tr v-if="!items.length">
-                <td colspan="5" class="empty-state">Nenhum item encontrado.</td>
+                <td colspan="6" class="empty-state">Nenhum item encontrado.</td>
               </tr>
             </tbody>
           </table>
@@ -364,6 +400,51 @@ table
 .rarity
     color #cbd5e1
     font-size 0.8rem
+
+.quality
+    color #a5b4fc
+    font-size 0.8rem
+
+.quality-row
+    display flex
+    align-items center
+    gap 0.4rem
+    flex-wrap wrap
+    margin-bottom 1.25rem
+
+.quality-label
+    color #94a3b8
+    font-size 0.8rem
+    margin-right 0.25rem
+
+.chip
+    background #1a1a1e
+    border 1px solid rgba(255,255,255,0.1)
+    color #cbd5e1
+    padding 0.35rem 0.7rem
+    border-radius 999px
+    font-size 0.78rem
+    cursor pointer
+    transition all 0.15s
+
+    &:hover
+        border-color rgba(99,102,241,0.4)
+
+    &.active
+        background rgba(99,102,241,0.18)
+        border-color rgba(99,102,241,0.5)
+        color #a5b4fc
+
+.chip-preset
+    border-color rgba(234,179,8,0.35)
+    color #eab308
+
+    &:hover
+        background rgba(234,179,8,0.1)
+
+.chip-clear
+    border-color rgba(244,67,54,0.3)
+    color #f87171
 
 .mono
     font-family monospace

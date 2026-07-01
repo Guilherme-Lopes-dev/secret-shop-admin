@@ -228,6 +228,7 @@ export const adminService = {
     pageSize?: number
     search?: string
     rarity?: string
+    qualities?: string[]
     priceFilter?: 'all' | 'with' | 'without'
     sortBy?: 'price' | 'name' | 'rarity'
     sortDir?: 'asc' | 'desc'
@@ -239,6 +240,7 @@ export const adminService = {
     })
     if (params.search) p.append('search', params.search)
     if (params.rarity) p.append('rarity', params.rarity)
+    if (params.qualities?.length) p.append('qualities', params.qualities.join(','))
     if (params.priceFilter) p.append('priceFilter', params.priceFilter)
     if (params.sortBy) p.append('sortBy', params.sortBy)
     if (params.sortDir) p.append('sortDir', params.sortDir)
@@ -754,6 +756,7 @@ export interface MarketExplorerItem {
   name: string | null
   image: string | null
   rarity: string | null
+  quality: string | null
   priceLatest: number | null
   priceMedian: number | null
   priceUpdatedAt: string | null
@@ -767,6 +770,7 @@ export interface MarketExplorerResponse {
   pageSize: number
   fetchedAt: string
   rarities: string[]
+  qualities: string[]
 }
 
 export interface SwapCompensationConfig {

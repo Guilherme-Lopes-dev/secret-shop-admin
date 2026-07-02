@@ -1,18 +1,57 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { adminService, type MarketExplorerItem } from '@/services/admin/admin.service'
 import { formatCurrency } from '@/utils/formatCurrency'
 import { Icon } from '@iconify/vue'
 import { toast } from 'vue3-toastify'
 import {
-  items, heroes, types, slots, rarities, qualities, hasFetched, fetchedAt,
+  source, items, heroes, types, slots, rarities, qualities, hasFetched, fetchedAt,
   currentPage, totalPages, totalItems, pageSize,
   searchQuery, heroFilter, typeFilter, slotFilter, rarityFilter, qualityFilter, priceFilter, sortValue,
+  excludedKeys,
 } from './explorerState'
 
 const router = useRouter()
 const loading = ref(false)
+const saving = ref(false)
+
+// Filtros aplicados (só campos setados) — enviados ao back na busca e no salvamento.
+const filterParams = () => ({
+  search: searchQuery.value || undefined,
+  hero: heroFilter.value || undefined,
+  type: typeFilter.value || undefined,
+  slot: slotFilter.value || undefined,
+  rarity: rarityFilter.value || undefined,
+  qualities: qualityFilter.value.length ? qualityFilter.value : undefined,
+  priceFilter: priceFilter.value,
+})
+
+// Cards visíveis = página atual menos os itens removidos manualmente.
+const visibleItems = computed(() =>
+  items.value.filter((i) => !excludedKeys.value.includes(i.marketHashName)),
+)
+
+const removeItem = (item: MarketExplorerItem) => {
+  if (!excludedKeys.value.includes(item.marketHashName)) {
+    excludedKeys.value = [...excludedKeys.value, item.marketHashName]
+  }
+}
+const restoreExcluded = () => {
+  excludedKeys.value = []
+}
+
+const saveToDb = async () => {
+  saving.value = true
+  try {
+    const res = await adminService.saveDropshipProducts(filterParams(), excludedKeys.value)
+    toast.success(`${res.data.saved} itens salvos (${res.data.batches} lotes).`)
+  } catch (e: any) {
+    toast.error(e?.response?.data?.message || 'Erro ao salvar no banco.')
+  } finally {
+    saving.value = false
+  }
+}
 
 let searchTimeout: ReturnType<typeof setTimeout> | null = null
 
@@ -91,20 +130,11 @@ const load = async (page: number, refresh = false) => {
   loading.value = true
   try {
     const [by, dir] = sortValue.value.split(':') as ['price' | 'name' | 'rarity', 'asc' | 'desc']
-    const res = await adminService.getMarketExplorer({
-      page,
-      pageSize: pageSize.value,
-      search: searchQuery.value || undefined,
-      hero: heroFilter.value || undefined,
-      type: typeFilter.value || undefined,
-      slot: slotFilter.value || undefined,
-      rarity: rarityFilter.value || undefined,
-      qualities: qualityFilter.value.length ? qualityFilter.value : undefined,
-      priceFilter: priceFilter.value,
-      sortBy: by,
-      sortDir: dir,
-      refresh,
-    })
+    const query = { page, pageSize: pageSize.value, ...filterParams(), sortBy: by, sortDir: dir }
+    const res =
+      source.value === 'db'
+        ? await adminService.getDropshipProducts(query)
+        : await adminService.getMarketExplorer({ ...query, refresh })
     const body = res.data
     items.value = body.data
     totalItems.value = body.total
@@ -127,7 +157,8 @@ const load = async (page: number, refresh = false) => {
   }
 }
 
-const fetchItems = () => load(1, true)
+const fetchFromApi = () => { source.value = 'api'; load(1, true) }
+const fetchFromDb = () => { source.value = 'db'; load(1) }
 
 const onFilterChange = () => {
   if (!hasFetched.value) return
@@ -152,14 +183,30 @@ const openItem = (item: MarketExplorerItem) => {
       <div>
         <h1 class="page-title">Market Explorer</h1>
         <p class="page-subtitle">
-          <template v-if="hasFetched">{{ totalItems }} itens · atualizado {{ $dayjs(fetchedAt).format('DD/MM/YY HH:mm') }}</template>
-          <template v-else>Catálogo cru do steamwebapi /items (Dota 2)</template>
+          <template v-if="hasFetched">
+            <span class="source-tag" :class="source">{{ source === 'db' ? 'Banco' : 'API' }}</span>
+            {{ totalItems }} itens · atualizado {{ $dayjs(fetchedAt).format('DD/MM/YY HH:mm') }}
+          </template>
+          <template v-else>Busque da API (steamwebapi) ou do banco (produtos salvos)</template>
         </p>
       </div>
       <div class="header-actions">
-        <button class="btn-fetch" :disabled="loading" @click="fetchItems">
-          <Icon :icon="loading ? 'mdi:loading' : 'mdi:cloud-download-outline'" :class="{ spinning: loading }" />
-          {{ loading ? 'Buscando...' : 'Buscar itens' }}
+        <span v-if="source === 'api' && excludedKeys.length" class="excluded-badge">
+          {{ excludedKeys.length }} removido(s)
+          <button class="undo-btn" @click="restoreExcluded" title="Restaurar removidos">
+            <Icon icon="mdi:undo" />
+          </button>
+        </span>
+        <button v-if="hasFetched && source === 'api'" class="btn-save" :disabled="saving || loading" @click="saveToDb">
+          <Icon :icon="saving ? 'mdi:loading' : 'mdi:database-plus-outline'" :class="{ spinning: saving }" />
+          {{ saving ? 'Salvando...' : 'Salvar no banco' }}
+        </button>
+        <button class="btn-fetch outline" :disabled="loading" @click="fetchFromDb">
+          <Icon icon="mdi:database-outline" /> Buscar do banco
+        </button>
+        <button class="btn-fetch" :disabled="loading" @click="fetchFromApi">
+          <Icon :icon="loading ? 'mdi:loading' : 'mdi:cloud-download-outline'" :class="{ spinning: loading && source === 'api' }" />
+          {{ loading && source === 'api' ? 'Buscando...' : 'Buscar da API' }}
         </button>
       </div>
     </header>
@@ -214,44 +261,40 @@ const openItem = (item: MarketExplorerItem) => {
     <div class="section">
       <div v-if="!hasFetched && !loading" class="empty-state">
         <Icon icon="mdi:cloud-search-outline" class="empty-icon" />
-        <p>Clique em <strong>Buscar itens</strong> para carregar o catálogo do market.</p>
+        <p><strong>Buscar da API</strong> = catálogo do market · <strong>Buscar do banco</strong> = produtos já salvos.</p>
       </div>
       <div v-else-if="loading && !items.length" class="loading-state">Buscando itens do market...</div>
       <div v-else>
-        <div class="table-wrapper">
-          <table>
-            <thead>
-              <tr>
-                <th>Item</th>
-                <th>Qualidade</th>
-                <th>Raridade</th>
-                <th>Preço atual</th>
-                <th>Mediana</th>
-                <th>Atualizado</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="item in items" :key="item.marketHashName" class="row-clickable" @click="openItem(item)">
-                <td>
-                  <div class="item-cell">
-                    <img v-if="item.image" :src="item.image" class="item-thumb" alt="" loading="lazy" />
-                    <div v-else class="item-thumb-placeholder"><Icon icon="mdi:sword" /></div>
-                    <span class="item-name">{{ item.name || item.marketHashName }}</span>
-                  </div>
-                </td>
-                <td><span class="quality">{{ item.quality || '—' }}</span></td>
-                <td><span class="rarity">{{ item.rarity || '—' }}</span></td>
-                <td class="price" :class="{ 'no-price': item.priceLatest == null }">
+        <div class="cards-grid">
+          <article
+            v-for="item in visibleItems"
+            :key="item.marketHashName"
+            class="card"
+            @click="openItem(item)"
+          >
+            <button v-if="source === 'api'" class="card-remove" title="Remover da listagem" @click.stop="removeItem(item)">
+              <Icon icon="mdi:close" />
+            </button>
+            <div class="card-img-wrap">
+              <img v-if="item.image" :src="item.image" class="card-img" alt="" loading="lazy" />
+              <div v-else class="card-img-placeholder"><Icon icon="mdi:sword" /></div>
+            </div>
+            <div class="card-body">
+              <h3 class="card-name" :title="item.name || item.marketHashName">{{ item.name || item.marketHashName }}</h3>
+              <div class="card-badges">
+                <span v-if="item.quality" class="badge badge-quality">{{ item.quality }}</span>
+                <span v-if="item.rarity" class="badge badge-rarity">{{ item.rarity }}</span>
+                <span v-if="item.hero" class="badge badge-hero">{{ item.hero }}</span>
+              </div>
+              <div class="card-prices">
+                <span class="card-price" :class="{ 'no-price': item.priceLatest == null }">
                   {{ item.priceLatest != null ? formatCurrency(item.priceLatest) : 'Sem preço' }}
-                </td>
-                <td class="price-muted">{{ item.priceMedian != null ? formatCurrency(item.priceMedian) : '—' }}</td>
-                <td class="mono">{{ item.priceUpdatedAt ? $dayjs(item.priceUpdatedAt).format('DD/MM/YY HH:mm') : '—' }}</td>
-              </tr>
-              <tr v-if="!items.length">
-                <td colspan="6" class="empty-state">Nenhum item encontrado.</td>
-              </tr>
-            </tbody>
-          </table>
+                </span>
+                <span v-if="item.priceMedian != null" class="card-median">med. {{ formatCurrency(item.priceMedian) }}</span>
+              </div>
+            </div>
+          </article>
+          <div v-if="!visibleItems.length" class="empty-state">Nenhum item para exibir.</div>
         </div>
 
         <div class="pagination" v-if="totalPages > 1">
@@ -313,6 +356,33 @@ const openItem = (item: MarketExplorerItem) => {
     &:disabled
         opacity 0.5
         cursor not-allowed
+
+    &.outline
+        background transparent
+        border 1px solid rgba(255,255,255,0.15)
+        color #cbd5e1
+        font-weight 500
+
+        &:hover:not(:disabled)
+            background rgba(255,255,255,0.06)
+            border-color rgba(255,255,255,0.25)
+
+.source-tag
+    display inline-block
+    padding 1px 8px
+    border-radius 5px
+    font-size 0.72rem
+    font-weight 700
+    margin-right 0.4rem
+    text-transform uppercase
+
+    &.api
+        background rgba(99,102,241,0.18)
+        color #a5b4fc
+
+    &.db
+        background rgba(34,197,94,0.16)
+        color #4ade80
 
 .spinning
     animation spin 1s linear infinite
@@ -393,81 +463,167 @@ const openItem = (item: MarketExplorerItem) => {
     color #3f3f46
     margin-bottom 1rem
 
-.table-wrapper
-    overflow-x auto
-    margin-bottom 1.5rem
-
-table
-    width 100%
-    border-collapse collapse
-
-    th
-        text-align left
-        color #94a3b8
-        font-size 0.78rem
-        font-weight 500
-        padding 0.75rem
-        border-bottom 1px solid rgba(255,255,255,0.05)
-        white-space nowrap
-        text-transform uppercase
-
-    td
-        padding 0.85rem 0.75rem
-        font-size 0.875rem
-        border-bottom 1px solid rgba(255,255,255,0.04)
-        vertical-align middle
-
-        &.price
-            font-weight 600
-            color #4caf50
-
-            &.no-price
-                color #64748b
-                font-weight 400
-
-        &.price-muted
-            color #94a3b8
-
-.row-clickable
+.btn-save
+    display inline-flex
+    align-items center
+    gap 0.4rem
+    background rgba(34,197,94,0.14)
+    color #4ade80
+    border 1px solid rgba(34,197,94,0.35)
+    padding 0.6rem 1.2rem
+    border-radius 8px
+    font-size 0.9rem
+    font-weight 600
     cursor pointer
-    transition background 0.15s
+    transition all 0.2s
+
+    &:hover:not(:disabled)
+        background rgba(34,197,94,0.24)
+
+    &:disabled
+        opacity 0.5
+        cursor not-allowed
+
+.excluded-badge
+    display inline-flex
+    align-items center
+    gap 0.35rem
+    color #f87171
+    font-size 0.8rem
+
+.undo-btn
+    background transparent
+    border none
+    color #f87171
+    cursor pointer
+    display inline-flex
+    font-size 1rem
 
     &:hover
-        background rgba(255,255,255,0.03)
+        color #fca5a5
 
-.item-cell
+.cards-grid
+    display grid
+    grid-template-columns repeat(auto-fill, minmax(200px, 1fr))
+    gap 1rem
+    margin-bottom 1.5rem
+
+.card
+    position relative
+    background #121214
+    border 1px solid rgba(255,255,255,0.06)
+    border-radius 10px
+    overflow hidden
+    cursor pointer
+    transition all 0.15s
     display flex
-    align-items center
-    gap 0.625rem
+    flex-direction column
 
-.item-thumb
-    width 40px
-    height 40px
-    object-fit contain
-    border-radius 4px
-    background rgba(255,255,255,0.04)
+    &:hover
+        border-color rgba(99,102,241,0.4)
+        transform translateY(-2px)
 
-.item-thumb-placeholder
-    width 40px
-    height 40px
-    border-radius 4px
-    background rgba(255,255,255,0.05)
+.card-remove
+    position absolute
+    top 6px
+    right 6px
+    z-index 2
+    width 26px
+    height 26px
+    border-radius 6px
+    border none
+    background rgba(0,0,0,0.55)
+    color #f87171
+    cursor pointer
     display flex
     align-items center
     justify-content center
-    color #64748b
+    font-size 1rem
+    opacity 0
+    transition opacity 0.15s
 
-.item-name
-    font-weight 500
-    font-size 0.85rem
+    &:hover
+        background rgba(244,67,54,0.85)
+        color #fff
 
-.rarity
-    color #cbd5e1
-    font-size 0.8rem
+.card:hover .card-remove
+    opacity 1
 
-.quality
+.card-img-wrap
+    aspect-ratio 4 / 3
+    background rgba(255,255,255,0.03)
+    display flex
+    align-items center
+    justify-content center
+
+.card-img
+    width 100%
+    height 100%
+    object-fit contain
+
+.card-img-placeholder
+    color #3f3f46
+    font-size 2rem
+
+.card-body
+    padding 0.7rem
+    display flex
+    flex-direction column
+    gap 0.4rem
+
+.card-name
+    font-size 0.82rem
+    font-weight 600
+    line-height 1.25
+    display -webkit-box
+    -webkit-line-clamp 2
+    -webkit-box-orient vertical
+    overflow hidden
+    min-height 2.05rem
+
+.card-badges
+    display flex
+    flex-wrap wrap
+    gap 0.25rem
+
+.badge
+    padding 2px 7px
+    border-radius 5px
+    font-size 0.68rem
+    font-weight 600
+
+.badge-quality
+    background rgba(99,102,241,0.15)
     color #a5b4fc
-    font-size 0.8rem
+
+.badge-rarity
+    background rgba(255,255,255,0.07)
+    color #cbd5e1
+
+.badge-hero
+    background rgba(76,175,80,0.12)
+    color #86efac
+
+.card-prices
+    display flex
+    align-items baseline
+    justify-content space-between
+    gap 0.4rem
+    margin-top 0.15rem
+
+.card-price
+    font-weight 700
+    font-size 0.9rem
+    color #4caf50
+
+    &.no-price
+        color #64748b
+        font-weight 400
+        font-size 0.8rem
+
+.card-median
+    font-size 0.72rem
+    color #94a3b8
 
 .quality-row
     display flex

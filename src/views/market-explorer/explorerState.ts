@@ -3,6 +3,8 @@ import { ref } from 'vue'
 import type { MarketExplorerItem } from '@/services/admin/admin.service'
 
 // Estado em escopo de módulo (singleton) → persiste ao abrir um item e voltar, sem re-fetch.
+// Fonte atual dos dados: 'api' (steamwebapi) ou 'db' (dropship_products salvos).
+export const source = ref<'api' | 'db'>('api')
 export const items = ref<MarketExplorerItem[]>([])
 export const hasFetched = ref(false)
 export const fetchedAt = ref<string | null>(null)
@@ -28,3 +30,6 @@ export const rarityFilter = ref('')
 export const qualityFilter = ref<string[]>([])
 export const priceFilter = ref<'all' | 'with' | 'without'>('all')
 export const sortValue = ref('name:asc')
+
+// Itens removidos manualmente da listagem (market_hash_name) — enviados ao salvar pra serem ignorados.
+export const excludedKeys = ref<string[]>([])

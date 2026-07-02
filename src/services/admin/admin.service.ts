@@ -257,6 +257,56 @@ export const adminService = {
     })
   },
 
+  // Lista produtos salvos no banco (dropship_products) — mesmos filtros do explorer
+  async getDropshipProducts(params: {
+    page?: number
+    pageSize?: number
+    search?: string
+    hero?: string
+    type?: string
+    slot?: string
+    rarity?: string
+    qualities?: string[]
+    priceFilter?: 'all' | 'with' | 'without'
+    sortBy?: 'price' | 'name' | 'rarity'
+    sortDir?: 'asc' | 'desc'
+  } = {}) {
+    const p = new URLSearchParams({
+      page: String(params.page ?? 1),
+      pageSize: String(params.pageSize ?? 50),
+    })
+    if (params.search) p.append('search', params.search)
+    if (params.hero) p.append('hero', params.hero)
+    if (params.type) p.append('type', params.type)
+    if (params.slot) p.append('slot', params.slot)
+    if (params.rarity) p.append('rarity', params.rarity)
+    if (params.qualities?.length) p.append('qualities', params.qualities.join(','))
+    if (params.priceFilter) p.append('priceFilter', params.priceFilter)
+    if (params.sortBy) p.append('sortBy', params.sortBy)
+    if (params.sortDir) p.append('sortDir', params.sortDir)
+    return api.get<MarketExplorerResponse>(`/skins/admin/dropship-products?${p}`, { timeout: 30_000 })
+  },
+
+  // Salva itens filtrados (menos excluídos) em dropship_products (lotes de 100 no back)
+  async saveDropshipProducts(
+    filters: {
+      search?: string
+      hero?: string
+      type?: string
+      slot?: string
+      rarity?: string
+      qualities?: string[]
+      priceFilter?: 'all' | 'with' | 'without'
+    },
+    excludeKeys: string[],
+  ) {
+    return api.post<{ saved: number; batches: number; total: number }>(
+      '/skins/admin/market-explorer/save',
+      { filters, excludeKeys },
+      { timeout: 180_000 },
+    )
+  },
+
   // Payload cru completo de um item do market (endpoint /item singular)
   async getMarketItemDetail(marketHashName: string) {
     return api.get<Record<string, any>>(

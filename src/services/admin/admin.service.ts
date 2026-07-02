@@ -287,6 +287,11 @@ export const adminService = {
     return api.get<MarketExplorerResponse>(`/skins/admin/dropship-products?${p}`, { timeout: 30_000 })
   },
 
+  // Apaga produtos do banco (dropship_products) por market_hash_name
+  async deleteDropshipProducts(marketHashNames: string[]) {
+    return api.post<{ deleted: number }>('/skins/admin/dropship-products/delete', { marketHashNames })
+  },
+
   // Salva itens filtrados (menos excluídos) em dropship_products (lotes de 100 no back)
   async saveDropshipProducts(
     filters: {

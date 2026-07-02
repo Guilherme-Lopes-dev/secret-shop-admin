@@ -41,6 +41,21 @@ const restoreExcluded = () => {
   excludedKeys.value = []
 }
 
+// Apaga do banco (só na fonte 'db'); na 'api' o X apenas exclui da listagem.
+const deleteFromDb = async (item: MarketExplorerItem) => {
+  if (!window.confirm(`Apagar "${item.name || item.marketHashName}" do banco?`)) return
+  try {
+    await adminService.deleteDropshipProducts([item.marketHashName])
+    items.value = items.value.filter((i) => i.marketHashName !== item.marketHashName)
+    totalItems.value = Math.max(totalItems.value - 1, 0)
+    toast.success('Item apagado do banco.')
+  } catch (e: any) {
+    toast.error(e?.response?.data?.message || 'Erro ao apagar item.')
+  }
+}
+const onCardRemove = (item: MarketExplorerItem) =>
+  source.value === 'db' ? deleteFromDb(item) : removeItem(item)
+
 const saveToDb = async () => {
   const estimate = Math.max(totalItems.value - excludedKeys.value.length, 0)
   const ok = window.confirm(
@@ -277,8 +292,13 @@ const openItem = (item: MarketExplorerItem) => {
             class="card"
             @click="openItem(item)"
           >
-            <button v-if="source === 'api'" class="card-remove" title="Remover da listagem" @click.stop="removeItem(item)">
-              <Icon icon="mdi:close" />
+            <button
+              class="card-remove"
+              :class="{ 'is-delete': source === 'db' }"
+              :title="source === 'db' ? 'Apagar do banco' : 'Remover da listagem'"
+              @click.stop="onCardRemove(item)"
+            >
+              <Icon :icon="source === 'db' ? 'mdi:trash-can-outline' : 'mdi:close'" />
             </button>
             <div class="card-img-wrap">
               <img v-if="item.image" :src="item.image" class="card-img" alt="" loading="lazy" />
@@ -553,6 +573,14 @@ const openItem = (item: MarketExplorerItem) => {
 
 .card:hover .card-remove
     opacity 1
+
+.card-remove.is-delete
+    color #f87171
+    background rgba(244,67,54,0.2)
+
+    &:hover
+        background rgba(244,67,54,0.9)
+        color #fff
 
 .card-img-wrap
     aspect-ratio 4 / 3

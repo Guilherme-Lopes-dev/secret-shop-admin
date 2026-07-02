@@ -42,6 +42,11 @@ const restoreExcluded = () => {
 }
 
 const saveToDb = async () => {
+  const estimate = Math.max(totalItems.value - excludedKeys.value.length, 0)
+  const ok = window.confirm(
+    `Salvar ~${estimate} itens no banco (filtro atual, menos ${excludedKeys.value.length} removidos)?`,
+  )
+  if (!ok) return
   saving.value = true
   try {
     const res = await adminService.saveDropshipProducts(filterParams(), excludedKeys.value)

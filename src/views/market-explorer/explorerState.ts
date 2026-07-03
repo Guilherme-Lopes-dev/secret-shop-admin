@@ -5,13 +5,12 @@ import type { MarketExplorerItem } from '@/services/admin/admin.service'
 // Estado em escopo de módulo (singleton) → persiste ao abrir um item e voltar, sem re-fetch.
 // Fonte atual dos dados: 'api' (steamwebapi) ou 'db' (dropship_products salvos).
 export const source = ref<'api' | 'db'>('api')
-export const items = ref<MarketExplorerItem[]>([])
+// Catálogo inteiro carregado 1x; filtro/ordenação/paginação rodam no cliente (sem cache no servidor).
+export const allItems = ref<MarketExplorerItem[]>([])
 export const hasFetched = ref(false)
 export const fetchedAt = ref<string | null>(null)
 
 export const currentPage = ref(1)
-export const totalPages = ref(1)
-export const totalItems = ref(0)
 export const pageSize = ref(50)
 
 // Facetas disponíveis (populadas pelo catálogo, espelham os filtros da Steam).

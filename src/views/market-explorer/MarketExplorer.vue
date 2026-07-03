@@ -1,13 +1,13 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { adminService, type MarketExplorerItem } from '@/services/admin/admin.service'
 import { formatCurrency } from '@/utils/formatCurrency'
 import { Icon } from '@iconify/vue'
 import { toast } from 'vue3-toastify'
 import {
-  source, items, heroes, types, slots, rarities, qualities, hasFetched, fetchedAt,
-  currentPage, totalPages, totalItems, pageSize,
+  source, allItems, heroes, types, slots, rarities, qualities, hasFetched, fetchedAt,
+  currentPage, pageSize,
   searchQuery, heroFilter, typeFilter, slotFilter, rarityFilter, qualityFilter,
   priceFilter, priceMin, priceMax, sortValue,
 } from './explorerState'
@@ -16,55 +16,79 @@ const router = useRouter()
 const loading = ref(false)
 const saving = ref(false)
 
-// Reais digitado → centavos (o back filtra em centavos).
+// Reais digitado → centavos.
 const toCents = (v: string) => {
   const n = parseFloat(v.replace(',', '.'))
   return Number.isFinite(n) && n >= 0 ? Math.round(n * 100) : undefined
 }
 
-// Filtros aplicados (só campos setados) — enviados ao back na busca e no salvamento.
-const filterParams = () => ({
-  search: searchQuery.value || undefined,
-  hero: heroFilter.value || undefined,
-  type: typeFilter.value || undefined,
-  slot: slotFilter.value || undefined,
-  rarity: rarityFilter.value || undefined,
-  qualities: qualityFilter.value.length ? qualityFilter.value : undefined,
-  priceFilter: priceFilter.value,
-  priceMin: toCents(priceMin.value),
-  priceMax: toCents(priceMax.value),
+// --- Filtro / ordenação / paginação: tudo no cliente sobre o catálogo carregado ---
+const filtered = computed(() => {
+  const search = searchQuery.value.trim().toLowerCase()
+  const qset = qualityFilter.value.length ? new Set(qualityFilter.value) : null
+  const min = toCents(priceMin.value)
+  const max = toCents(priceMax.value)
+  return allItems.value.filter((i) => {
+    if (search && !i.marketHashName.toLowerCase().includes(search)) return false
+    if (heroFilter.value && i.hero !== heroFilter.value) return false
+    if (typeFilter.value && i.type !== typeFilter.value) return false
+    if (slotFilter.value && i.slot !== slotFilter.value) return false
+    if (rarityFilter.value && i.rarity !== rarityFilter.value) return false
+    if (qset && !(i.quality && qset.has(i.quality))) return false
+    if (priceFilter.value === 'with' && i.priceLatest == null) return false
+    if (priceFilter.value === 'without' && i.priceLatest != null) return false
+    if (min != null && (i.priceLatest == null || i.priceLatest < min)) return false
+    if (max != null && (i.priceLatest == null || i.priceLatest > max)) return false
+    return true
+  })
 })
 
-// Apaga do banco (fonte 'db').
+const sorted = computed(() => {
+  const [by, dir] = sortValue.value.split(':') as ['price' | 'name' | 'rarity', 'asc' | 'desc']
+  const mul = dir === 'desc' ? -1 : 1
+  const cmp = {
+    price: (a: MarketExplorerItem, b: MarketExplorerItem) => (a.priceLatest ?? -1) - (b.priceLatest ?? -1),
+    name: (a: MarketExplorerItem, b: MarketExplorerItem) => a.marketHashName.localeCompare(b.marketHashName),
+    rarity: (a: MarketExplorerItem, b: MarketExplorerItem) => (a.rarity ?? '').localeCompare(b.rarity ?? ''),
+  }[by]
+  return [...filtered.value].sort((a, b) => cmp(a, b) * mul)
+})
+
+const totalItems = computed(() => sorted.value.length)
+const totalPages = computed(() => Math.max(Math.ceil(totalItems.value / pageSize.value), 1))
+const pageItems = computed(() => {
+  const start = (currentPage.value - 1) * pageSize.value
+  return sorted.value.slice(start, start + pageSize.value)
+})
+
+// Reclampa a página se o filtro/remoção reduziu o total.
+watch(totalPages, (tp) => { if (currentPage.value > tp) currentPage.value = tp })
+
+const onFilterChange = () => { currentPage.value = 1 }
+
+const removeFromView = (names: string[]) => {
+  const set = new Set(names)
+  allItems.value = allItems.value.filter((i) => !set.has(i.marketHashName))
+}
+
+// Fonte 'db': X apaga do banco. Fonte 'api': X só tira da lista (cliente).
 const deleteFromDb = async (item: MarketExplorerItem) => {
   if (!window.confirm(`Apagar "${item.name || item.marketHashName}" do banco?`)) return
   try {
     await adminService.deleteDropshipProducts([item.marketHashName])
+    removeFromView([item.marketHashName])
     toast.success('Item apagado do banco.')
-    load(currentPage.value) // recarrega → total/páginas ficam corretos
   } catch (e: any) {
     toast.error(e?.response?.data?.message || 'Erro ao apagar item.')
   }
 }
-
-// Remove do cache do explorer (fonte 'api') → some da visão e reduz total/páginas.
-const apiRemove = async (names: string[]) => {
-  if (!names.length) return
-  try {
-    await adminService.excludeFromMarketExplorer(names)
-    load(currentPage.value) // recarrega; back reclampa a página se passou do fim
-  } catch (e: any) {
-    toast.error(e?.response?.data?.message || 'Erro ao remover da listagem.')
-  }
-}
-
 const onCardRemove = (item: MarketExplorerItem) =>
-  source.value === 'db' ? deleteFromDb(item) : apiRemove([item.marketHashName])
+  source.value === 'db' ? deleteFromDb(item) : removeFromView([item.marketHashName])
 
-// Limpar página: remove todos os itens da página atual (banco apaga; API tira do cache) → recarrega.
+// Limpar página: some com os itens da página atual (banco apaga; API só tira da lista).
 const clearingPage = ref(false)
 const clearPage = async () => {
-  const names = items.value.map((i) => i.marketHashName)
+  const names = pageItems.value.map((i) => i.marketHashName)
   if (!names.length) return
   const alvo = source.value === 'db' ? 'do banco' : 'da listagem'
   if (!window.confirm(`Apagar os ${names.length} itens desta página ${alvo}?`)) return
@@ -73,10 +97,8 @@ const clearPage = async () => {
     if (source.value === 'db') {
       const res = await adminService.deleteDropshipProducts(names)
       toast.success(`${res.data.deleted} itens apagados.`)
-    } else {
-      await adminService.excludeFromMarketExplorer(names)
     }
-    load(currentPage.value)
+    removeFromView(names)
   } catch (e: any) {
     toast.error(e?.response?.data?.message || 'Erro ao limpar a página.')
   } finally {
@@ -84,21 +106,26 @@ const clearPage = async () => {
   }
 }
 
+// Salva o conjunto filtrado (já sem os removidos) em blocos (limite de body 1mb no back).
 const saveToDb = async () => {
-  const ok = window.confirm(`Salvar ~${totalItems.value} itens no banco (filtro atual)?`)
-  if (!ok) return
+  const list = sorted.value
+  if (!list.length) return
+  if (!window.confirm(`Salvar ${list.length} itens no banco?`)) return
   saving.value = true
   try {
-    const res = await adminService.saveDropshipProducts(filterParams(), [])
-    toast.success(`${res.data.saved} itens salvos (${res.data.batches} lotes).`)
+    const CHUNK = 1000
+    let saved = 0
+    for (let i = 0; i < list.length; i += CHUNK) {
+      const res = await adminService.saveDropshipProducts(list.slice(i, i + CHUNK))
+      saved += res.data.saved
+    }
+    toast.success(`${saved} itens salvos no banco.`)
   } catch (e: any) {
     toast.error(e?.response?.data?.message || 'Erro ao salvar no banco.')
   } finally {
     saving.value = false
   }
 }
-
-let searchTimeout: ReturnType<typeof setTimeout> | null = null
 
 // Preset pedido: só qualidades cosméticas comuns.
 const QUALITY_PRESET = ['Exalted', 'Genuine', 'Inscribed', 'Standard']
@@ -119,7 +146,7 @@ const clearQualities = () => {
   onFilterChange()
 }
 
-// "Só skins" = tipo Wearable (o que a Steam chama de itens de herói vestíveis).
+// "Só skins" = tipo Wearable.
 const onlySkins = () => {
   typeFilter.value = 'Wearable'
   onFilterChange()
@@ -173,23 +200,19 @@ const sortOptions = [
   { label: 'Raridade', by: 'rarity', dir: 'asc' },
 ]
 
+// Carrega o catálogo INTEIRO numa chamada (pageSize alto). Depois filtro/paginação é tudo no cliente.
 let loadToken = 0
-const load = async (page: number, refresh = false) => {
-  const token = ++loadToken // só a última chamada aplica resultado/estado
+const fetchAll = async (src: 'api' | 'db', refresh = false) => {
+  const token = ++loadToken
   loading.value = true
   try {
-    const [by, dir] = sortValue.value.split(':') as ['price' | 'name' | 'rarity', 'asc' | 'desc']
-    const query = { page, pageSize: pageSize.value, ...filterParams(), sortBy: by, sortDir: dir }
     const res =
-      source.value === 'db'
-        ? await adminService.getDropshipProducts(query)
-        : await adminService.getMarketExplorer({ ...query, refresh })
-    if (token !== loadToken) return // resposta obsoleta — ignora
+      src === 'db'
+        ? await adminService.getDropshipProducts({ pageSize: 100000 })
+        : await adminService.getMarketExplorer({ pageSize: 100000, refresh })
+    if (token !== loadToken) return
     const body = res.data
-    items.value = body.data
-    totalItems.value = body.total
-    totalPages.value = body.pages
-    currentPage.value = body.page
+    allItems.value = body.data
     fetchedAt.value = body.fetchedAt
     const f = body.facets
     if (f) {
@@ -199,6 +222,7 @@ const load = async (page: number, refresh = false) => {
       rarities.value = f.rarities ?? []
       qualities.value = f.qualities ?? []
     }
+    currentPage.value = 1
     hasFetched.value = true
   } catch (e: any) {
     if (token === loadToken) toast.error(e?.response?.data?.message || 'Erro ao buscar itens do market.')
@@ -207,20 +231,12 @@ const load = async (page: number, refresh = false) => {
   }
 }
 
-const fetchFromApi = () => { source.value = 'api'; load(1, true) }
-const fetchFromDb = () => { source.value = 'db'; load(1) }
+const fetchFromApi = () => { source.value = 'api'; fetchAll('api', true) }
+const fetchFromDb = () => { source.value = 'db'; fetchAll('db') }
 
-const onFilterChange = () => {
-  if (!hasFetched.value) return
-  load(1)
-}
-const onSearchInput = () => {
-  if (!hasFetched.value) return
-  if (searchTimeout) clearTimeout(searchTimeout)
-  searchTimeout = setTimeout(() => load(1), 400)
-}
-const nextPage = () => { if (currentPage.value < totalPages.value) load(currentPage.value + 1) }
-const prevPage = () => { if (currentPage.value > 1) load(currentPage.value - 1) }
+const onSearchInput = () => { currentPage.value = 1 }
+const nextPage = () => { if (currentPage.value < totalPages.value) currentPage.value += 1 }
+const prevPage = () => { if (currentPage.value > 1) currentPage.value -= 1 }
 
 const openItem = (item: MarketExplorerItem) => {
   router.push({ name: 'market-explorer-item', query: { name: item.marketHashName } })
@@ -246,7 +262,7 @@ const openItem = (item: MarketExplorerItem) => {
           {{ saving ? 'Salvando...' : 'Salvar no banco' }}
         </button>
         <button
-          v-if="hasFetched && items.length"
+          v-if="hasFetched && pageItems.length"
           class="btn-clear"
           :disabled="clearingPage || loading"
           @click="clearPage"
@@ -321,11 +337,11 @@ const openItem = (item: MarketExplorerItem) => {
         <Icon icon="mdi:cloud-search-outline" class="empty-icon" />
         <p><strong>Buscar da API</strong> = catálogo do market · <strong>Buscar do banco</strong> = produtos já salvos.</p>
       </div>
-      <div v-else-if="loading && !items.length" class="loading-state">Buscando itens do market...</div>
+      <div v-else-if="loading && !allItems.length" class="loading-state">Buscando itens do market...</div>
       <div v-else>
         <div class="cards-grid">
           <article
-            v-for="item in items"
+            v-for="item in pageItems"
             :key="item.marketHashName"
             class="card"
             @click="openItem(item)"
@@ -357,7 +373,7 @@ const openItem = (item: MarketExplorerItem) => {
               </div>
             </div>
           </article>
-          <div v-if="!items.length" class="empty-state">Nenhum item para exibir.</div>
+          <div v-if="!pageItems.length" class="empty-state">Nenhum item para exibir.</div>
         </div>
 
         <div class="pagination" v-if="totalPages > 1">

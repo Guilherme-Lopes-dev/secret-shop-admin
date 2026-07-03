@@ -295,38 +295,17 @@ export const adminService = {
     return api.get<MarketExplorerResponse>(`/skins/admin/dropship-products?${p}`, { timeout: 30_000 })
   },
 
-  // Remove itens do cache do explorer (API) — some da visão e reduz o total de páginas
-  async excludeFromMarketExplorer(marketHashNames: string[]) {
-    return api.post<{ removed: number; remaining: number }>(
-      '/skins/admin/market-explorer/exclude',
-      { marketHashNames },
-    )
-  },
-
   // Apaga produtos do banco (dropship_products) por market_hash_name
   async deleteDropshipProducts(marketHashNames: string[]) {
     return api.post<{ deleted: number }>('/skins/admin/dropship-products/delete', { marketHashNames })
   },
 
-  // Salva itens filtrados (menos excluídos) em dropship_products (lotes de 100 no back)
-  async saveDropshipProducts(
-    filters: {
-      search?: string
-      hero?: string
-      type?: string
-      slot?: string
-      rarity?: string
-      qualities?: string[]
-      priceFilter?: 'all' | 'with' | 'without'
-      priceMin?: number
-      priceMax?: number
-    },
-    excludeKeys: string[],
-  ) {
-    return api.post<{ saved: number; batches: number; total: number }>(
+  // Salva um bloco de itens (curados no cliente) em dropship_products
+  async saveDropshipProducts(items: MarketExplorerItem[]) {
+    return api.post<{ saved: number }>(
       '/skins/admin/market-explorer/save',
-      { filters, excludeKeys },
-      { timeout: 180_000 },
+      { items },
+      { timeout: 60_000 },
     )
   },
 

@@ -40,9 +40,8 @@ const deleteFromDb = async (item: MarketExplorerItem) => {
   if (!window.confirm(`Apagar "${item.name || item.marketHashName}" do banco?`)) return
   try {
     await adminService.deleteDropshipProducts([item.marketHashName])
-    items.value = items.value.filter((i) => i.marketHashName !== item.marketHashName)
-    totalItems.value = Math.max(totalItems.value - 1, 0)
     toast.success('Item apagado do banco.')
+    load(currentPage.value) // recarrega → total/páginas ficam corretos
   } catch (e: any) {
     toast.error(e?.response?.data?.message || 'Erro ao apagar item.')
   }
@@ -174,7 +173,9 @@ const sortOptions = [
   { label: 'Raridade', by: 'rarity', dir: 'asc' },
 ]
 
+let loadToken = 0
 const load = async (page: number, refresh = false) => {
+  const token = ++loadToken // só a última chamada aplica resultado/estado
   loading.value = true
   try {
     const [by, dir] = sortValue.value.split(':') as ['price' | 'name' | 'rarity', 'asc' | 'desc']
@@ -183,6 +184,7 @@ const load = async (page: number, refresh = false) => {
       source.value === 'db'
         ? await adminService.getDropshipProducts(query)
         : await adminService.getMarketExplorer({ ...query, refresh })
+    if (token !== loadToken) return // resposta obsoleta — ignora
     const body = res.data
     items.value = body.data
     totalItems.value = body.total
@@ -191,17 +193,17 @@ const load = async (page: number, refresh = false) => {
     fetchedAt.value = body.fetchedAt
     const f = body.facets
     if (f) {
-      if (f.heroes?.length) heroes.value = f.heroes
-      if (f.types?.length) types.value = f.types
-      if (f.slots?.length) slots.value = f.slots
-      if (f.rarities?.length) rarities.value = f.rarities
-      if (f.qualities?.length) qualities.value = f.qualities
+      heroes.value = f.heroes ?? []
+      types.value = f.types ?? []
+      slots.value = f.slots ?? []
+      rarities.value = f.rarities ?? []
+      qualities.value = f.qualities ?? []
     }
     hasFetched.value = true
   } catch (e: any) {
-    toast.error(e?.response?.data?.message || 'Erro ao buscar itens do market.')
+    if (token === loadToken) toast.error(e?.response?.data?.message || 'Erro ao buscar itens do market.')
   } finally {
-    loading.value = false
+    if (token === loadToken) loading.value = false
   }
 }
 

@@ -233,6 +233,8 @@ export const adminService = {
     rarity?: string
     qualities?: string[]
     priceFilter?: 'all' | 'with' | 'without'
+    priceMin?: number
+    priceMax?: number
     sortBy?: 'price' | 'name' | 'rarity'
     sortDir?: 'asc' | 'desc'
     refresh?: boolean
@@ -248,6 +250,8 @@ export const adminService = {
     if (params.rarity) p.append('rarity', params.rarity)
     if (params.qualities?.length) p.append('qualities', params.qualities.join(','))
     if (params.priceFilter) p.append('priceFilter', params.priceFilter)
+    if (params.priceMin != null) p.append('priceMin', String(params.priceMin))
+    if (params.priceMax != null) p.append('priceMax', String(params.priceMax))
     if (params.sortBy) p.append('sortBy', params.sortBy)
     if (params.sortDir) p.append('sortDir', params.sortDir)
     if (params.refresh) p.append('refresh', 'true')
@@ -268,6 +272,8 @@ export const adminService = {
     rarity?: string
     qualities?: string[]
     priceFilter?: 'all' | 'with' | 'without'
+    priceMin?: number
+    priceMax?: number
     sortBy?: 'price' | 'name' | 'rarity'
     sortDir?: 'asc' | 'desc'
   } = {}) {
@@ -282,6 +288,8 @@ export const adminService = {
     if (params.rarity) p.append('rarity', params.rarity)
     if (params.qualities?.length) p.append('qualities', params.qualities.join(','))
     if (params.priceFilter) p.append('priceFilter', params.priceFilter)
+    if (params.priceMin != null) p.append('priceMin', String(params.priceMin))
+    if (params.priceMax != null) p.append('priceMax', String(params.priceMax))
     if (params.sortBy) p.append('sortBy', params.sortBy)
     if (params.sortDir) p.append('sortDir', params.sortDir)
     return api.get<MarketExplorerResponse>(`/skins/admin/dropship-products?${p}`, { timeout: 30_000 })
@@ -302,6 +310,8 @@ export const adminService = {
       rarity?: string
       qualities?: string[]
       priceFilter?: 'all' | 'with' | 'without'
+      priceMin?: number
+      priceMax?: number
     },
     excludeKeys: string[],
   ) {

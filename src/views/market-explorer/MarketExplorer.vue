@@ -8,13 +8,20 @@ import { toast } from 'vue3-toastify'
 import {
   source, items, heroes, types, slots, rarities, qualities, hasFetched, fetchedAt,
   currentPage, totalPages, totalItems, pageSize,
-  searchQuery, heroFilter, typeFilter, slotFilter, rarityFilter, qualityFilter, priceFilter, sortValue,
+  searchQuery, heroFilter, typeFilter, slotFilter, rarityFilter, qualityFilter,
+  priceFilter, priceMin, priceMax, sortValue,
   excludedKeys,
 } from './explorerState'
 
 const router = useRouter()
 const loading = ref(false)
 const saving = ref(false)
+
+// Reais digitado → centavos (o back filtra em centavos).
+const toCents = (v: string) => {
+  const n = parseFloat(v.replace(',', '.'))
+  return Number.isFinite(n) && n >= 0 ? Math.round(n * 100) : undefined
+}
 
 // Filtros aplicados (só campos setados) — enviados ao back na busca e no salvamento.
 const filterParams = () => ({
@@ -25,6 +32,8 @@ const filterParams = () => ({
   rarity: rarityFilter.value || undefined,
   qualities: qualityFilter.value.length ? qualityFilter.value : undefined,
   priceFilter: priceFilter.value,
+  priceMin: toCents(priceMin.value),
+  priceMax: toCents(priceMax.value),
 })
 
 // Cards visíveis = página atual menos os itens removidos manualmente.
@@ -55,6 +64,24 @@ const deleteFromDb = async (item: MarketExplorerItem) => {
 }
 const onCardRemove = (item: MarketExplorerItem) =>
   source.value === 'db' ? deleteFromDb(item) : removeItem(item)
+
+// Apaga do banco todos os itens da página atual → recarrega (a próxima página sobe).
+const clearingPage = ref(false)
+const clearPage = async () => {
+  const names = visibleItems.value.map((i) => i.marketHashName)
+  if (!names.length) return
+  if (!window.confirm(`Apagar os ${names.length} itens desta página do banco?`)) return
+  clearingPage.value = true
+  try {
+    const res = await adminService.deleteDropshipProducts(names)
+    toast.success(`${res.data.deleted} itens apagados.`)
+    load(currentPage.value) // back clampa a página se passou do fim
+  } catch (e: any) {
+    toast.error(e?.response?.data?.message || 'Erro ao apagar a página.')
+  } finally {
+    clearingPage.value = false
+  }
+}
 
 const saveToDb = async () => {
   const estimate = Math.max(totalItems.value - excludedKeys.value.length, 0)
@@ -106,6 +133,8 @@ const clearAllFilters = () => {
   rarityFilter.value = ''
   qualityFilter.value = []
   priceFilter.value = 'all'
+  priceMin.value = ''
+  priceMax.value = ''
   searchQuery.value = ''
   onFilterChange()
 }
@@ -221,6 +250,15 @@ const openItem = (item: MarketExplorerItem) => {
           <Icon :icon="saving ? 'mdi:loading' : 'mdi:database-plus-outline'" :class="{ spinning: saving }" />
           {{ saving ? 'Salvando...' : 'Salvar no banco' }}
         </button>
+        <button
+          v-if="hasFetched && source === 'db' && visibleItems.length"
+          class="btn-clear"
+          :disabled="clearingPage || loading"
+          @click="clearPage"
+        >
+          <Icon :icon="clearingPage ? 'mdi:loading' : 'mdi:trash-can-outline'" :class="{ spinning: clearingPage }" />
+          {{ clearingPage ? 'Apagando...' : 'Limpar página' }}
+        </button>
         <button class="btn-fetch outline" :disabled="loading" @click="fetchFromDb">
           <Icon icon="mdi:database-outline" /> Buscar do banco
         </button>
@@ -255,6 +293,11 @@ const openItem = (item: MarketExplorerItem) => {
       <select v-model="priceFilter" @change="onFilterChange" class="filter-select">
         <option v-for="opt in priceOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
       </select>
+      <div class="price-range">
+        <input v-model="priceMin" @change="onFilterChange" type="number" min="0" step="0.01" placeholder="R$ mín" class="price-input" />
+        <span class="price-sep">—</span>
+        <input v-model="priceMax" @change="onFilterChange" type="number" min="0" step="0.01" placeholder="R$ máx" class="price-input" />
+      </div>
       <select v-model="sortValue" @change="onFilterChange" class="filter-select">
         <option v-for="opt in sortOptions" :key="`${opt.by}:${opt.dir}`" :value="`${opt.by}:${opt.dir}`">{{ opt.label }}</option>
       </select>
@@ -466,6 +509,54 @@ const openItem = (item: MarketExplorerItem) => {
 
     option
         background #1a1a1e
+
+.price-range
+    display flex
+    align-items center
+    gap 0.4rem
+
+.price-input
+    width 110px
+    background #1a1a1e
+    border 1px solid rgba(255,255,255,0.08)
+    border-radius 8px
+    color #fff
+    padding 0.5rem 0.6rem
+    font-size 0.875rem
+    outline none
+
+    &::placeholder
+        color #64748b
+
+    &:focus
+        border-color rgba(99,102,241,0.4)
+
+    &::-webkit-outer-spin-button, &::-webkit-inner-spin-button
+        -webkit-appearance none
+
+.price-sep
+    color #64748b
+
+.btn-clear
+    display inline-flex
+    align-items center
+    gap 0.4rem
+    background rgba(244,67,54,0.12)
+    color #f87171
+    border 1px solid rgba(244,67,54,0.35)
+    padding 0.6rem 1.2rem
+    border-radius 8px
+    font-size 0.9rem
+    font-weight 600
+    cursor pointer
+    transition all 0.2s
+
+    &:hover:not(:disabled)
+        background rgba(244,67,54,0.22)
+
+    &:disabled
+        opacity 0.5
+        cursor not-allowed
 
 .section
     background #1a1a1e

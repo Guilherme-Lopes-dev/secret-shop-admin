@@ -29,6 +29,8 @@ export const slotFilter = ref('')
 export const rarityFilter = ref('')
 export const qualityFilter = ref<string[]>([])
 export const priceFilter = ref<'all' | 'with' | 'without'>('all')
+export const priceMin = ref('') // reais, digitado
+export const priceMax = ref('') // reais, digitado
 export const sortValue = ref('name:asc')
 
 // Itens removidos manualmente da listagem (market_hash_name) — enviados ao salvar pra serem ignorados.

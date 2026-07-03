@@ -16,9 +16,9 @@ const router = useRouter()
 const loading = ref(false)
 const saving = ref(false)
 
-// Reais digitado → centavos.
-const toCents = (v: string) => {
-  const n = parseFloat(v.replace(',', '.'))
+// Reais digitado → centavos. (input number pode devolver number; coerço pra string.)
+const toCents = (v: string | number) => {
+  const n = parseFloat(String(v).replace(',', '.'))
   return Number.isFinite(n) && n >= 0 ? Math.round(n * 100) : undefined
 }
 

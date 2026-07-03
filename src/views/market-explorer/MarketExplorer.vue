@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { adminService, type MarketExplorerItem } from '@/services/admin/admin.service'
 import { formatCurrency } from '@/utils/formatCurrency'
@@ -10,7 +10,6 @@ import {
   currentPage, totalPages, totalItems, pageSize,
   searchQuery, heroFilter, typeFilter, slotFilter, rarityFilter, qualityFilter,
   priceFilter, priceMin, priceMax, sortValue,
-  excludedKeys,
 } from './explorerState'
 
 const router = useRouter()
@@ -36,21 +35,7 @@ const filterParams = () => ({
   priceMax: toCents(priceMax.value),
 })
 
-// Cards visíveis = página atual menos os itens removidos manualmente.
-const visibleItems = computed(() =>
-  items.value.filter((i) => !excludedKeys.value.includes(i.marketHashName)),
-)
-
-const removeItem = (item: MarketExplorerItem) => {
-  if (!excludedKeys.value.includes(item.marketHashName)) {
-    excludedKeys.value = [...excludedKeys.value, item.marketHashName]
-  }
-}
-const restoreExcluded = () => {
-  excludedKeys.value = []
-}
-
-// Apaga do banco (só na fonte 'db'); na 'api' o X apenas exclui da listagem.
+// Apaga do banco (fonte 'db').
 const deleteFromDb = async (item: MarketExplorerItem) => {
   if (!window.confirm(`Apagar "${item.name || item.marketHashName}" do banco?`)) return
   try {
@@ -62,36 +47,50 @@ const deleteFromDb = async (item: MarketExplorerItem) => {
     toast.error(e?.response?.data?.message || 'Erro ao apagar item.')
   }
 }
-const onCardRemove = (item: MarketExplorerItem) =>
-  source.value === 'db' ? deleteFromDb(item) : removeItem(item)
 
-// Apaga do banco todos os itens da página atual → recarrega (a próxima página sobe).
+// Remove do cache do explorer (fonte 'api') → some da visão e reduz total/páginas.
+const apiRemove = async (names: string[]) => {
+  if (!names.length) return
+  try {
+    await adminService.excludeFromMarketExplorer(names)
+    load(currentPage.value) // recarrega; back reclampa a página se passou do fim
+  } catch (e: any) {
+    toast.error(e?.response?.data?.message || 'Erro ao remover da listagem.')
+  }
+}
+
+const onCardRemove = (item: MarketExplorerItem) =>
+  source.value === 'db' ? deleteFromDb(item) : apiRemove([item.marketHashName])
+
+// Limpar página: remove todos os itens da página atual (banco apaga; API tira do cache) → recarrega.
 const clearingPage = ref(false)
 const clearPage = async () => {
-  const names = visibleItems.value.map((i) => i.marketHashName)
+  const names = items.value.map((i) => i.marketHashName)
   if (!names.length) return
-  if (!window.confirm(`Apagar os ${names.length} itens desta página do banco?`)) return
+  const alvo = source.value === 'db' ? 'do banco' : 'da listagem'
+  if (!window.confirm(`Apagar os ${names.length} itens desta página ${alvo}?`)) return
   clearingPage.value = true
   try {
-    const res = await adminService.deleteDropshipProducts(names)
-    toast.success(`${res.data.deleted} itens apagados.`)
-    load(currentPage.value) // back clampa a página se passou do fim
+    if (source.value === 'db') {
+      const res = await adminService.deleteDropshipProducts(names)
+      toast.success(`${res.data.deleted} itens apagados.`)
+    } else {
+      await adminService.excludeFromMarketExplorer(names)
+    }
+    load(currentPage.value)
   } catch (e: any) {
-    toast.error(e?.response?.data?.message || 'Erro ao apagar a página.')
+    toast.error(e?.response?.data?.message || 'Erro ao limpar a página.')
   } finally {
     clearingPage.value = false
   }
 }
 
 const saveToDb = async () => {
-  const estimate = Math.max(totalItems.value - excludedKeys.value.length, 0)
-  const ok = window.confirm(
-    `Salvar ~${estimate} itens no banco (filtro atual, menos ${excludedKeys.value.length} removidos)?`,
-  )
+  const ok = window.confirm(`Salvar ~${totalItems.value} itens no banco (filtro atual)?`)
   if (!ok) return
   saving.value = true
   try {
-    const res = await adminService.saveDropshipProducts(filterParams(), excludedKeys.value)
+    const res = await adminService.saveDropshipProducts(filterParams(), [])
     toast.success(`${res.data.saved} itens salvos (${res.data.batches} lotes).`)
   } catch (e: any) {
     toast.error(e?.response?.data?.message || 'Erro ao salvar no banco.')
@@ -240,18 +239,12 @@ const openItem = (item: MarketExplorerItem) => {
         </p>
       </div>
       <div class="header-actions">
-        <span v-if="source === 'api' && excludedKeys.length" class="excluded-badge">
-          {{ excludedKeys.length }} removido(s)
-          <button class="undo-btn" @click="restoreExcluded" title="Restaurar removidos">
-            <Icon icon="mdi:undo" />
-          </button>
-        </span>
         <button v-if="hasFetched && source === 'api'" class="btn-save" :disabled="saving || loading" @click="saveToDb">
           <Icon :icon="saving ? 'mdi:loading' : 'mdi:database-plus-outline'" :class="{ spinning: saving }" />
           {{ saving ? 'Salvando...' : 'Salvar no banco' }}
         </button>
         <button
-          v-if="hasFetched && source === 'db' && visibleItems.length"
+          v-if="hasFetched && items.length"
           class="btn-clear"
           :disabled="clearingPage || loading"
           @click="clearPage"
@@ -330,7 +323,7 @@ const openItem = (item: MarketExplorerItem) => {
       <div v-else>
         <div class="cards-grid">
           <article
-            v-for="item in visibleItems"
+            v-for="item in items"
             :key="item.marketHashName"
             class="card"
             @click="openItem(item)"
@@ -362,7 +355,7 @@ const openItem = (item: MarketExplorerItem) => {
               </div>
             </div>
           </article>
-          <div v-if="!visibleItems.length" class="empty-state">Nenhum item para exibir.</div>
+          <div v-if="!items.length" class="empty-state">Nenhum item para exibir.</div>
         </div>
 
         <div class="pagination" v-if="totalPages > 1">
@@ -599,24 +592,6 @@ const openItem = (item: MarketExplorerItem) => {
     &:disabled
         opacity 0.5
         cursor not-allowed
-
-.excluded-badge
-    display inline-flex
-    align-items center
-    gap 0.35rem
-    color #f87171
-    font-size 0.8rem
-
-.undo-btn
-    background transparent
-    border none
-    color #f87171
-    cursor pointer
-    display inline-flex
-    font-size 1rem
-
-    &:hover
-        color #fca5a5
 
 .cards-grid
     display grid

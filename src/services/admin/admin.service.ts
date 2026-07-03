@@ -295,6 +295,14 @@ export const adminService = {
     return api.get<MarketExplorerResponse>(`/skins/admin/dropship-products?${p}`, { timeout: 30_000 })
   },
 
+  // Remove itens do cache do explorer (API) — some da visão e reduz o total de páginas
+  async excludeFromMarketExplorer(marketHashNames: string[]) {
+    return api.post<{ removed: number; remaining: number }>(
+      '/skins/admin/market-explorer/exclude',
+      { marketHashNames },
+    )
+  },
+
   // Apaga produtos do banco (dropship_products) por market_hash_name
   async deleteDropshipProducts(marketHashNames: string[]) {
     return api.post<{ deleted: number }>('/skins/admin/dropship-products/delete', { marketHashNames })

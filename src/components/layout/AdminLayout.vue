@@ -24,6 +24,7 @@ const navItems = [
     { label: 'Collectors', icon: 'mdi:trophy-outline', to: '/collectors', name: 'collectors', exact: true },
     { label: 'Catálogo Col.', icon: 'mdi:trophy-variant-outline', to: '/collectors/catalog', name: 'collectors-catalog', exact: false },
     { label: 'Pedidos Collector', icon: 'mdi:receipt-text-outline', to: '/collector-orders', name: 'collector-orders' },
+    { label: 'Envios Dropship', icon: 'mdi:package-variant-closed', to: '/dropship-orders', name: 'dropship-orders' },
     { label: 'Secret Pass', icon: 'mdi:shield-star-outline', to: '/passes', name: 'passes' },
     { label: 'Antifraude', icon: 'mdi:shield-alert-outline', to: '/antifraud', name: 'antifraud-policy' },
     { label: 'Discord', icon: 'mdi:discord', to: '/discord', name: 'discord' },

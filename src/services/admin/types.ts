@@ -8,6 +8,44 @@ export interface PassTierEntry {
   is_current:    boolean
 }
 
+export interface DropshipNotificationItem {
+  name: string
+  quantity: number
+  unitPrice: number
+  steamMarketUrl?: string | null
+}
+
+export interface DropshipNotificationMetadata {
+  saleId: string
+  saleUuid: string
+  orderNumber: string
+  userName: string
+  email?: string | null
+  contact?: string | null
+  steamId?: string | null
+  tradeLink?: string | null
+  totalAmount: number
+  items: DropshipNotificationItem[]
+}
+
+export interface DropshipNotificationDto {
+  id: string
+  type: 'DROPSHIP_PURCHASE'
+  title: string
+  body: string
+  metadata: DropshipNotificationMetadata
+  is_read: boolean
+  read_at: string | null
+  created_at: string
+}
+
+export interface DropshipNotificationsResponse {
+  data: DropshipNotificationDto[]
+  total: number
+  page: number
+  limit: number
+}
+
 export interface PassProgressDto {
   pass_active:         boolean
   season_start:        string | null

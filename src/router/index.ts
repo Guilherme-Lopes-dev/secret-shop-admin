@@ -104,6 +104,16 @@ const routes = [
         component: () => import('@/views/collector-orders/CollectorOrderDetail.vue'),
       },
       {
+        path: 'dropship-orders',
+        name: 'dropship-orders',
+        component: () => import('@/views/dropship-orders/DropshipOrdersList.vue'),
+      },
+      {
+        path: 'dropship-orders/:uuid',
+        name: 'dropship-order-detail',
+        component: () => import('@/views/dropship-orders/DropshipOrderDetail.vue'),
+      },
+      {
         path: 'products/create',
         name: 'create-product',
         component: () => import('@/views/products/CreateProduct.vue'),

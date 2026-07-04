@@ -7,6 +7,7 @@ import { formatCurrency } from '@/utils/formatCurrency'
 import { generateSaleReportPdf } from '@/utils/pdf/saleReport'
 import { Icon } from '@iconify/vue'
 import { countryName } from '@/utils/countries'
+import { buildSteamImageUrl } from '@/utils/steamImage'
 
 const route = useRoute()
 const router = useRouter()
@@ -47,14 +48,8 @@ const fetchSale = async () => {
     }
 }
 
-const buildSteamImageUrl = (image: string | null | undefined, size: string = '80fx80f') => {
-    if (!image) return null
-    if (image.startsWith('http://') || image.startsWith('https://')) return image
-    return `https://steamcommunity-a.akamaihd.net/economy/image/${image}/${size}`
-}
-
 const resolveItemImageUrl = (item: any) => {
-    return buildSteamImageUrl(item?.skin_image ?? item?.bot_inventory?.skins?.icon_url_large ?? null)
+    return buildSteamImageUrl(item?.skin_image ?? item?.bot_inventory?.skins?.icon_url_large ?? null, '80fx80f')
 }
 
 const getStatusClass = (status: string) => {

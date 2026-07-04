@@ -110,7 +110,7 @@ const clearPage = async () => {
 const saveToDb = async () => {
   const list = sorted.value
   if (!list.length) return
-  if (!window.confirm(`Salvar ${list.length} itens no banco?`)) return
+  if (!window.confirm(`Salvar ${list.length} itens no banco? O preço de venda é calculado pelo servidor sobre o valor Steam.`)) return
   saving.value = true
   try {
     const CHUNK = 1000
@@ -364,12 +364,27 @@ const openItem = (item: MarketExplorerItem) => {
                 <span v-if="item.quality" class="badge badge-quality">{{ item.quality }}</span>
                 <span v-if="item.rarity" class="badge badge-rarity">{{ item.rarity }}</span>
                 <span v-if="item.hero" class="badge badge-hero">{{ item.hero }}</span>
+                <a
+                  v-if="item.steamMarketUrl"
+                  :href="item.steamMarketUrl"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="badge badge-steam"
+                  @click.stop
+                >
+                  <Icon icon="mdi:steam" /> Steam Market
+                </a>
               </div>
               <div class="card-prices">
-                <span class="card-price" :class="{ 'no-price': item.priceLatest == null }">
-                  {{ item.priceLatest != null ? formatCurrency(item.priceLatest) : 'Sem preço' }}
+                <!-- Cache antigo não tem salePrice: cai no valor Steam. -->
+                <span class="card-price" :class="{ 'no-price': (item.salePrice ?? item.priceLatest) == null }">
+                  {{ (item.salePrice ?? item.priceLatest) != null
+                    ? formatCurrency(item.salePrice ?? item.priceLatest!)
+                    : 'Sem preço' }}
                 </span>
-                <span v-if="item.priceMedian != null" class="card-median">med. {{ formatCurrency(item.priceMedian) }}</span>
+                <span v-if="item.salePrice != null && item.priceLatest != null" class="card-market-price">
+                  Steam {{ formatCurrency(item.priceLatest) }}
+                </span>
               </div>
             </div>
           </article>
@@ -721,6 +736,17 @@ const openItem = (item: MarketExplorerItem) => {
     background rgba(76,175,80,0.12)
     color #86efac
 
+.badge-steam
+    display inline-flex
+    align-items center
+    gap 0.2rem
+    background rgba(102,192,244,0.12)
+    color #66c0f4
+    text-decoration none
+
+    &:hover
+        background rgba(102,192,244,0.22)
+
 .card-prices
     display flex
     align-items baseline
@@ -738,9 +764,10 @@ const openItem = (item: MarketExplorerItem) => {
         font-weight 400
         font-size 0.8rem
 
-.card-median
+.card-market-price
     font-size 0.72rem
     color #94a3b8
+    text-decoration line-through
 
 .quality-row
     display flex

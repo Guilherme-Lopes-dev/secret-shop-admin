@@ -20,10 +20,12 @@ import type {
   DiscordUpdateChannelPayload,
   DiscordUpdateRolePayload,
   DiscordWebhookCreatedDto,
+  DropshipNotificationsResponse,
   PassProgressDto,
 } from './types'
 
 const collectorNotificationTypes = 'COLLECTOR_PURCHASE,COLLECTOR_SHIPPING_REMINDER'
+const dropshipNotificationTypes = 'DROPSHIP_PURCHASE'
 
 export const adminService = {
   async getSalesStats() {
@@ -351,6 +353,27 @@ export const adminService = {
 
   async markAllCollectorNotificationsRead() {
     return api.patch(`/admin/notifications/read-all?types=${collectorNotificationTypes}`)
+  },
+
+  // Dropship shipping queue
+  async getDropshipNotifications(page: number = 1, limit: number = 20, onlyUnread: boolean = true) {
+    const params = new URLSearchParams({
+      page: String(page),
+      limit: String(limit),
+      types: dropshipNotificationTypes,
+    })
+    if (onlyUnread) params.append('onlyUnread', 'true')
+    return api.get<DropshipNotificationsResponse>(`/admin/notifications?${params}`)
+  },
+
+  async getDropshipUnreadCount() {
+    return api.get<{ count: number }>(
+      `/admin/notifications/unread-count?types=${dropshipNotificationTypes}`,
+    )
+  },
+
+  async markDropshipNotificationRead(id: string) {
+    return api.patch(`/admin/notifications/${id}/read`)
   },
 
   // Collectors catalog
@@ -813,11 +836,13 @@ export interface MarketExplorerItem {
   marketHashName: string
   name: string | null
   image: string | null
+  steamMarketUrl: string
   rarity: string | null
   quality: string | null
   type: string | null
   slot: string | null
   hero: string | null
+  salePrice: number | null
   priceLatest: number | null
   priceMedian: number | null
   priceUpdatedAt: string | null

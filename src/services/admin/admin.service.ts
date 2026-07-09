@@ -225,22 +225,7 @@ export const adminService = {
   },
 
   // Market Explorer — catálogo cru do steamwebapi /items (paginado no back)
-  async getMarketExplorer(params: {
-    page?: number
-    pageSize?: number
-    search?: string
-    hero?: string
-    type?: string
-    slot?: string
-    rarity?: string
-    qualities?: string[]
-    priceFilter?: 'all' | 'with' | 'without'
-    priceMin?: number
-    priceMax?: number
-    sortBy?: 'price' | 'name' | 'rarity'
-    sortDir?: 'asc' | 'desc'
-    refresh?: boolean
-  } = {}) {
+  async getMarketExplorer(params: MarketExplorerFilters & { page?: number; pageSize?: number; refresh?: boolean } = {}) {
     const p = new URLSearchParams({
       page: String(params.page ?? 1),
       pageSize: String(params.pageSize ?? 50),
@@ -264,21 +249,7 @@ export const adminService = {
   },
 
   // Lista produtos salvos no banco (dropship_products) — mesmos filtros do explorer
-  async getDropshipProducts(params: {
-    page?: number
-    pageSize?: number
-    search?: string
-    hero?: string
-    type?: string
-    slot?: string
-    rarity?: string
-    qualities?: string[]
-    priceFilter?: 'all' | 'with' | 'without'
-    priceMin?: number
-    priceMax?: number
-    sortBy?: 'price' | 'name' | 'rarity'
-    sortDir?: 'asc' | 'desc'
-  } = {}) {
+  async getDropshipProducts(params: MarketExplorerFilters & { page?: number; pageSize?: number } = {}) {
     const p = new URLSearchParams({
       page: String(params.page ?? 1),
       pageSize: String(params.pageSize ?? 50),
@@ -443,9 +414,19 @@ export const adminService = {
   },
 
   // Preços — catálogo + evolução por skin
-  async getSkinsPriceCatalog(page: number = 1, limit: number = 20, search?: string) {
+  async getSkinsPriceCatalog(page: number = 1, limit: number = 20, filters: MarketExplorerFilters = {}) {
     const params = new URLSearchParams({ page: String(page), limit: String(limit) })
-    if (search) params.append('search', search)
+    if (filters.search) params.append('search', filters.search)
+    if (filters.hero) params.append('hero', filters.hero)
+    if (filters.type) params.append('type', filters.type)
+    if (filters.slot) params.append('slot', filters.slot)
+    if (filters.rarity) params.append('rarity', filters.rarity)
+    if (filters.qualities?.length) params.append('qualities', filters.qualities.join(','))
+    if (filters.priceFilter) params.append('priceFilter', filters.priceFilter)
+    if (filters.priceMin != null) params.append('priceMin', String(filters.priceMin))
+    if (filters.priceMax != null) params.append('priceMax', String(filters.priceMax))
+    if (filters.sortBy) params.append('sortBy', filters.sortBy)
+    if (filters.sortDir) params.append('sortDir', filters.sortDir)
     return api.get<SkinPriceCatalogResponse>(`/skins/admin/price-catalog?${params}`)
   },
 
@@ -843,6 +824,20 @@ export const adminService = {
   },
 }
 
+export interface MarketExplorerFilters {
+  search?: string
+  hero?: string
+  type?: string
+  slot?: string
+  rarity?: string
+  qualities?: string[]
+  priceFilter?: 'all' | 'with' | 'without'
+  priceMin?: number
+  priceMax?: number
+  sortBy?: 'price' | 'name' | 'rarity'
+  sortDir?: 'asc' | 'desc'
+}
+
 export interface MarketExplorerItem {
   marketHashName: string
   name: string | null
@@ -908,6 +903,9 @@ export interface SkinPriceCatalogItem {
   median_price: number | null
   manual_price: number | null
   last_price_update_at: string | null
+  first_median_price: number | null
+  last_median_price: number | null
+  median_price_change_pct: number | null
 }
 
 export interface SkinPriceCatalogResponse {
@@ -915,6 +913,7 @@ export interface SkinPriceCatalogResponse {
   total: number
   page: number
   pages: number
+  facets: MarketExplorerFacets
 }
 
 export interface SkinPriceHistoryPoint {

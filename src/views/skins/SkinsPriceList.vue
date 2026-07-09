@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { adminService, type SkinPriceCatalogItem } from '@/services/admin/admin.service'
+import { adminService, type SkinPriceCatalogItem, type MarketExplorerFacets } from '@/services/admin/admin.service'
 import { formatCurrency } from '@/utils/formatCurrency'
+import { toCents } from '@/utils/toCents'
 import { Icon } from '@iconify/vue'
 
 const router = useRouter()
@@ -12,18 +13,44 @@ const currentPage = ref(1)
 const totalPages = ref(1)
 const totalItems = ref(0)
 const limit = ref(20)
+
 const searchQuery = ref('')
+const heroFilter = ref('')
+const typeFilter = ref('')
+const slotFilter = ref('')
+const rarityFilter = ref('')
+const qualityFilter = ref<string[]>([])
+const priceFilter = ref<'all' | 'with' | 'without'>('all')
+const priceMin = ref('')
+const priceMax = ref('')
+const sortValue = ref('update:desc')
+
+const facets = ref<MarketExplorerFacets>({ heroes: [], types: [], slots: [], rarities: [], qualities: [] })
 let searchTimeout: ReturnType<typeof setTimeout> | null = null
 
 const fetchCatalog = async (page: number) => {
     loading.value = true
     try {
-        const response = await adminService.getSkinsPriceCatalog(page, limit.value, searchQuery.value || undefined)
+        const [sortBy, sortDir] = sortValue.value.split(':') as [string, 'asc' | 'desc']
+        const response = await adminService.getSkinsPriceCatalog(page, limit.value, {
+            search: searchQuery.value || undefined,
+            hero: heroFilter.value || undefined,
+            type: typeFilter.value || undefined,
+            slot: slotFilter.value || undefined,
+            rarity: rarityFilter.value || undefined,
+            qualities: qualityFilter.value.length ? qualityFilter.value : undefined,
+            priceFilter: priceFilter.value !== 'all' ? priceFilter.value : undefined,
+            priceMin: priceMin.value ? toCents(priceMin.value) : undefined,
+            priceMax: priceMax.value ? toCents(priceMax.value) : undefined,
+            sortBy: sortBy === 'update' ? undefined : (sortBy as 'price' | 'name' | 'rarity'),
+            sortDir,
+        })
         if (response.data) {
             items.value = response.data.data
             totalPages.value = response.data.pages
             totalItems.value = response.data.total
             currentPage.value = response.data.page
+            facets.value = response.data.facets
         }
     } catch (error) {
         console.error('Erro ao buscar catálogo de preços:', error)
@@ -32,12 +59,60 @@ const fetchCatalog = async (page: number) => {
     }
 }
 
+const onFilterChange = () => fetchCatalog(1)
 const onSearchInput = () => {
     if (searchTimeout) clearTimeout(searchTimeout)
     searchTimeout = setTimeout(() => fetchCatalog(1), 400)
 }
 const nextPage = () => { if (currentPage.value < totalPages.value) fetchCatalog(currentPage.value + 1) }
 const prevPage = () => { if (currentPage.value > 1) fetchCatalog(currentPage.value - 1) }
+
+const toggleQuality = (q: string) => {
+    const set = new Set(qualityFilter.value)
+    set.has(q) ? set.delete(q) : set.add(q)
+    qualityFilter.value = [...set]
+    onFilterChange()
+}
+const clearQualities = () => {
+    qualityFilter.value = []
+    onFilterChange()
+}
+const clearAllFilters = () => {
+    heroFilter.value = ''
+    typeFilter.value = ''
+    slotFilter.value = ''
+    rarityFilter.value = ''
+    qualityFilter.value = []
+    priceFilter.value = 'all'
+    priceMin.value = ''
+    priceMax.value = ''
+    searchQuery.value = ''
+    sortValue.value = 'update:desc'
+    onFilterChange()
+}
+
+const priceOptions = [
+    { label: 'Todos', value: 'all' },
+    { label: 'Com preço', value: 'with' },
+    { label: 'Sem preço', value: 'without' },
+]
+const sortOptions = [
+    { label: 'Última atualização', value: 'update:desc' },
+    { label: 'Nome (A→Z)', value: 'name:asc' },
+    { label: 'Nome (Z→A)', value: 'name:desc' },
+    { label: 'Menor preço', value: 'price:asc' },
+    { label: 'Maior preço', value: 'price:desc' },
+    { label: 'Raridade', value: 'rarity:asc' },
+]
+
+const formatTrend = (pct: number | null) => {
+    if (pct == null) return '—'
+    return `${pct > 0 ? '+' : ''}${pct.toFixed(1)}%`
+}
+const trendClass = (pct: number | null) => {
+    if (pct == null) return ''
+    return pct > 0 ? 'trend-up' : pct < 0 ? 'trend-down' : ''
+}
 
 onMounted(() => fetchCatalog(1))
 </script>
@@ -62,6 +137,46 @@ onMounted(() => fetchCatalog(1))
                     class="search-input"
                 />
             </div>
+            <select v-model="heroFilter" @change="onFilterChange" class="filter-select">
+                <option value="">Todos os heróis</option>
+                <option v-for="h in facets.heroes" :key="h" :value="h">{{ h }}</option>
+            </select>
+            <select v-model="typeFilter" @change="onFilterChange" class="filter-select">
+                <option value="">Todos os tipos</option>
+                <option v-for="t in facets.types" :key="t" :value="t">{{ t }}</option>
+            </select>
+            <select v-model="slotFilter" @change="onFilterChange" class="filter-select">
+                <option value="">Todos os slots</option>
+                <option v-for="s in facets.slots" :key="s" :value="s">{{ s }}</option>
+            </select>
+            <select v-model="rarityFilter" @change="onFilterChange" class="filter-select">
+                <option value="">Todas raridades</option>
+                <option v-for="r in facets.rarities" :key="r" :value="r">{{ r }}</option>
+            </select>
+            <select v-model="priceFilter" @change="onFilterChange" class="filter-select">
+                <option v-for="opt in priceOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+            </select>
+            <div class="price-range">
+                <input v-model="priceMin" @change="onFilterChange" type="number" min="0" step="0.01" placeholder="R$ mín" class="price-input" />
+                <span class="price-sep">—</span>
+                <input v-model="priceMax" @change="onFilterChange" type="number" min="0" step="0.01" placeholder="R$ máx" class="price-input" />
+            </div>
+            <select v-model="sortValue" @change="onFilterChange" class="filter-select">
+                <option v-for="opt in sortOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+            </select>
+            <button class="chip chip-clear" @click="clearAllFilters">Limpar filtros</button>
+        </div>
+
+        <div class="quality-row" v-if="facets.qualities.length">
+            <span class="quality-label">Qualidade:</span>
+            <button
+                v-for="q in facets.qualities"
+                :key="q"
+                class="chip"
+                :class="{ active: qualityFilter.includes(q) }"
+                @click="toggleQuality(q)"
+            >{{ q }}</button>
+            <button v-if="qualityFilter.length" class="chip chip-clear" @click="clearQualities">Limpar</button>
         </div>
 
         <div class="section">
@@ -76,6 +191,9 @@ onMounted(() => fetchCatalog(1))
                                 <th>Preço Mediano</th>
                                 <th>Preço Catálogo</th>
                                 <th>Última atualização</th>
+                                <th>1º Valor (Mediano)</th>
+                                <th>Último Valor (Mediano)</th>
+                                <th>Variação</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -106,6 +224,9 @@ onMounted(() => fetchCatalog(1))
                                 <td class="price">{{ formatCurrency(item.median_price) }}</td>
                                 <td class="price">{{ formatCurrency(item.manual_price) }}</td>
                                 <td>{{ item.last_price_update_at ? $dayjs(item.last_price_update_at).format('DD/MM/YY HH:mm') : '—' }}</td>
+                                <td class="price">{{ item.first_median_price != null ? formatCurrency(item.first_median_price) : '—' }}</td>
+                                <td class="price">{{ item.last_median_price != null ? formatCurrency(item.last_median_price) : '—' }}</td>
+                                <td :class="trendClass(item.median_price_change_pct)">{{ formatTrend(item.median_price_change_pct) }}</td>
                             </tr>
                             <tr v-if="items.length === 0">
                                 <td colspan="5" class="empty-state">Nenhuma skin encontrada.</td>
@@ -186,6 +307,80 @@ onMounted(() => fetchCatalog(1))
     &:focus
         border-color rgba(99,102,241,0.4)
 
+.filter-select
+    background #1a1a1e
+    border 1px solid rgba(255,255,255,0.08)
+    border-radius 8px
+    color #fff
+    padding 0.5rem 0.75rem
+    font-size 0.875rem
+    outline none
+    cursor pointer
+
+    option
+        background #1a1a1e
+
+.price-range
+    display flex
+    align-items center
+    gap 0.4rem
+
+.price-input
+    width 110px
+    background #1a1a1e
+    border 1px solid rgba(255,255,255,0.08)
+    border-radius 8px
+    color #fff
+    padding 0.5rem 0.6rem
+    font-size 0.875rem
+    outline none
+
+    &::placeholder
+        color #64748b
+
+    &:focus
+        border-color rgba(99,102,241,0.4)
+
+    &::-webkit-outer-spin-button, &::-webkit-inner-spin-button
+        -webkit-appearance none
+
+.price-sep
+    color #64748b
+
+.quality-row
+    display flex
+    align-items center
+    gap 0.4rem
+    flex-wrap wrap
+    margin-bottom 1.25rem
+
+.quality-label
+    color #94a3b8
+    font-size 0.8rem
+    margin-right 0.25rem
+
+.chip
+    background #1a1a1e
+    border 1px solid rgba(255,255,255,0.1)
+    color #cbd5e1
+    padding 0.35rem 0.7rem
+    border-radius 999px
+    font-size 0.78rem
+    cursor pointer
+    transition all 0.15s
+
+    &:hover
+        border-color rgba(99,102,241,0.4)
+
+    &.active
+        background rgba(99,102,241,0.18)
+        border-color rgba(99,102,241,0.5)
+        color #a5b4fc
+
+.chip-clear
+    border-color rgba(244,67,54,0.3)
+    color #f87171
+
 .section
     background #1a1a1e
     padding 1.5rem
@@ -224,6 +419,14 @@ table
         &.price
             font-weight 600
             color #4caf50
+
+        &.trend-up
+            font-weight 600
+            color #4caf50
+
+        &.trend-down
+            font-weight 600
+            color #f44336
 
 .row-clickable
     cursor pointer

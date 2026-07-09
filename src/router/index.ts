@@ -64,6 +64,16 @@ const routes = [
         component: () => import('@/views/inventory/InventoryList.vue'),
       },
       {
+        path: 'skins/prices',
+        name: 'skins-prices',
+        component: () => import('@/views/skins/SkinsPriceList.vue'),
+      },
+      {
+        path: 'skins/prices/:uuid',
+        name: 'skin-price-history',
+        component: () => import('@/views/skins/SkinPriceHistory.vue'),
+      },
+      {
         path: 'market-explorer',
         name: 'market-explorer',
         component: () => import('@/views/market-explorer/MarketExplorer.vue'),

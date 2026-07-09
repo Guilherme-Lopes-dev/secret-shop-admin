@@ -442,6 +442,17 @@ export const adminService = {
     return api.patch(`/skins/admin/skin/${skinUuid}/price-lock`, { locked })
   },
 
+  // Preços — catálogo + evolução por skin
+  async getSkinsPriceCatalog(page: number = 1, limit: number = 20, search?: string) {
+    const params = new URLSearchParams({ page: String(page), limit: String(limit) })
+    if (search) params.append('search', search)
+    return api.get<SkinPriceCatalogResponse>(`/skins/admin/price-catalog?${params}`)
+  },
+
+  async getSkinPriceHistory(uuid: string) {
+    return api.get<SkinPriceHistoryResponse>(`/skins/admin/${uuid}/price-history`)
+  },
+
   // Pass config
   async getPassConfig() {
     return api.get<{
@@ -886,4 +897,39 @@ export interface RarityMultiplierInput {
   userMultiplier?: number
   storeMultiplier?: number
   active?: boolean
+}
+
+export interface SkinPriceCatalogItem {
+  uuid: string
+  name: string
+  hero: string | null
+  icon_url_large: string | null
+  lowest_price: number | null
+  median_price: number | null
+  manual_price: number | null
+  last_price_update_at: string | null
+}
+
+export interface SkinPriceCatalogResponse {
+  data: SkinPriceCatalogItem[]
+  total: number
+  page: number
+  pages: number
+}
+
+export interface SkinPriceHistoryPoint {
+  day: string
+  lowest_price: number | null
+  median_price: number | null
+  manual_price: number | null
+}
+
+export interface SkinPriceHistoryResponse {
+  skin: {
+    uuid: string
+    name: string
+    hero: string | null
+    icon_url_large: string | null
+  }
+  points: SkinPriceHistoryPoint[]
 }

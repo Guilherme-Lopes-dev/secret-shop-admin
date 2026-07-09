@@ -900,7 +900,7 @@ export interface RarityMultiplierInput {
 }
 
 export interface SkinPriceCatalogItem {
-  uuid: string
+  id: string
   name: string
   hero: string | null
   icon_url_large: string | null
@@ -926,7 +926,7 @@ export interface SkinPriceHistoryPoint {
 
 export interface SkinPriceHistoryResponse {
   skin: {
-    uuid: string
+    id: string
     name: string
     hero: string | null
     icon_url_large: string | null

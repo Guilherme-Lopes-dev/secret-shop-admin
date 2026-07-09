@@ -81,9 +81,9 @@ onMounted(() => fetchCatalog(1))
                         <tbody>
                             <tr
                                 v-for="item in items"
-                                :key="item.uuid"
+                                :key="item.id"
                                 class="row-clickable"
-                                @click="router.push(`/skins/prices/${item.uuid}`)"
+                                @click="router.push(`/skins/prices/${item.id}`)"
                             >
                                 <td>
                                     <div class="item-cell">

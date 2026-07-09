@@ -182,57 +182,53 @@ onMounted(() => fetchCatalog(1))
         <div class="section">
             <div v-if="loading" class="loading-state">Carregando catálogo...</div>
             <div v-else>
-                <div class="table-wrapper">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Skin</th>
-                                <th>Menor Preço</th>
-                                <th>Preço Mediano</th>
-                                <th>Preço Catálogo</th>
-                                <th>Última atualização</th>
-                                <th>1º Valor (Mediano)</th>
-                                <th>Último Valor (Mediano)</th>
-                                <th>Variação</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr
-                                v-for="item in items"
-                                :key="item.id"
-                                class="row-clickable"
-                                @click="router.push(`/skins/prices/${item.id}`)"
-                            >
-                                <td>
-                                    <div class="item-cell">
-                                        <img
-                                            v-if="item.icon_url_large"
-                                            :src="`https://steamcommunity-a.akamaihd.net/economy/image/${item.icon_url_large}/62fx62f`"
-                                            class="item-thumb"
-                                            alt=""
-                                        />
-                                        <div v-else class="item-thumb-placeholder">
-                                            <Icon icon="mdi:sword" />
-                                        </div>
-                                        <div>
-                                            <span class="item-name">{{ item.name }}</span>
-                                            <small class="item-hero">{{ item.hero || '' }}</small>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td class="price">{{ formatCurrency(item.lowest_price) }}</td>
-                                <td class="price">{{ formatCurrency(item.median_price) }}</td>
-                                <td class="price">{{ formatCurrency(item.manual_price) }}</td>
-                                <td>{{ item.last_price_update_at ? $dayjs(item.last_price_update_at).format('DD/MM/YY HH:mm') : '—' }}</td>
-                                <td class="price">{{ item.first_median_price != null ? formatCurrency(item.first_median_price) : '—' }}</td>
-                                <td class="price">{{ item.last_median_price != null ? formatCurrency(item.last_median_price) : '—' }}</td>
-                                <td :class="trendClass(item.median_price_change_pct)">{{ formatTrend(item.median_price_change_pct) }}</td>
-                            </tr>
-                            <tr v-if="items.length === 0">
-                                <td colspan="5" class="empty-state">Nenhuma skin encontrada.</td>
-                            </tr>
-                        </tbody>
-                    </table>
+                <div class="cards-grid">
+                    <article
+                        v-for="item in items"
+                        :key="item.id"
+                        class="card"
+                        @click="router.push(`/skins/prices/${item.id}`)"
+                    >
+                        <div class="card-img-wrap">
+                            <img v-if="item.icon_url_large" :src="`https://steamcommunity-a.akamaihd.net/economy/image/${item.icon_url_large}/184fx184f`" class="card-img" alt="" loading="lazy" />
+                            <div v-else class="card-img-placeholder"><Icon icon="mdi:sword" /></div>
+                        </div>
+                        <div class="card-body">
+                            <h3 class="card-name" :title="item.name">{{ item.name }}</h3>
+                            <span v-if="item.hero" class="badge badge-hero">{{ item.hero }}</span>
+
+                            <div class="card-price-grid">
+                                <div class="card-price-cell">
+                                    <span class="card-price-label">Menor</span>
+                                    <span class="card-price-value">{{ formatCurrency(item.lowest_price) }}</span>
+                                </div>
+                                <div class="card-price-cell">
+                                    <span class="card-price-label">Mediano</span>
+                                    <span class="card-price-value">{{ formatCurrency(item.median_price) }}</span>
+                                </div>
+                                <div class="card-price-cell">
+                                    <span class="card-price-label">Catálogo</span>
+                                    <span class="card-price-value">{{ formatCurrency(item.manual_price) }}</span>
+                                </div>
+                            </div>
+
+                            <div class="card-evolution">
+                                <div class="card-evolution-cell">
+                                    <span class="card-price-label">1º Valor</span>
+                                    <span class="card-price-value">{{ item.first_median_price != null ? formatCurrency(item.first_median_price) : '—' }}</span>
+                                </div>
+                                <Icon icon="mdi:arrow-right" class="card-evolution-arrow" />
+                                <div class="card-evolution-cell">
+                                    <span class="card-price-label">Último</span>
+                                    <span class="card-price-value">{{ item.last_median_price != null ? formatCurrency(item.last_median_price) : '—' }}</span>
+                                </div>
+                                <span class="card-trend" :class="trendClass(item.median_price_change_pct)">{{ formatTrend(item.median_price_change_pct) }}</span>
+                            </div>
+
+                            <span class="card-updated-at">{{ item.last_price_update_at ? `Atualizado ${$dayjs(item.last_price_update_at).format('DD/MM/YY HH:mm')}` : 'Sem atualização' }}</span>
+                        </div>
+                    </article>
+                    <div v-if="!items.length" class="empty-state">Nenhuma skin encontrada.</div>
                 </div>
 
                 <div class="pagination" v-if="totalPages > 1">
@@ -392,82 +388,123 @@ onMounted(() => fetchCatalog(1))
     text-align center
     color #94a3b8
 
-.table-wrapper
-    overflow-x auto
+.cards-grid
+    display grid
+    grid-template-columns repeat(auto-fill, minmax(240px, 1fr))
+    gap 1rem
     margin-bottom 1.5rem
 
-table
-    width 100%
-    border-collapse collapse
-
-    th
-        text-align left
-        color #94a3b8
-        font-size 0.78rem
-        font-weight 500
-        padding 0.75rem
-        border-bottom 1px solid rgba(255,255,255,0.05)
-        white-space nowrap
-        text-transform uppercase
-
-    td
-        padding 0.85rem 0.75rem
-        font-size 0.875rem
-        border-bottom 1px solid rgba(255,255,255,0.04)
-        vertical-align middle
-
-        &.price
-            font-weight 600
-            color #4caf50
-
-        &.trend-up
-            font-weight 600
-            color #4caf50
-
-        &.trend-down
-            font-weight 600
-            color #f44336
-
-.row-clickable
+.card
+    background #121214
+    border 1px solid rgba(255,255,255,0.06)
+    border-radius 10px
+    overflow hidden
     cursor pointer
-    transition background 0.15s
+    transition all 0.15s
+    display flex
+    flex-direction column
 
     &:hover
-        background rgba(255,255,255,0.03)
+        border-color rgba(99,102,241,0.4)
+        transform translateY(-2px)
 
-.item-cell
-    display flex
-    align-items center
-    gap 0.625rem
-
-.item-thumb
-    width 40px
-    height 40px
-    object-fit contain
-    border-radius 4px
-    background rgba(255,255,255,0.04)
-
-.item-thumb-placeholder
-    width 40px
-    height 40px
-    border-radius 4px
-    background rgba(255,255,255,0.05)
+.card-img-wrap
+    aspect-ratio 16 / 10
+    background rgba(255,255,255,0.03)
     display flex
     align-items center
     justify-content center
-    color #64748b
 
-.item-name
-    display block
-    font-weight 500
-    font-size 0.85rem
+.card-img
+    width 100%
+    height 100%
+    object-fit contain
 
-.item-hero
-    display block
+.card-img-placeholder
+    color #3f3f46
+    font-size 2rem
+
+.card-body
+    padding 0.85rem
+    display flex
+    flex-direction column
+    gap 0.5rem
+
+.card-name
+    font-size 0.88rem
+    font-weight 600
+    line-height 1.25
+    display -webkit-box
+    -webkit-line-clamp 2
+    -webkit-box-orient vertical
+    overflow hidden
+    min-height 2.2rem
+
+.badge-hero
+    align-self flex-start
+    padding 2px 7px
+    border-radius 5px
+    font-size 0.68rem
+    font-weight 600
+    background rgba(76,175,80,0.12)
+    color #86efac
+
+.card-price-grid
+    display grid
+    grid-template-columns repeat(3, 1fr)
+    gap 0.5rem
+    padding-top 0.25rem
+    border-top 1px solid rgba(255,255,255,0.05)
+
+.card-price-cell
+    display flex
+    flex-direction column
+    gap 0.15rem
+
+.card-price-label
+    font-size 0.65rem
     color #64748b
-    font-size 0.73rem
+    text-transform uppercase
+
+.card-price-value
+    font-size 0.82rem
+    font-weight 600
+    color #4caf50
+
+.card-evolution
+    display flex
+    align-items center
+    gap 0.5rem
+    padding-top 0.5rem
+    border-top 1px solid rgba(255,255,255,0.05)
+
+.card-evolution-cell
+    display flex
+    flex-direction column
+    gap 0.15rem
+
+.card-evolution-arrow
+    color #64748b
+    font-size 0.9rem
+
+.card-trend
+    margin-left auto
+    font-size 0.8rem
+    font-weight 700
+    color #94a3b8
+
+    &.trend-up
+        color #4caf50
+
+    &.trend-down
+        color #f44336
+
+.card-updated-at
+    font-size 0.7rem
+    color #64748b
 
 .empty-state
+    grid-column 1 / -1
     text-align center
     padding 3rem
     color #94a3b8

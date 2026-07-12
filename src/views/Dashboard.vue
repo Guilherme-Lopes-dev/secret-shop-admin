@@ -20,13 +20,13 @@ const today = ref({
 const pendings = ref<Record<string, number>>({})
 
 const pendingDefs = [
-    { key: 'salesActionRequired', label: 'Vendas com ação necessária', to: '/sales', severity: 'critical', icon: 'mdi:alert-circle-outline' },
-    { key: 'tradeOffersFailed', label: 'Trade offers falhadas', to: '/trade-offers', severity: 'critical', icon: 'mdi:swap-horizontal' },
+    { key: 'salesActionRequired', label: 'Vendas com ação necessária', to: '/sales?fulfillment=ACTION_REQUIRED', severity: 'critical', icon: 'mdi:alert-circle-outline' },
+    { key: 'tradeOffersFailed', label: 'Trade offers falhadas', to: '/trade-offers?status=FAILED', severity: 'critical', icon: 'mdi:swap-horizontal' },
     { key: 'botsInactive', label: 'Bots inativos', to: '/bots', severity: 'critical', icon: 'mdi:robot-off-outline' },
-    { key: 'salesAwaitingDelivery', label: 'Vendas pagas a entregar', to: '/sales', severity: 'warn', icon: 'mdi:truck-outline' },
-    { key: 'tradeOffersAwaitingAccept', label: 'Trades aguardando aceite', to: '/trade-offers', severity: 'warn', icon: 'mdi:clock-outline' },
-    { key: 'swapsPendingAdmin', label: 'Swaps aguardando admin', to: '/swaps', severity: 'warn', icon: 'mdi:swap-horizontal-bold' },
-    { key: 'swapsInReview', label: 'Swaps em revisão', to: '/swaps', severity: 'warn', icon: 'mdi:magnify' },
+    { key: 'salesAwaitingDelivery', label: 'Vendas pagas a entregar', to: '/sales?fulfillment=OPEN', severity: 'warn', icon: 'mdi:truck-outline' },
+    { key: 'tradeOffersAwaitingAccept', label: 'Trades aguardando aceite', to: '/trade-offers?status=AWAITING', severity: 'warn', icon: 'mdi:clock-outline' },
+    { key: 'swapsPendingAdmin', label: 'Swaps aguardando admin', to: '/swaps?status=pending_admin', severity: 'warn', icon: 'mdi:swap-horizontal-bold' },
+    { key: 'swapsInReview', label: 'Swaps em revisão', to: '/swaps?status=review', severity: 'warn', icon: 'mdi:magnify' },
     { key: 'collectorNotificationsUnread', label: 'Pedidos collector a tratar', to: '/collector-orders', severity: 'warn', icon: 'mdi:trophy-outline' },
     { key: 'dropshipNotificationsUnread', label: 'Envios dropship a tratar', to: '/dropship-orders', severity: 'warn', icon: 'mdi:package-variant-closed' },
 ]

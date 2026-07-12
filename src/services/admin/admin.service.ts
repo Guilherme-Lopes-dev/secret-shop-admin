@@ -57,13 +57,14 @@ export const adminService = {
   async getAllSales(
     page: number = 1,
     limit: number = 20,
-    filters: { from?: string; to?: string; paymentStatus?: string; couponCode?: string } = {},
+    filters: { from?: string; to?: string; paymentStatus?: string; couponCode?: string; fulfillmentStatus?: string } = {},
   ) {
     const params = new URLSearchParams({ page: String(page), limit: String(limit) })
     if (filters.from) params.append('from', filters.from)
     if (filters.to) params.append('to', filters.to)
     if (filters.paymentStatus) params.append('payment_status', filters.paymentStatus)
     if (filters.couponCode) params.append('coupon_code', filters.couponCode)
+    if (filters.fulfillmentStatus) params.append('fulfillment_status', filters.fulfillmentStatus)
     return api.get(`/admin/sales?${params}`)
   },
 

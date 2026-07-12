@@ -3,9 +3,10 @@ import { ref, onMounted, computed } from 'vue'
 import dayjs from 'dayjs'
 import { adminService } from '@/services/admin/admin.service'
 import { formatCurrency } from '@/utils/formatCurrency'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 
 const router = useRouter()
+const route = useRoute()
 const sales = ref<any[]>([])
 const loading = ref(true)
 const currentPage = ref(1)
@@ -16,6 +17,14 @@ const saleSearch = ref('')
 const dateFrom = ref('')
 const dateTo = ref('')
 const couponCode = ref('')
+const fulfillment = ref((route.query.fulfillment as string) ?? '')
+
+const fulfillmentOptions = [
+    { value: '', label: 'Todas' },
+    { value: 'OPEN', label: 'Entrega pendente' },
+    { value: 'ACTION_REQUIRED', label: 'Ação necessária' },
+    { value: 'COMPLETED', label: 'Entregues' },
+]
 
 const filteredSales = computed(() => {
     const q = saleSearch.value.trim().toLowerCase()
@@ -26,7 +35,7 @@ const filteredSales = computed(() => {
     )
 })
 
-const hasActiveFilters = computed(() => Boolean(dateFrom.value || dateTo.value || couponCode.value))
+const hasActiveFilters = computed(() => Boolean(dateFrom.value || dateTo.value || couponCode.value || fulfillment.value))
 
 const fetchSales = async (page: number) => {
     loading.value = true
@@ -35,6 +44,7 @@ const fetchSales = async (page: number) => {
             from: dateFrom.value || undefined,
             to: dateTo.value || undefined,
             couponCode: couponCode.value.trim() || undefined,
+            fulfillmentStatus: fulfillment.value || undefined,
         })
         if (response.data) {
             sales.value = response.data.data
@@ -62,6 +72,8 @@ const clearFilters = () => {
     dateFrom.value = ''
     dateTo.value = ''
     couponCode.value = ''
+    fulfillment.value = ''
+    router.replace({ query: {} })
     applyFilters()
 }
 
@@ -120,6 +132,12 @@ onMounted(() => fetchSales(1))
                         @keyup.enter="applyFilters"
                         @blur="applyFilters"
                     />
+                </div>
+                <div class="filter-field">
+                    <label>Entrega</label>
+                    <select v-model="fulfillment" @change="applyFilters">
+                        <option v-for="opt in fulfillmentOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+                    </select>
                 </div>
             </div>
             <div class="preset-row">
@@ -256,7 +274,7 @@ onMounted(() => fetchSales(1))
         font-size 0.78rem
         color #94a3b8
 
-    input
+    input, select
         background #2a2a30
         border 1px solid rgba(255,255,255,0.08)
         border-radius 6px

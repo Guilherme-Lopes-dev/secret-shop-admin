@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { adminService } from '@/services/admin/admin.service'
 import { Icon } from '@iconify/vue'
 import { toast } from 'vue3-toastify'
 
 const router = useRouter()
+const route = useRoute()
 
 const offers = ref<any[]>([])
 const loading = ref(true)
@@ -13,7 +14,7 @@ const currentPage = ref(1)
 const totalPages = ref(1)
 const totalItems = ref(0)
 const limit = ref(20)
-const statusFilter = ref('')
+const statusFilter = ref((route.query.status as string) ?? '')
 const saleSearch = ref('')
 const retrySaleUuid = ref<string | null>(null)
 
@@ -28,6 +29,7 @@ const filteredOffers = computed(() => {
 
 const statusOptions = [
     { label: 'Todos', value: '' },
+    { label: 'Aguardando aceite', value: 'AWAITING' },
     { label: 'Enviado', value: 'SENT' },
     { label: 'Aceito', value: 'ACCEPTED' },
     { label: 'Recusado', value: 'DECLINED' },
@@ -53,7 +55,10 @@ const fetchOffers = async (page: number) => {
     }
 }
 
-const onFilterChange = () => fetchOffers(1)
+const onFilterChange = () => {
+    router.replace({ query: statusFilter.value ? { status: statusFilter.value } : {} })
+    fetchOffers(1)
+}
 const nextPage = () => { if (currentPage.value < totalPages.value) fetchOffers(currentPage.value + 1) }
 const prevPage = () => { if (currentPage.value > 1) fetchOffers(currentPage.value - 1) }
 

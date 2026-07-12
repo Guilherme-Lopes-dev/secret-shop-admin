@@ -353,6 +353,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue3-toastify'
 import { adminService, type SwapCompensationConfig, type RarityMultiplier } from '@/services/admin/admin.service'
 import { formatCurrency } from '@/utils/formatCurrency'
@@ -365,7 +366,9 @@ const actionError = ref('')
 const multiplier = ref(1)
 const storeMultiplier = ref(1)
 const savingMultiplier = ref(false)
-const activeStatus = ref('')
+const route = useRoute()
+const router = useRouter()
+const activeStatus = ref((route.query.status as string) ?? '')
 
 const KNOWN_RARITIES = ['Common', 'Uncommon', 'Rare', 'Mythical', 'Legendary', 'Ancient', 'Immortal', 'Arcana']
 const rarityMultipliers = ref<RarityMultiplier[]>([])
@@ -501,6 +504,7 @@ const setAllSwap = async (enabled: boolean) => {
 
 const setStatus = (status: string) => {
   activeStatus.value = status
+  router.replace({ query: status ? { status } : {} })
   fetchSwaps()
 }
 

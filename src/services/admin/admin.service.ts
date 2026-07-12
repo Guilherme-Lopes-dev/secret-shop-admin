@@ -40,6 +40,20 @@ export const adminService = {
     return api.get('/dashboard/recent-orders')
   },
 
+  async getDashboardToday() {
+    return api.get<{
+      revenueToday: number
+      ordersToday: number
+      revenueYesterday: number
+      ordersYesterday: number
+      pendingPaymentsToday: number
+    }>('/dashboard/today')
+  },
+
+  async getDashboardPendings() {
+    return api.get<Record<string, number>>('/dashboard/pendings')
+  },
+
   async getAllSales(
     page: number = 1,
     limit: number = 20,

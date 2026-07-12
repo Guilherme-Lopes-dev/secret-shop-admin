@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
+import dayjs from 'dayjs'
 import { adminService } from '@/services/admin/admin.service'
 import { formatCurrency } from '@/utils/formatCurrency'
 import { useRouter } from 'vue-router'
@@ -12,6 +13,9 @@ const totalPages = ref(1)
 const totalItems = ref(0)
 const limit = ref(20)
 const saleSearch = ref('')
+const dateFrom = ref('')
+const dateTo = ref('')
+const couponCode = ref('')
 
 const filteredSales = computed(() => {
     const q = saleSearch.value.trim().toLowerCase()
@@ -22,10 +26,16 @@ const filteredSales = computed(() => {
     )
 })
 
+const hasActiveFilters = computed(() => Boolean(dateFrom.value || dateTo.value || couponCode.value))
+
 const fetchSales = async (page: number) => {
     loading.value = true
     try {
-        const response = await adminService.getAllSales(page, limit.value)
+        const response = await adminService.getAllSales(page, limit.value, {
+            from: dateFrom.value || undefined,
+            to: dateTo.value || undefined,
+            couponCode: couponCode.value.trim() || undefined,
+        })
         if (response.data) {
             sales.value = response.data.data
             totalPages.value = response.data.pages
@@ -37,6 +47,22 @@ const fetchSales = async (page: number) => {
     } finally {
         loading.value = false
     }
+}
+
+const applyFilters = () => fetchSales(1)
+
+const setToday = () => {
+    const today = dayjs().format('YYYY-MM-DD')
+    dateFrom.value = today
+    dateTo.value = today
+    applyFilters()
+}
+
+const clearFilters = () => {
+    dateFrom.value = ''
+    dateTo.value = ''
+    couponCode.value = ''
+    applyFilters()
 }
 
 const nextPage = () => { if (currentPage.value < totalPages.value) fetchSales(currentPage.value + 1) }
@@ -76,6 +102,32 @@ onMounted(() => fetchSales(1))
             />
         </header>
 
+        <div class="section filters-section">
+            <div class="filter-grid">
+                <div class="filter-field">
+                    <label>De</label>
+                    <input type="date" v-model="dateFrom" @change="applyFilters" />
+                </div>
+                <div class="filter-field">
+                    <label>Até</label>
+                    <input type="date" v-model="dateTo" @change="applyFilters" />
+                </div>
+                <div class="filter-field">
+                    <label>Cupom</label>
+                    <input
+                        v-model="couponCode"
+                        placeholder="Código do cupom"
+                        @keyup.enter="applyFilters"
+                        @blur="applyFilters"
+                    />
+                </div>
+            </div>
+            <div class="preset-row">
+                <button class="preset-btn" @click="setToday">Hoje</button>
+                <button v-if="hasActiveFilters" class="preset-btn" @click="clearFilters">Limpar filtros</button>
+            </div>
+        </div>
+
         <div class="section">
             <div v-if="loading" class="loading-state">Carregando vendas...</div>
             <div v-else>
@@ -87,6 +139,7 @@ onMounted(() => fetchSales(1))
                                 <th>Cliente</th>
                                 <th>Data</th>
                                 <th>Valor Total</th>
+                                <th>Cupom</th>
                                 <th>Status</th>
                                 <th>Ações</th>
                             </tr>
@@ -108,6 +161,10 @@ onMounted(() => fetchSales(1))
                                 <td>{{ $dayjs(sale.created_at).format('DD/MM/YYYY HH:mm') }}</td>
                                 <td class="price">{{ formatCurrency(sale.total_amount) }}</td>
                                 <td>
+                                    <span v-if="sale.coupon?.code" class="coupon-badge">{{ sale.coupon.code }}</span>
+                                    <span v-else class="muted">-</span>
+                                </td>
+                                <td>
                                     <span class="status-badge" :class="getStatusClass(sale.payment_status)">
                                         {{ formatStatusText(sale.payment_status) }}
                                     </span>
@@ -119,7 +176,7 @@ onMounted(() => fetchSales(1))
                                 </td>
                             </tr>
                             <tr v-if="filteredSales.length === 0">
-                                <td colspan="6" class="empty-state">Nenhuma venda encontrada.</td>
+                                <td colspan="7" class="empty-state">Nenhuma venda encontrada.</td>
                             </tr>
                         </tbody>
                     </table>
@@ -181,6 +238,54 @@ onMounted(() => fetchSales(1))
     border-radius 12px
     border 1px solid rgba(255,255,255,0.05)
 
+.filters-section
+    margin-bottom 1.5rem
+
+.filter-grid
+    display grid
+    grid-template-columns repeat(auto-fit, minmax(180px, 1fr))
+    gap 1rem
+    margin-bottom 1rem
+
+.filter-field
+    display flex
+    flex-direction column
+    gap 0.35rem
+
+    label
+        font-size 0.78rem
+        color #94a3b8
+
+    input
+        background #2a2a30
+        border 1px solid rgba(255,255,255,0.08)
+        border-radius 6px
+        color #fff
+        padding 0.55rem 0.75rem
+        font-size 0.875rem
+        outline none
+
+        &:focus
+            border-color rgba(99,102,241,0.4)
+
+.preset-row
+    display flex
+    flex-wrap wrap
+    gap 0.5rem
+
+.preset-btn
+    background rgba(255,255,255,0.05)
+    color #cbd5e1
+    border 1px solid rgba(255,255,255,0.08)
+    padding 0.4rem 0.85rem
+    border-radius 6px
+    font-size 0.8rem
+    cursor pointer
+    transition all 0.2s
+
+    &:hover
+        background rgba(255,255,255,0.1)
+
 .loading-state
     padding 3rem
     text-align center
@@ -228,6 +333,14 @@ table
 .muted
     color #64748b
     font-size 0.72rem
+
+.coupon-badge
+    padding 3px 8px
+    border-radius 5px
+    font-size 0.72rem
+    font-weight 600
+    background rgba(99,102,241,0.1)
+    color #818cf8
 
 .status-badge
     padding 3px 8px

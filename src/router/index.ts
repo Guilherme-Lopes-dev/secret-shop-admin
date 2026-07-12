@@ -189,6 +189,11 @@ const routes = [
         component: () => import('@/views/swaps/SwapsList.vue'),
       },
       {
+        path: 'bots',
+        name: 'bots',
+        component: () => import('@/views/bots/SteamBotsList.vue'),
+      },
+      {
         path: 'news',
         name: 'news',
         component: () => import('@/views/news/NewsList.vue'),

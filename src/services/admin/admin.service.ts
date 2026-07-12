@@ -43,12 +43,13 @@ export const adminService = {
   async getAllSales(
     page: number = 1,
     limit: number = 20,
-    filters: { from?: string; to?: string; paymentStatus?: string } = {},
+    filters: { from?: string; to?: string; paymentStatus?: string; couponCode?: string } = {},
   ) {
     const params = new URLSearchParams({ page: String(page), limit: String(limit) })
     if (filters.from) params.append('from', filters.from)
     if (filters.to) params.append('to', filters.to)
     if (filters.paymentStatus) params.append('payment_status', filters.paymentStatus)
+    if (filters.couponCode) params.append('coupon_code', filters.couponCode)
     return api.get(`/admin/sales?${params}`)
   },
 
@@ -711,6 +712,24 @@ export const adminService = {
 
   async deleteCoupon(uuid: string) {
     return api.delete(`/coupons/${uuid}`)
+  },
+
+  // ── Steam Bots ──────────────────────────────────────────────────────────────
+
+  async getSteamBots() {
+    return api.get('/steam-bots')
+  },
+
+  async createSteamBot(data: Record<string, unknown>) {
+    return api.post('/steam-bots', data)
+  },
+
+  async updateSteamBot(uuid: string, data: Record<string, unknown>) {
+    return api.patch(`/steam-bots/${uuid}`, data)
+  },
+
+  async deleteSteamBot(uuid: string) {
+    return api.delete(`/steam-bots/${uuid}`)
   },
 
   // WhatsApp Blast

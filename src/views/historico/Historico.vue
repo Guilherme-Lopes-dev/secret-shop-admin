@@ -326,11 +326,13 @@ function itemsLabel(items: TradeItem[]) {
             <div class="filters-row">
                 <input
                     v-model="searchItem"
+                    type="search"
                     class="filter-input"
                     placeholder="Filtrar por nome do item..."
                 />
                 <input
                     v-model="searchTradeId"
+                    type="search"
                     class="filter-input filter-input--id"
                     placeholder="Trade ID ou Offer ID..."
                     spellcheck="false"

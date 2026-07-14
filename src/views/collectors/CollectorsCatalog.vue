@@ -225,6 +225,13 @@ function applyFilters() {
 
 watch([page, limit], load)
 
+watch([search, steamIdFilter], ([searchValue, steamIdValue], [previousSearch, previousSteamId]) => {
+    const clearedSearch = searchValue === '' && previousSearch !== ''
+    const clearedSteamId = steamIdValue === '' && previousSteamId !== ''
+    if (!clearedSearch && !clearedSteamId) return
+    applyFilters()
+})
+
 onMounted(async () => {
     try {
         const res = await adminService.getDotaHeroes()
@@ -254,7 +261,7 @@ onMounted(async () => {
                     <Icon icon="mdi:magnify" class="search-icon" />
                     <input
                         v-model="search"
-                        type="text"
+                        type="search"
                         placeholder="Buscar por nome ou market hash"
                         class="search-input"
                         @keyup.enter="applyFilters"
@@ -265,7 +272,7 @@ onMounted(async () => {
                     <Icon icon="mdi:steam" class="search-icon" />
                     <input
                         v-model="steamIdFilter"
-                        type="text"
+                        type="search"
                         inputmode="numeric"
                         placeholder="SteamID64"
                         class="search-input"

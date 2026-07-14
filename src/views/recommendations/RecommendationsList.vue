@@ -12,7 +12,7 @@
         <Icon icon="mdi:magnify" class="search-icon" />
         <input
           v-model="search"
-          type="text"
+          type="search"
           placeholder="Buscar por herói ou usuário..."
           class="search-input"
           @input="onSearchInput"

@@ -278,7 +278,7 @@ const openItem = (item: MarketExplorerItem) => {
     <div class="filters-row" v-if="hasFetched">
       <div class="search-wrap">
         <Icon icon="mdi:magnify" class="search-icon" />
-        <input v-model="searchQuery" @input="onSearchInput" type="text" placeholder="Buscar por nome..." class="search-input" />
+        <input v-model="searchQuery" @input="onSearchInput" type="search" placeholder="Buscar por nome..." class="search-input" />
       </div>
       <select v-model="heroFilter" @change="onFilterChange" class="filter-select">
         <option value="">Todos os heróis</option>

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import dayjs from 'dayjs'
 import { adminService } from '@/services/admin/admin.service'
 import { formatCurrency } from '@/utils/formatCurrency'
@@ -61,6 +61,12 @@ const fetchSales = async (page: number) => {
 
 const applyFilters = () => fetchSales(1)
 
+watch(couponCode, (value, previous) => {
+    if (value !== '' || previous === '') return
+    if (loading.value) return
+    applyFilters()
+})
+
 const setToday = () => {
     const today = dayjs().format('YYYY-MM-DD')
     dateFrom.value = today
@@ -109,6 +115,7 @@ onMounted(() => fetchSales(1))
             </div>
             <input
                 v-model="saleSearch"
+                type="search"
                 class="filter-input"
                 placeholder="Buscar por pedido ou cliente..."
             />
@@ -128,6 +135,7 @@ onMounted(() => fetchSales(1))
                     <label>Cupom</label>
                     <input
                         v-model="couponCode"
+                        type="search"
                         placeholder="Código do cupom"
                         @keyup.enter="applyFilters"
                         @blur="applyFilters"

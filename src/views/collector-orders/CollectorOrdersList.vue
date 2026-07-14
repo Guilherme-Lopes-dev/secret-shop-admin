@@ -113,6 +113,7 @@ onMounted(() => fetchSales(1))
                 <Icon icon="mdi:magnify" class="search-icon" />
                 <input
                     v-model="search"
+                    type="search"
                     class="search-input"
                     placeholder="Buscar por nº pedido ou item..."
                     @input="onSearchInput"

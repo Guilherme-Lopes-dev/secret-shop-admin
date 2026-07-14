@@ -107,6 +107,7 @@ onMounted(() => fetchOffers(1))
             <div class="filters-row">
                 <input
                     v-model="saleSearch"
+                    type="search"
                     class="filter-input"
                     placeholder="Buscar por pedido ou Trade ID..."
                 />

@@ -119,7 +119,7 @@ onMounted(() => fetchUsers(1))
                 <input
                     v-model="search"
                     @input="onSearchInput"
-                    type="text"
+                    type="search"
                     placeholder="Buscar por nome, e-mail ou Steam ID..."
                     class="search-input"
                 />

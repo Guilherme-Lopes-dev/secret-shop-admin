@@ -32,6 +32,7 @@ function onBlur() {
     <div class="country-picker">
         <input
             v-model="query"
+            type="search"
             class="picker-input"
             :placeholder="placeholder || 'Buscar país…'"
             @focus="open = true"

@@ -372,7 +372,7 @@ onMounted(() => {
                 <Icon icon="mdi:magnify" class="search-icon" />
                 <input
                     v-model="itemSearch"
-                    type="text"
+                    type="search"
                     placeholder="Filtrar itens carregados por nome, asset ou market hash"
                     class="search-input"
                 />

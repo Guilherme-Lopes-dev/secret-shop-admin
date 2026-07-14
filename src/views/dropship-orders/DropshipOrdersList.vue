@@ -167,6 +167,7 @@ onMounted(() => fetchQueue())
                 <Icon icon="mdi:magnify" class="search-icon" />
                 <input
                     v-model="search"
+                    type="search"
                     class="search-input"
                     placeholder="Filtrar nesta página por produto, pedido, cliente ou Steam ID..."
                 />

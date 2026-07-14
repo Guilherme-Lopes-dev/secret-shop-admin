@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 import { toast } from 'vue3-toastify'
 import { adminService } from '@/services/admin/admin.service'
@@ -432,6 +432,12 @@ async function loadGuildDetails(showToast = true) {
         })
     })
 }
+
+watch(memberSearch, (value, previous) => {
+    if (value !== '' || previous === '') return
+    if (!selectedGuildId.value) return
+    runSafely(() => loadGuildDetails(false))
+})
 
 async function loadSavedChannels() {
     await withLoading(async () => {
@@ -1066,7 +1072,7 @@ onMounted(() => {
             <div class="section-header">
                 <h2 class="section-title"><Icon icon="mdi:account-group-outline" />Membros</h2>
                 <div class="inline-controls">
-                    <input v-model="memberSearch" placeholder="Buscar membro" @keyup.enter="runSafely(() => loadGuildDetails())" />
+                    <input v-model="memberSearch" type="search" placeholder="Buscar membro" @keyup.enter="runSafely(() => loadGuildDetails())" />
                     <button class="btn-secondary" @click="runSafely(() => loadGuildDetails())">Buscar</button>
                 </div>
             </div>

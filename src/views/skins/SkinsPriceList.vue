@@ -132,7 +132,7 @@ onMounted(() => fetchCatalog(1))
                 <input
                     v-model="searchQuery"
                     @input="onSearchInput"
-                    type="text"
+                    type="search"
                     placeholder="Buscar por nome..."
                     class="search-input"
                 />

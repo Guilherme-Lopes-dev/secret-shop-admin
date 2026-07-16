@@ -868,7 +868,7 @@ export interface MarketExplorerFilters {
   priceFilter?: 'all' | 'with' | 'without'
   priceMin?: number
   priceMax?: number
-  sortBy?: 'price' | 'name' | 'rarity'
+  sortBy?: 'price' | 'name' | 'rarity' | 'variation'
   sortDir?: 'asc' | 'desc'
 }
 

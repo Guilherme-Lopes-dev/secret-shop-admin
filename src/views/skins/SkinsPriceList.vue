@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, nextTick, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { adminService, type SkinPriceCatalogItem, type MarketExplorerFacets } from '@/services/admin/admin.service'
 import { formatCurrency } from '@/utils/formatCurrency'
@@ -9,10 +9,13 @@ import { Icon } from '@iconify/vue'
 const router = useRouter()
 const items = ref<SkinPriceCatalogItem[]>([])
 const loading = ref(true)
+const loadingMore = ref(false)
 const currentPage = ref(1)
 const totalPages = ref(1)
 const totalItems = ref(0)
-const limit = ref(20)
+const limit = ref(40)
+const sentinel = ref<HTMLElement | null>(null)
+let observer: IntersectionObserver | null = null
 
 const searchQuery = ref('')
 const heroFilter = ref('')
@@ -27,9 +30,13 @@ const sortValue = ref('update:desc')
 
 const facets = ref<MarketExplorerFacets>({ heroes: [], types: [], slots: [], rarities: [], qualities: [] })
 let searchTimeout: ReturnType<typeof setTimeout> | null = null
+let fetchGeneration = 0
 
-const fetchCatalog = async (page: number) => {
-    loading.value = true
+const fetchCatalog = async (page: number, append = false) => {
+    const myGeneration = ++fetchGeneration
+    let applied = false
+    if (append) loadingMore.value = true
+    else loading.value = true
     try {
         const [sortBy, sortDir] = sortValue.value.split(':') as [string, 'asc' | 'desc']
         const response = await adminService.getSkinsPriceCatalog(page, limit.value, {
@@ -42,21 +49,37 @@ const fetchCatalog = async (page: number) => {
             priceFilter: priceFilter.value !== 'all' ? priceFilter.value : undefined,
             priceMin: priceMin.value ? toCents(priceMin.value) : undefined,
             priceMax: priceMax.value ? toCents(priceMax.value) : undefined,
-            sortBy: sortBy === 'update' ? undefined : (sortBy as 'price' | 'name' | 'rarity'),
+            sortBy: sortBy === 'update' ? undefined : (sortBy as 'price' | 'name' | 'rarity' | 'variation'),
             sortDir,
         })
+        // resposta antiga (filtro mudou no meio) não pode sobrescrever a mais nova
+        if (myGeneration !== fetchGeneration) return
         if (response.data) {
-            items.value = response.data.data
+            items.value = append ? [...items.value, ...response.data.data] : response.data.data
             totalPages.value = response.data.pages
             totalItems.value = response.data.total
             currentPage.value = response.data.page
             facets.value = response.data.facets
+            applied = true
         }
     } catch (error) {
         console.error('Erro ao buscar catálogo de preços:', error)
     } finally {
-        loading.value = false
+        if (myGeneration === fetchGeneration) {
+            loading.value = false
+            loadingMore.value = false
+        }
     }
+    if (!applied) return
+    // sentinela pode seguir visível após render (página curta) — sem cruzar a borda o observer não refire
+    await nextTick()
+    if (sentinelInView()) loadMore()
+}
+
+const sentinelInView = () => {
+    const el = sentinel.value
+    if (!el) return false
+    return el.getBoundingClientRect().top <= window.innerHeight + 200
 }
 
 const onFilterChange = () => fetchCatalog(1)
@@ -64,8 +87,11 @@ const onSearchInput = () => {
     if (searchTimeout) clearTimeout(searchTimeout)
     searchTimeout = setTimeout(() => fetchCatalog(1), 400)
 }
-const nextPage = () => { if (currentPage.value < totalPages.value) fetchCatalog(currentPage.value + 1) }
-const prevPage = () => { if (currentPage.value > 1) fetchCatalog(currentPage.value - 1) }
+const loadMore = () => {
+    if (loading.value || loadingMore.value) return
+    if (currentPage.value >= totalPages.value) return
+    fetchCatalog(currentPage.value + 1, true)
+}
 
 const toggleQuality = (q: string) => {
     const set = new Set(qualityFilter.value)
@@ -102,6 +128,8 @@ const sortOptions = [
     { label: 'Nome (Z→A)', value: 'name:desc' },
     { label: 'Menor preço', value: 'price:asc' },
     { label: 'Maior preço', value: 'price:desc' },
+    { label: 'Maior variação', value: 'variation:desc' },
+    { label: 'Menor variação', value: 'variation:asc' },
     { label: 'Raridade', value: 'rarity:asc' },
 ]
 
@@ -114,7 +142,15 @@ const trendClass = (pct: number | null) => {
     return pct > 0 ? 'trend-up' : pct < 0 ? 'trend-down' : ''
 }
 
-onMounted(() => fetchCatalog(1))
+onMounted(() => {
+    fetchCatalog(1)
+    observer = new IntersectionObserver(
+        ([entry]) => { if (entry?.isIntersecting) loadMore() },
+        { rootMargin: '200px' },
+    )
+    if (sentinel.value) observer.observe(sentinel.value)
+})
+onUnmounted(() => observer?.disconnect())
 </script>
 
 <template>
@@ -231,13 +267,10 @@ onMounted(() => fetchCatalog(1))
                     <div v-if="!items.length" class="empty-state">Nenhuma skin encontrada.</div>
                 </div>
 
-                <div class="pagination" v-if="totalPages > 1">
-                    <button class="page-btn" :disabled="currentPage === 1" @click="prevPage">Anterior</button>
-                    <span class="page-info">Página {{ currentPage }} de {{ totalPages }}</span>
-                    <button class="page-btn" :disabled="currentPage === totalPages" @click="nextPage">Próxima</button>
-                </div>
+                <div v-if="loadingMore" class="loading-state">Carregando mais...</div>
             </div>
         </div>
+        <div ref="sentinel" class="scroll-sentinel"></div>
     </div>
 </template>
 
@@ -509,32 +542,6 @@ onMounted(() => fetchCatalog(1))
     padding 3rem
     color #94a3b8
 
-.pagination
-    display flex
-    justify-content flex-end
-    align-items center
-    gap 1rem
-    padding-top 1rem
-    border-top 1px solid rgba(255,255,255,0.05)
-
-.page-btn
-    background #2a2a30
-    color #fff
-    border 1px solid rgba(255,255,255,0.1)
-    padding 0.45rem 1rem
-    border-radius 6px
-    cursor pointer
-    font-size 0.85rem
-    transition all 0.2s
-
-    &:hover:not(:disabled)
-        background #3a3a42
-
-    &:disabled
-        opacity 0.4
-        cursor not-allowed
-
-.page-info
-    color #94a3b8
-    font-size 0.875rem
+.scroll-sentinel
+    height 1px
 </style>

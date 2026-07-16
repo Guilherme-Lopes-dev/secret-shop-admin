@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import dayjs from 'dayjs'
 import Chart from 'chart.js/auto'
@@ -73,12 +73,14 @@ const fetchHistory = async (uuid: string) => {
     try {
         const response = await adminService.getSkinPriceHistory(uuid)
         result.value = response.data
-        renderChart()
     } catch (error) {
         console.error('Erro ao buscar histórico de preço:', error)
     } finally {
         loading.value = false
     }
+    // canvas só monta depois de loading=false — renderizar antes acha chartCanvas null
+    await nextTick()
+    renderChart()
 }
 
 watch(
@@ -86,6 +88,8 @@ watch(
     (uuid) => fetchHistory(uuid),
     { immediate: true },
 )
+
+onUnmounted(() => chartInstance?.destroy())
 </script>
 
 <template>

@@ -114,6 +114,7 @@ onUnmounted(() => chartInstance?.destroy())
                 </div>
             </div>
 
+            <div class="history-grid">
             <div class="section">
                 <h2 class="section-title">Evolução</h2>
                 <div v-if="points.length === 0" class="empty-state">
@@ -147,6 +148,7 @@ onUnmounted(() => chartInstance?.destroy())
                     </table>
                 </div>
             </div>
+            </div>
         </template>
     </div>
 </template>
@@ -157,7 +159,27 @@ onUnmounted(() => chartInstance?.destroy())
     color #fff
     background #121214
     min-height 100vh
-    max-width 960px
+    max-width 1720px
+
+// ultra wide: gráfico e tabela lado a lado; telas menores empilham
+.history-grid
+    display grid
+    grid-template-columns 1fr
+    gap 1.5rem
+    align-items start
+
+    .section
+        margin-bottom 0
+
+    @media (min-width: 1400px)
+        grid-template-columns 3fr 2fr
+
+        .chart-wrap
+            height 420px
+
+        .table-wrapper
+            max-height 480px
+            overflow-y auto
 
 .page-header
     margin-bottom 1.5rem
@@ -251,6 +273,9 @@ table
     border-collapse collapse
 
     th
+        position sticky
+        top 0
+        background #1a1a1e
         text-align left
         color #94a3b8
         font-size 0.78rem

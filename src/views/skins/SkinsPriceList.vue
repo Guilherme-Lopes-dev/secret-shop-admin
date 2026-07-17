@@ -236,29 +236,33 @@ onUnmounted(() => observer?.disconnect())
                             <div class="card-price-grid">
                                 <div class="card-price-cell">
                                     <span class="card-price-label">Menor</span>
-                                    <span class="card-price-value">{{ formatCurrency(item.lowest_price) }}</span>
+                                    <span class="card-price-value value-lowest">{{ formatCurrency(item.lowest_price) }}</span>
                                 </div>
                                 <div class="card-price-cell">
                                     <span class="card-price-label">Mediano</span>
-                                    <span class="card-price-value">{{ formatCurrency(item.median_price) }}</span>
+                                    <span class="card-price-value value-median">{{ formatCurrency(item.median_price) }}</span>
                                 </div>
                                 <div class="card-price-cell">
                                     <span class="card-price-label">Catálogo</span>
-                                    <span class="card-price-value">{{ formatCurrency(item.manual_price) }}</span>
+                                    <span class="card-price-value value-manual">{{ formatCurrency(item.manual_price) }}</span>
                                 </div>
                             </div>
 
                             <div class="card-evolution">
                                 <div class="card-evolution-cell">
                                     <span class="card-price-label">1º Valor</span>
-                                    <span class="card-price-value">{{ item.first_median_price != null ? formatCurrency(item.first_median_price) : '—' }}</span>
+                                    <span class="card-price-value value-first">{{ item.first_median_price != null ? formatCurrency(item.first_median_price) : '—' }}</span>
                                 </div>
                                 <Icon icon="mdi:arrow-right" class="card-evolution-arrow" />
                                 <div class="card-evolution-cell">
                                     <span class="card-price-label">Último</span>
-                                    <span class="card-price-value">{{ item.last_median_price != null ? formatCurrency(item.last_median_price) : '—' }}</span>
+                                    <span class="card-price-value value-last">{{ item.last_median_price != null ? formatCurrency(item.last_median_price) : '—' }}</span>
                                 </div>
-                                <span class="card-trend" :class="trendClass(item.median_price_change_pct)">{{ formatTrend(item.median_price_change_pct) }}</span>
+                            </div>
+
+                            <div class="card-trend-banner" :class="trendClass(item.median_price_change_pct)">
+                                <Icon v-if="item.median_price_change_pct != null && item.median_price_change_pct !== 0" :icon="item.median_price_change_pct > 0 ? 'mdi:trending-up' : 'mdi:trending-down'" class="card-trend-icon" />
+                                {{ formatTrend(item.median_price_change_pct) }}
                             </div>
 
                             <span class="card-updated-at">{{ item.last_price_update_at ? `Atualizado ${$dayjs(item.last_price_update_at).format('DD/MM/YY HH:mm')}` : 'Sem atualização' }}</span>
@@ -499,10 +503,25 @@ onUnmounted(() => observer?.disconnect())
     color #64748b
     text-transform uppercase
 
+// cores por valor — mesma paleta do gráfico da interna (Catálogo/Mediano/Menor)
 .card-price-value
-    font-size 0.82rem
-    font-weight 600
-    color #4caf50
+    font-size 0.9rem
+    font-weight 700
+
+    &.value-lowest
+        color #ff9800
+
+    &.value-median
+        color #4caf50
+
+    &.value-manual
+        color #818cf8
+
+    &.value-first
+        color #94a3b8
+
+    &.value-last
+        color #e2e8f0
 
 .card-evolution
     display flex
@@ -520,17 +539,31 @@ onUnmounted(() => observer?.disconnect())
     color #64748b
     font-size 0.9rem
 
-.card-trend
-    margin-left auto
-    font-size 0.8rem
-    font-weight 700
+.card-trend-banner
+    display flex
+    align-items center
+    justify-content center
+    gap 0.4rem
+    font-size 1.35rem
+    font-weight 800
+    padding 0.45rem 0.6rem
+    border-radius 8px
     color #94a3b8
+    background rgba(148,163,184,0.08)
+    border 1px solid rgba(148,163,184,0.15)
 
     &.trend-up
-        color #4caf50
+        color #4ade80
+        background rgba(76,175,80,0.14)
+        border-color rgba(76,175,80,0.35)
 
     &.trend-down
-        color #f44336
+        color #f87171
+        background rgba(244,67,54,0.14)
+        border-color rgba(244,67,54,0.35)
+
+.card-trend-icon
+    font-size 1.4rem
 
 .card-updated-at
     font-size 0.7rem

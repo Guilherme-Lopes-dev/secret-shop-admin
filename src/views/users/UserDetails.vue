@@ -141,6 +141,13 @@ onMounted(fetchUser)
                             <Icon icon="mdi:refresh" />
                             {{ resettingCooldown ? 'Aguarde...' : !user.last_inventory_fetch_at ? 'Inventário já liberado' : 'Liberar atualização de inventário' }}
                         </button>
+                        <button
+                            class="btn-toggle-active btn-listings"
+                            @click="router.push(`/listings?seller=${user.id}`)"
+                        >
+                            <Icon icon="mdi:storefront-outline" />
+                            Ver anúncios P2P
+                        </button>
                     </div>
                 </div>
             </div>

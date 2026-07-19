@@ -19,6 +19,7 @@ const navItems = [
     { label: 'Usuários', icon: 'mdi:account-group-outline', to: '/users', name: 'users' },
     { label: 'Trade Offers', icon: 'mdi:swap-horizontal', to: '/trade-offers', name: 'trade-offers' },
     { label: 'Trocas (Swaps)', icon: 'mdi:swap-horizontal-bold', to: '/swaps', name: 'swaps' },
+    { label: 'Marketplace P2P', icon: 'mdi:storefront-outline', to: '/listings', name: 'listings' },
     { label: 'Inventário', icon: 'mdi:sword', to: '/inventory', name: 'inventory' },
     { label: 'Evolução de Preços', icon: 'mdi:chart-line', to: '/skins/prices', name: 'skins-prices' },
     { label: 'Market Explorer', icon: 'mdi:cloud-search-outline', to: '/market-explorer', name: 'market-explorer' },

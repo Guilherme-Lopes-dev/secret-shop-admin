@@ -132,6 +132,49 @@ export const adminService = {
     return api.post(`/admin/sales/trade-offers/${tradeOfferId}/sync`)
   },
 
+  // Listings (marketplace P2P)
+  async getListings(
+    page: number = 1,
+    limit: number = 20,
+    filters: { seller?: string; status?: string } = {},
+  ) {
+    const params = new URLSearchParams({ page: String(page), limit: String(limit) })
+    if (filters.seller) params.append('seller', filters.seller)
+    if (filters.status) params.append('status', filters.status)
+    return api.get<{
+      data: Array<{
+        uuid: string
+        asset_id: string
+        market_hash_name: string
+        name: string | null
+        icon_url: string | null
+        price: number
+        status: string
+        last_error: string | null
+        status_history: Array<{ from: string | null; to: string; at: string; by: string; error?: string }>
+        trade_offer_id: string | null
+        created_at: string
+        seller: { uuid: string; username: string | null; avatar: string | null; steam_id: string | null }
+      }>
+      total: number
+      page: number
+      limit: number
+      pages: number
+    }>(`/admin/listings?${params}`)
+  },
+
+  async syncListing(uuid: string) {
+    return api.post(`/admin/listings/${uuid}/sync`)
+  },
+
+  async cancelListing(uuid: string) {
+    return api.delete(`/admin/listings/${uuid}`)
+  },
+
+  async deliverListing(uuid: string, payload: { tradelink: string; partnersteamid: string }) {
+    return api.post(`/admin/listings/${uuid}/deliver`, payload)
+  },
+
   // Users
   async getAllUsers(
     page: number = 1,

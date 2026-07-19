@@ -21,6 +21,7 @@ const navItems = [
     { label: 'Trocas (Swaps)', icon: 'mdi:swap-horizontal-bold', to: '/swaps', name: 'swaps' },
     { label: 'Inventário', icon: 'mdi:sword', to: '/inventory', name: 'inventory' },
     { label: 'Evolução de Preços', icon: 'mdi:chart-line', to: '/skins/prices', name: 'skins-prices' },
+    { label: 'Config de Preços', icon: 'mdi:cash-edit', to: '/pricing-config', name: 'pricing-config' },
     { label: 'Market Explorer', icon: 'mdi:cloud-search-outline', to: '/market-explorer', name: 'market-explorer' },
     { label: 'Collectors', icon: 'mdi:trophy-outline', to: '/collectors', name: 'collectors', exact: true },
     { label: 'Catálogo Col.', icon: 'mdi:trophy-variant-outline', to: '/collectors/catalog', name: 'collectors-catalog', exact: false },

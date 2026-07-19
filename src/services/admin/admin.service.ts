@@ -856,6 +856,22 @@ export const adminService = {
   async deleteRarityMultiplier(rarity: string) {
     return api.post<RarityMultiplier[]>('/swaps/config/rarity-multipliers/delete', { rarity })
   },
+
+  async getPricingConfig() {
+    return api.get<PricingConfig>('/skins/admin/pricing-config')
+  },
+
+  async setPricingConfig(payload: PricingConfigInput) {
+    return api.post<PricingConfigBase>('/skins/admin/pricing-config', payload)
+  },
+
+  async upsertArcanaHeroMultiplier(payload: ArcanaHeroMultiplierInput) {
+    return api.post<ArcanaHeroMultiplier[]>('/skins/admin/pricing-config/arcana-heroes', payload)
+  },
+
+  async deleteArcanaHeroMultiplier(hero: string) {
+    return api.post<ArcanaHeroMultiplier[]>('/skins/admin/pricing-config/arcana-heroes/delete', { hero })
+  },
 }
 
 export interface MarketExplorerFilters {
@@ -926,6 +942,41 @@ export interface RarityMultiplierInput {
   userMultiplier?: number
   storeMultiplier?: number
   active?: boolean
+}
+
+export interface ArcanaHeroMultiplier {
+  hero: string
+  level1: number
+  level2: number
+  level3: number
+  active: boolean
+}
+
+export interface ArcanaHeroMultiplierInput {
+  hero: string
+  level1?: number
+  level2?: number
+  level3?: number
+  active?: boolean
+}
+
+export interface PricingConfigBase {
+  priceSyncDiscount: number
+  dropshipPriceMultiplier: number
+  arcanaLevelMultipliers: Record<1 | 2 | 3, number>
+}
+
+export interface PricingConfig extends PricingConfigBase {
+  arcanaHeroes: ArcanaHeroMultiplier[]
+  heroOptions: string[]
+}
+
+export interface PricingConfigInput {
+  priceSyncDiscount?: number
+  dropshipPriceMultiplier?: number
+  arcanaLevel1Multiplier?: number
+  arcanaLevel2Multiplier?: number
+  arcanaLevel3Multiplier?: number
 }
 
 export interface SkinPriceCatalogItem {

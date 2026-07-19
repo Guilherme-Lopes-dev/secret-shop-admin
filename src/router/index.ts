@@ -74,6 +74,11 @@ const routes = [
         component: () => import('@/views/skins/SkinPriceHistory.vue'),
       },
       {
+        path: 'pricing-config',
+        name: 'pricing-config',
+        component: () => import('@/views/pricing/PricingConfig.vue'),
+      },
+      {
         path: 'market-explorer',
         name: 'market-explorer',
         component: () => import('@/views/market-explorer/MarketExplorer.vue'),

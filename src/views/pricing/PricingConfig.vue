@@ -119,6 +119,10 @@ const markDirty = (row: ArcanaHeroMultiplier) => {
 const rowValid = (row: ArcanaHeroMultiplier) =>
     [row.level1, row.level2, row.level3].every((v) => Number.isFinite(v) && v > 0)
 
+// Magus Cypher não tem styles: evolui por wins na gema — acima de 40 = lvl 3, senão neutro.
+// Lvl 1/2 nunca se aplicam ao Rubick, então os inputs ficam travados.
+const isRubick = (hero: string) => hero.trim().toLowerCase() === 'rubick'
+
 const saveDirtyHeroes = async () => {
     const rows = heroRows.value.filter((row) => dirtyHeroes.value.has(row.hero))
     if (rows.some((row) => !rowValid(row))) {
@@ -127,14 +131,17 @@ const saveDirtyHeroes = async () => {
     }
     savingRows.value = true
     try {
+        // Só sobrescreve a UI depois de TODAS salvarem — falha parcial mantém as edições na tela.
+        let latest: ArcanaHeroMultiplier[] | null = null
         for (const row of rows) {
             const res = await adminService.upsertArcanaHeroMultiplier(row)
-            if (res.data) heroRows.value = res.data
+            if (res.data) latest = res.data
         }
+        if (latest) heroRows.value = latest
         dirtyHeroes.value = new Set()
         toast.success(`${rows.length} herói(s) atualizado(s).`)
     } catch (err) {
-        toast.error(errorMessage(err, 'Erro ao atualizar heróis.'))
+        toast.error(errorMessage(err, 'Erro ao atualizar heróis. Edições mantidas — tente salvar de novo.'))
     } finally {
         savingRows.value = false
     }
@@ -260,8 +267,8 @@ const removeHeroRow = async (row: ArcanaHeroMultiplier) => {
                             {{ hero }}
                         </option>
                     </select>
-                    <input v-model.number="newHero.level1" type="number" min="0.01" step="0.01" class="field-input hero-add-mult" title="Level 1" />
-                    <input v-model.number="newHero.level2" type="number" min="0.01" step="0.01" class="field-input hero-add-mult" title="Level 2" />
+                    <input v-model.number="newHero.level1" type="number" min="0.01" step="0.01" class="field-input hero-add-mult" title="Level 1" :disabled="isRubick(newHero.hero)" />
+                    <input v-model.number="newHero.level2" type="number" min="0.01" step="0.01" class="field-input hero-add-mult" title="Level 2" :disabled="isRubick(newHero.hero)" />
                     <input v-model.number="newHero.level3" type="number" min="0.01" step="0.01" class="field-input hero-add-mult" title="Level 3 (full)" />
                     <button class="btn-save" :disabled="savingHero || !heroValid" @click="addHero">
                         <Icon v-if="savingHero" icon="mdi:loading" class="spin" />
@@ -269,6 +276,11 @@ const removeHeroRow = async (row: ArcanaHeroMultiplier) => {
                         Adicionar
                     </button>
                 </div>
+                <p v-if="isRubick(newHero.hero)" class="rubick-hint">
+                    <Icon icon="mdi:information-outline" />
+                    Rubick (Magus Cypher) não tem styles — evolui pelas wins da gema.
+                    Acima de 40 wins = Lvl 3; com 40 ou menos fica no preço normal. Só o Lvl 3 é usado.
+                </p>
 
                 <table v-if="heroRows.length" class="hero-table">
                     <thead>
@@ -284,9 +296,15 @@ const removeHeroRow = async (row: ArcanaHeroMultiplier) => {
                     <tbody>
                         <tr v-for="row in heroRows" :key="row.hero" :class="{ 'hero-row--inactive': !row.active }">
                             <td class="hero-name">{{ row.hero }}</td>
-                            <td><input v-model.number="row.level1" type="number" min="0.01" step="0.01" class="field-input hero-cell" @input="markDirty(row)" /></td>
-                            <td><input v-model.number="row.level2" type="number" min="0.01" step="0.01" class="field-input hero-cell" @input="markDirty(row)" /></td>
-                            <td><input v-model.number="row.level3" type="number" min="0.01" step="0.01" class="field-input hero-cell" @input="markDirty(row)" /></td>
+                            <td>
+                                <input v-if="!isRubick(row.hero)" v-model.number="row.level1" type="number" min="0.01" step="0.01" class="field-input hero-cell" @input="markDirty(row)" />
+                                <span v-else class="hero-cell-na" title="Rubick evolui por wins na gema — só o Lvl 3 é usado">—</span>
+                            </td>
+                            <td>
+                                <input v-if="!isRubick(row.hero)" v-model.number="row.level2" type="number" min="0.01" step="0.01" class="field-input hero-cell" @input="markDirty(row)" />
+                                <span v-else class="hero-cell-na" title="Rubick evolui por wins na gema — só o Lvl 3 é usado">—</span>
+                            </td>
+                            <td><input v-model.number="row.level3" type="number" min="0.01" step="0.01" class="field-input hero-cell" @input="markDirty(row)" :title="isRubick(row.hero) ? 'Aplicado quando a gema passa de 40 wins' : undefined" /></td>
                             <td>
                                 <button class="btn-icon" :title="row.active ? 'Desativar (volta pro padrão)' : 'Ativar'" @click="toggleHeroRow(row)">
                                     <Icon :icon="row.active ? 'mdi:toggle-switch' : 'mdi:toggle-switch-off-outline'" :class="row.active ? 'toggle-on' : 'toggle-off'" />
@@ -509,4 +527,18 @@ const removeHeroRow = async (row: ArcanaHeroMultiplier) => {
 
 .hero-save-bar
     margin-top 1rem
+
+.rubick-hint
+    display flex
+    align-items center
+    gap 0.4rem
+    color #a78bfa
+    font-size 0.82rem
+    margin-bottom 1rem
+
+.hero-cell-na
+    color #64748b
+    display inline-block
+    width 90px
+    text-align center
 </style>

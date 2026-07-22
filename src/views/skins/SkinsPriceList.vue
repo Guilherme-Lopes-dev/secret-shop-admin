@@ -248,6 +248,29 @@ onUnmounted(() => observer?.disconnect())
                                 </div>
                             </div>
 
+                            <div class="card-avg-grid">
+                                <div class="card-price-cell">
+                                    <span class="card-price-label">Média</span>
+                                    <span class="card-price-value value-avg">{{ formatCurrency(item.price_avg) }}</span>
+                                </div>
+                                <div class="card-price-cell">
+                                    <span class="card-price-label">24h</span>
+                                    <span class="card-price-value value-avg-24h">{{ formatCurrency(item.price_avg_24h) }}</span>
+                                </div>
+                                <div class="card-price-cell">
+                                    <span class="card-price-label">7d</span>
+                                    <span class="card-price-value value-avg-7d">{{ formatCurrency(item.price_avg_7d) }}</span>
+                                </div>
+                                <div class="card-price-cell">
+                                    <span class="card-price-label">30d</span>
+                                    <span class="card-price-value value-avg-30d">{{ formatCurrency(item.price_avg_30d) }}</span>
+                                </div>
+                                <div class="card-price-cell">
+                                    <span class="card-price-label">90d</span>
+                                    <span class="card-price-value value-avg-90d">{{ formatCurrency(item.price_avg_90d) }}</span>
+                                </div>
+                            </div>
+
                             <div class="card-evolution">
                                 <div class="card-evolution-cell">
                                     <span class="card-price-label">1º Valor</span>
@@ -522,6 +545,32 @@ onUnmounted(() => observer?.disconnect())
 
     &.value-last
         color #e2e8f0
+
+    &.value-avg
+        color #22d3ee
+
+    &.value-avg-24h
+        color #38bdf8
+
+    &.value-avg-7d
+        color #60a5fa
+
+    &.value-avg-30d
+        color #a78bfa
+
+    &.value-avg-90d
+        color #e879f9
+
+// médias steamwebapi (24h/7d/30d/90d) — paleta separada da grid principal pra não confundir
+.card-avg-grid
+    display grid
+    grid-template-columns repeat(5, 1fr)
+    gap 0.35rem
+    padding-top 0.25rem
+    border-top 1px solid rgba(255,255,255,0.05)
+
+    .card-price-value
+        font-size 0.75rem
 
 .card-evolution
     display flex

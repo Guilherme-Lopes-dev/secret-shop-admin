@@ -991,6 +991,11 @@ export interface SkinPriceCatalogItem {
   first_median_price: number | null
   last_median_price: number | null
   median_price_change_pct: number | null
+  price_avg: number | null
+  price_avg_24h: number | null
+  price_avg_7d: number | null
+  price_avg_30d: number | null
+  price_avg_90d: number | null
 }
 
 export interface SkinPriceCatalogResponse {
@@ -1006,6 +1011,11 @@ export interface SkinPriceHistoryPoint {
   lowest_price: number | null
   median_price: number | null
   manual_price: number | null
+  price_avg: number | null
+  price_avg_24h: number | null
+  price_avg_7d: number | null
+  price_avg_30d: number | null
+  price_avg_90d: number | null
 }
 
 export interface SkinPriceHistoryResponse {
@@ -1014,6 +1024,8 @@ export interface SkinPriceHistoryResponse {
     name: string
     hero: string | null
     icon_url_large: string | null
+    // Shape interno não documentado pelo steamwebapi — renderizado de forma genérica.
+    latest_10_sales: unknown[] | null
   }
   points: SkinPriceHistoryPoint[]
 }

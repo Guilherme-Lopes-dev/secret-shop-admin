@@ -18,6 +18,12 @@ let chartInstance: Chart | null = null
 const skin = computed(() => result.value?.skin ?? null)
 const points = computed(() => result.value?.points ?? [])
 const recentFirst = computed(() => [...points.value].reverse())
+const units = computed(() => result.value?.units ?? [])
+
+const formatCurrencyOrDash = (v: number | null) => (v == null ? '—' : formatCurrency(v))
+const formatDateOrDash = (v: string | null) => (v == null ? '—' : dayjs(v).format('DD/MM/YYYY'))
+const formatPctOrDash = (v: number | null) => (v == null ? '—' : `${v > 0 ? '+' : ''}${v.toFixed(1)}%`)
+const pctClass = (v: number | null) => (v == null || v === 0 ? '' : v > 0 ? 'pct-up' : 'pct-down')
 
 const previewImageUrl = (hash: string | null) => {
     if (!hash) return ''
@@ -175,6 +181,40 @@ onUnmounted(() => chartInstance?.destroy())
                     </table>
                 </div>
             </div>
+            </div>
+
+            <div v-if="units.length > 0" class="section">
+                <h2 class="section-title">Rastreio por unidade (entrada/saída do bot)</h2>
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Bot</th>
+                                <th>Entrada</th>
+                                <th>Saída</th>
+                                <th>Custo pago</th>
+                                <th>Preço mercado (entrada)</th>
+                                <th>Preço mercado (saída)</th>
+                                <th>Var. mercado</th>
+                                <th>Venda</th>
+                                <th>Margem</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="u in units" :key="u.uuid">
+                                <td>{{ u.bot_name || '—' }}</td>
+                                <td>{{ formatDateOrDash(u.entered_at) }}</td>
+                                <td>{{ u.exited_at ? formatDateOrDash(u.exited_at) : (u.is_sold ? 'Vendida' : 'Ativa') }}</td>
+                                <td class="price">{{ formatCurrencyOrDash(u.cost_price) }}</td>
+                                <td class="price">{{ formatCurrencyOrDash(u.entry_market_price) }}</td>
+                                <td class="price">{{ formatCurrencyOrDash(u.exit_market_price) }}</td>
+                                <td :class="pctClass(u.market_variation_pct)">{{ formatPctOrDash(u.market_variation_pct) }}</td>
+                                <td class="price">{{ formatCurrencyOrDash(u.sale_price) }}</td>
+                                <td :class="pctClass(u.margin_pct)">{{ formatPctOrDash(u.margin_pct) }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
 
             <div v-if="skin.latest_10_sales?.length" class="section sales-section">
@@ -348,6 +388,14 @@ table
 
         &.col-avg-90d
             color #e879f9
+
+        &.pct-up
+            font-weight 600
+            color #4caf50
+
+        &.pct-down
+            font-weight 600
+            color #f87171
 
 .sales-list
     display flex

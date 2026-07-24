@@ -1018,6 +1018,20 @@ export interface SkinPriceHistoryPoint {
   price_avg_90d: number | null
 }
 
+export interface SkinUnitTracking {
+  uuid: string
+  bot_name: string | null
+  entered_at: string | null
+  exited_at: string | null
+  is_sold: boolean
+  cost_price: number | null
+  entry_market_price: number | null
+  exit_market_price: number | null
+  sale_price: number | null
+  market_variation_pct: number | null
+  margin_pct: number | null
+}
+
 export interface SkinPriceHistoryResponse {
   skin: {
     id: string
@@ -1028,4 +1042,5 @@ export interface SkinPriceHistoryResponse {
     latest_10_sales: unknown[] | null
   }
   points: SkinPriceHistoryPoint[]
+  units: SkinUnitTracking[]
 }

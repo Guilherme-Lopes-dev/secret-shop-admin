@@ -19,6 +19,24 @@ const today = ref({
 
 const pendings = ref<Record<string, number>>({})
 
+const PENDINGS_CLEARED_KEY = 'admin_pendings_cleared_at'
+const pendingsClearedAt = ref(localStorage.getItem(PENDINGS_CLEARED_KEY) ?? '')
+
+const clearAllPendings = async () => {
+    const now = new Date().toISOString()
+    localStorage.setItem(PENDINGS_CLEARED_KEY, now)
+    pendingsClearedAt.value = now
+    const res = await adminService.getDashboardPendings(pendingsClearedAt.value)
+    if (res.data) pendings.value = res.data
+}
+
+const removePendingsCutoff = async () => {
+    localStorage.removeItem(PENDINGS_CLEARED_KEY)
+    pendingsClearedAt.value = ''
+    const res = await adminService.getDashboardPendings()
+    if (res.data) pendings.value = res.data
+}
+
 const pendingDefs = [
     { key: 'salesActionRequired', label: 'Vendas com ação necessária', to: '/sales?fulfillment=ACTION_REQUIRED', severity: 'critical', icon: 'mdi:alert-circle-outline' },
     { key: 'tradeOffersFailed', label: 'Trade offers falhadas', to: '/trade-offers?status=FAILED', severity: 'critical', icon: 'mdi:swap-horizontal' },
@@ -27,7 +45,7 @@ const pendingDefs = [
     { key: 'tradeOffersAwaitingAccept', label: 'Trades aguardando aceite', to: '/trade-offers?status=AWAITING', severity: 'warn', icon: 'mdi:clock-outline' },
     { key: 'swapsPendingAdmin', label: 'Swaps aguardando admin', to: '/swaps?status=pending_admin', severity: 'warn', icon: 'mdi:swap-horizontal-bold' },
     { key: 'swapsInReview', label: 'Swaps em revisão', to: '/swaps?status=review', severity: 'warn', icon: 'mdi:magnify' },
-    { key: 'collectorNotificationsUnread', label: 'Pedidos collector a tratar', to: '/collector-orders', severity: 'warn', icon: 'mdi:trophy-outline' },
+    { key: 'collectorNotificationsUnread', label: 'Pedidos collector a tratar', to: '/collector-orders?delivery_status=PENDING', severity: 'warn', icon: 'mdi:trophy-outline' },
     { key: 'dropshipNotificationsUnread', label: 'Envios dropship a tratar', to: '/dropship-orders', severity: 'warn', icon: 'mdi:package-variant-closed' },
 ]
 
@@ -94,7 +112,7 @@ const fetchDashboardData = async () => {
             adminService.getPerformance(),
             adminService.getRecentOrders(),
             adminService.getDashboardToday(),
-            adminService.getDashboardPendings(),
+            adminService.getDashboardPendings(pendingsClearedAt.value || undefined),
         ])
 
         if (todayRes.data) today.value = todayRes.data
@@ -196,6 +214,27 @@ onMounted(fetchDashboardData)
         <div class="section pendings-section">
             <div class="section-header">
                 <h2 class="section-title">Pendências</h2>
+                <div class="pendings-actions">
+                    <button
+                        type="button"
+                        class="clear-all-btn"
+                        title="Não altera status/leitura de nada, só oculta o que já existia antes de agora"
+                        @click="clearAllPendings"
+                    >
+                        <Icon icon="mdi:broom" width="15" />
+                        Limpar tudo
+                    </button>
+                    <button
+                        v-if="pendingsClearedAt"
+                        type="button"
+                        class="clear-all-btn"
+                        title="Remove o corte e volta a mostrar tudo"
+                        @click="removePendingsCutoff"
+                    >
+                        <Icon icon="mdi:close" width="15" />
+                        Remover corte
+                    </button>
+                </div>
             </div>
             <div class="pendings-grid">
                 <router-link
@@ -360,6 +399,26 @@ onMounted(fetchDashboardData)
     transition border-color 0.15s, background 0.15s
     &:hover
         border-color rgba(99,102,241,0.5)
+
+.pendings-actions
+    display flex
+    gap 0.5rem
+
+.clear-all-btn
+    display flex
+    align-items center
+    gap 0.35rem
+    background rgba(255,255,255,0.05)
+    border 1px solid rgba(255,255,255,0.1)
+    color #94a3b8
+    font-size 0.8rem
+    padding 0.4rem 0.7rem
+    border-radius 7px
+    cursor pointer
+    transition background 0.15s, color 0.15s
+    &:hover
+        background rgba(99,102,241,0.2)
+        color #e2e8f0
 
 .pending-count
     font-size 1.1rem

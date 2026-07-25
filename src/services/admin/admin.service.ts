@@ -50,8 +50,9 @@ export const adminService = {
     }>('/dashboard/today')
   },
 
-  async getDashboardPendings() {
-    return api.get<Record<string, number>>('/dashboard/pendings')
+  async getDashboardPendings(pendingFrom?: string) {
+    const p = pendingFrom ? `?pending_from=${encodeURIComponent(pendingFrom)}` : ''
+    return api.get<Record<string, number>>(`/dashboard/pendings${p}`)
   },
 
   async getAllSales(
@@ -522,11 +523,13 @@ export const adminService = {
     payment_status?: string
     delivery_status?: string
     search?: string
+    from?: string
   } = {}) {
     const p = new URLSearchParams({ page: String(params.page ?? 1), limit: String(params.limit ?? 20) })
     if (params.payment_status) p.append('payment_status', params.payment_status)
     if (params.delivery_status) p.append('delivery_status', params.delivery_status)
     if (params.search) p.append('search', params.search)
+    if (params.from) p.append('from', params.from)
     return api.get(`/collector-sales/admin/list?${p}`)
   },
 
@@ -584,6 +587,100 @@ export const adminService = {
     trade_cooldown_until?: string
   }) {
     return api.post('/skins/admin/products', dto)
+  },
+
+  // Uploads
+  async uploadMedia(file: File) {
+    const formData = new FormData()
+    formData.append('file', file)
+    return api.post<{ url: string; filename: string; mimetype: string; size: number }>(
+      '/uploads/media',
+      formData,
+    )
+  },
+
+  // Produtos Físicos
+  async createPhysicalProduct(dto: {
+    name: string
+    description?: string
+    price: number
+    weight_grams?: number
+    height_cm?: number
+    width_cm?: number
+    length_cm?: number
+    media?: { url: string; media_type: 'image' | 'video' }[]
+  }) {
+    return api.post('/physical-products/admin', dto)
+  },
+
+  async listPhysicalProductsAdmin(params: { page?: number; limit?: number; status?: string }) {
+    return api.get('/physical-products/admin/list', { params })
+  },
+
+  async updatePhysicalProduct(uuid: string, dto: {
+    name?: string
+    description?: string
+    price?: number
+    weight_grams?: number
+    height_cm?: number
+    width_cm?: number
+    length_cm?: number
+    status?: 'AVAILABLE' | 'RESERVED' | 'SOLD'
+  }) {
+    return api.patch(`/physical-products/admin/${uuid}`, dto)
+  },
+
+  async deletePhysicalProduct(uuid: string) {
+    return api.delete(`/physical-products/admin/${uuid}`)
+  },
+
+  async addPhysicalProductMedia(uuid: string, dto: { url: string; media_type: 'image' | 'video' }) {
+    return api.post(`/physical-products/admin/${uuid}/media`, dto)
+  },
+
+  async removePhysicalProductMedia(mediaUuid: string) {
+    return api.delete(`/physical-products/admin/media/${mediaUuid}`)
+  },
+
+  // Pedidos de Produto Físico
+  async listPhysicalOrders(params: {
+    page?: number
+    limit?: number
+    search?: string
+    payment_status?: string
+    delivery_status?: string
+  }) {
+    return api.get('/physical-sales/admin/list', { params })
+  },
+
+  async getPhysicalOrderDetail(uuid: string) {
+    return api.get(`/physical-sales/admin/${uuid}`)
+  },
+
+  async getPhysicalOrderAsaasPayment(uuid: string) {
+    return api.get<{
+      id: string
+      status: string
+      billingType: string
+      value: number
+      netValue?: number | null
+      dueDate: string
+      invoiceUrl?: string | null
+      bankSlipUrl?: string | null
+      transactionReceiptUrl?: string | null
+    }>(`/physical-sales/admin/${uuid}/asaas-payment`)
+  },
+
+  async updatePhysicalOrderDelivery(orderUuid: string, dto: {
+    delivery_status: 'SHIPPED' | 'DELIVERED'
+    tracking_code?: string
+    notes?: string
+  }) {
+    return api.patch(`/physical-sales/admin/${orderUuid}/delivery`, dto)
+  },
+
+  async cancelPhysicalOrder(uuid: string, refund = false) {
+    return api.post(`/physical-sales/admin/${uuid}/cancel`, { refund })
   },
 
   // Discord

@@ -38,6 +38,9 @@ const navItems = [
     { label: 'Recomendações', icon: 'mdi:star-shooting-outline', to: '/recommendations', name: 'recommendations' },
     { label: 'Novidades', icon: 'mdi:bullhorn-outline', to: '/news', name: 'news' },
     { label: 'Bots Steam', icon: 'mdi:robot-outline', to: '/bots', name: 'bots' },
+    { label: 'Produtos Físicos', icon: 'mdi:trophy-award', to: '/physical-products', name: 'physical-products' },
+    { label: 'Pedidos Físicos', icon: 'mdi:package-variant-closed', to: '/physical-orders', name: 'physical-orders' },
+    { label: 'Teste Upload', icon: 'mdi:cloud-upload-outline', to: '/uploads/test', name: 'upload-test' },
     // { label: 'Add Produto', icon: 'mdi:plus-circle-outline', to: '/products/create', name: 'create-product' },
 ]
 

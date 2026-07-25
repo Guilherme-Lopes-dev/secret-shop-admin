@@ -213,6 +213,26 @@ const routes = [
         name: 'news-edit',
         component: () => import('@/views/news/NewsForm.vue'),
       },
+      {
+        path: 'uploads/test',
+        name: 'upload-test',
+        component: () => import('@/views/uploads/UploadTest.vue'),
+      },
+      {
+        path: 'physical-products',
+        name: 'physical-products',
+        component: () => import('@/views/physical-products/PhysicalProductsList.vue'),
+      },
+      {
+        path: 'physical-orders',
+        name: 'physical-orders',
+        component: () => import('@/views/physical-orders/PhysicalOrdersList.vue'),
+      },
+      {
+        path: 'physical-orders/:uuid',
+        name: 'physical-order-detail',
+        component: () => import('@/views/physical-orders/PhysicalOrderDetail.vue'),
+      },
     ],
   },
   {

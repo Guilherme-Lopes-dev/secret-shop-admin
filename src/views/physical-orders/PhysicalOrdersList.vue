@@ -1,48 +1,48 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRouter } from 'vue-router'
+import { Icon } from '@iconify/vue'
+import { toast } from 'vue3-toastify'
 import { adminService } from '@/services/admin/admin.service'
 import { formatCurrency } from '@/utils/formatCurrency'
-import { toast } from 'vue3-toastify'
-import { Icon } from '@iconify/vue'
 
 const router = useRouter()
-const route = useRoute()
+const goToDetail = (uuid: string) => router.push(`/physical-orders/${uuid}`)
 
-const sales       = ref<any[]>([])
-const loading     = ref(true)
+const API_URL = import.meta.env.VITE_API_URL?.trim() || ''
+
+const orders = ref<any[]>([])
+const loading = ref(true)
 const currentPage = ref(1)
-const totalPages  = ref(1)
-const totalItems  = ref(0)
-const limit       = ref(20)
+const totalPages = ref(1)
+const totalItems = ref(0)
+const limit = ref(20)
 
-const search         = ref('')
-const filterPayment  = ref('')
-const filterDelivery = ref((route.query.delivery_status as string) ?? '')
-let   searchTimer: ReturnType<typeof setTimeout> | null = null
+const search = ref('')
+const filterPayment = ref('')
+const filterDelivery = ref('')
+let searchTimer: ReturnType<typeof setTimeout> | null = null
 
-const PENDINGS_CLEARED_KEY = 'admin_pendings_cleared_at'
-const pendingClearedAt = ref(localStorage.getItem(PENDINGS_CLEARED_KEY) ?? '')
+const mediaUrl = (path: string) => `${API_URL}${path}`
 
-const fetchSales = async (page: number) => {
+const fetchOrders = async (page: number) => {
     loading.value = true
     try {
-        const res = await adminService.getCollectorSales({
+        const res = await adminService.listPhysicalOrders({
             page,
-            limit:           limit.value,
-            payment_status:  filterPayment.value  || undefined,
+            limit: limit.value,
+            payment_status: filterPayment.value || undefined,
             delivery_status: filterDelivery.value || undefined,
-            search:          search.value         || undefined,
-            from:            filterDelivery.value === 'PENDING' ? (pendingClearedAt.value || undefined) : undefined,
+            search: search.value || undefined,
         })
         if (res.data) {
-            sales.value       = res.data.data
-            totalItems.value  = res.data.total
+            orders.value = res.data.data
+            totalItems.value = res.data.total
             currentPage.value = res.data.page
-            totalPages.value  = Math.ceil(res.data.total / limit.value) || 1
+            totalPages.value = Math.ceil(res.data.total / limit.value) || 1
         }
     } catch {
-        toast.error('Erro ao carregar pedidos collector.')
+        toast.error('Erro ao carregar pedidos de produto físico.')
     } finally {
         loading.value = false
     }
@@ -50,53 +50,52 @@ const fetchSales = async (page: number) => {
 
 const onSearchInput = () => {
     if (searchTimer) clearTimeout(searchTimer)
-    searchTimer = setTimeout(() => fetchSales(1), 400)
+    searchTimer = setTimeout(() => fetchOrders(1), 400)
 }
 
-const onFilterChange = () => fetchSales(1)
-const nextPage = () => { if (currentPage.value < totalPages.value) fetchSales(currentPage.value + 1) }
-const prevPage = () => { if (currentPage.value > 1) fetchSales(currentPage.value - 1) }
+const onFilterChange = () => fetchOrders(1)
+const nextPage = () => { if (currentPage.value < totalPages.value) fetchOrders(currentPage.value + 1) }
+const prevPage = () => { if (currentPage.value > 1) fetchOrders(currentPage.value - 1) }
 
-const goToDetail = (uuid: string) => router.push(`/collector-orders/${uuid}`)
-
-const line      = (s: any) => s.collector_sales?.[0] ?? null
-const itemName  = (s: any) => line(s)?.snapshot_data?.name ?? line(s)?.collectors?.name ?? '-'
-const itemImage = (s: any) => line(s)?.snapshot_data?.icon_url_large ?? line(s)?.collectors?.icon_url_large ?? null
+const line = (o: any) => o.physical_sales?.[0] ?? null
+const itemName = (o: any) => {
+    const name = line(o)?.physical_products?.name ?? '-'
+    const extra = (o.physical_sales?.length ?? 0) - 1
+    return extra > 0 ? `${name} (+${extra})` : name
+}
+const itemImage = (o: any) => line(o)?.physical_products?.media?.[0]?.url ?? null
 
 const paymentBadgeClass = (s: string) => ({
-    PENDING:          'badge-pending',
+    PENDING: 'badge-pending',
     AWAITING_PAYMENT: 'badge-awaiting',
-    PAID:             'badge-paid',
-    EXPIRED:          'badge-expired',
-    CANCELLED:        'badge-cancelled',
-    REFUNDED:         'badge-refunded',
+    PAID: 'badge-paid',
+    EXPIRED: 'badge-expired',
+    CANCELLED: 'badge-cancelled',
+    REFUNDED: 'badge-refunded',
 }[s] ?? 'badge-pending')
 
 const paymentLabel = (s: string) => ({
-    PENDING:          'Pendente',
+    PENDING: 'Pendente',
     AWAITING_PAYMENT: 'Aguardando',
-    PAID:             'Pago',
-    EXPIRED:          'Expirado',
-    CANCELLED:        'Cancelado',
-    REFUNDED:         'Reembolsado',
+    PAID: 'Pago',
+    EXPIRED: 'Expirado',
+    CANCELLED: 'Cancelado',
+    REFUNDED: 'Reembolsado',
 }[s] ?? s)
 
 const deliveryBadgeClass = (s: string | null) => ({
     AWAITING_SHIPPING: 'badge-awaiting',
-    SHIPPED:           'badge-shipped',
-    DELIVERED:         'badge-delivered',
+    SHIPPED: 'badge-shipped',
+    DELIVERED: 'badge-delivered',
 }[s ?? ''] ?? '')
 
 const deliveryLabel = (s: string | null) => ({
     AWAITING_SHIPPING: 'Aguard. Envio',
-    SHIPPED:           'Enviado',
-    DELIVERED:         'Entregue',
+    SHIPPED: 'Enviado',
+    DELIVERED: 'Entregue',
 }[s ?? ''] ?? '-')
 
-const paymentMethodLabel = (m: string | null) =>
-    ({ PIX: 'PIX', BOLETO: 'Boleto', CREDIT_CARD: 'Cartão' }[m ?? ''] ?? m ?? '-')
-
-onMounted(() => fetchSales(1))
+onMounted(() => fetchOrders(1))
 </script>
 
 <template>
@@ -104,8 +103,8 @@ onMounted(() => fetchSales(1))
         <header class="page-header">
             <div>
                 <h1 class="page-title">
-                    <Icon icon="mdi:trophy-outline" class="title-icon" />
-                    Pedidos Collector
+                    <Icon icon="mdi:package-variant-closed" class="title-icon" />
+                    Pedidos Produto Físico
                 </h1>
                 <p class="page-subtitle">
                     {{ totalItems }} pedido{{ totalItems !== 1 ? 's' : '' }} encontrado{{ totalItems !== 1 ? 's' : '' }}
@@ -116,13 +115,7 @@ onMounted(() => fetchSales(1))
         <div class="filters-bar">
             <div class="search-wrap">
                 <Icon icon="mdi:magnify" class="search-icon" />
-                <input
-                    v-model="search"
-                    type="search"
-                    class="search-input"
-                    placeholder="Buscar por nº pedido ou item..."
-                    @input="onSearchInput"
-                />
+                <input v-model="search" type="search" class="search-input" placeholder="Buscar por nº pedido ou item..." @input="onSearchInput" />
             </div>
             <select v-model="filterPayment" class="filter-select" @change="onFilterChange">
                 <option value="">Todos pagamentos</option>
@@ -135,7 +128,6 @@ onMounted(() => fetchSales(1))
             </select>
             <select v-model="filterDelivery" class="filter-select" @change="onFilterChange">
                 <option value="">Todas entregas</option>
-                <option value="PENDING">Pendentes (a tratar)</option>
                 <option value="AWAITING_SHIPPING">Aguard. Envio</option>
                 <option value="SHIPPED">Enviado</option>
                 <option value="DELIVERED">Entregue</option>
@@ -144,8 +136,7 @@ onMounted(() => fetchSales(1))
 
         <div class="section">
             <div v-if="loading" class="loading-state">
-                <Icon icon="mdi:loading" class="spin" />
-                Carregando pedidos collector...
+                <Icon icon="mdi:loading" class="spin" /> Carregando pedidos...
             </div>
 
             <template v-else>
@@ -156,65 +147,51 @@ onMounted(() => fetchSales(1))
                                 <th>Pedido</th>
                                 <th>Item</th>
                                 <th>Cliente</th>
-                                <th>Qtd × Preço</th>
                                 <th>Total</th>
                                 <th>Pagamento</th>
                                 <th>Entrega</th>
-                                <th>Método</th>
+                                <th>Rastreio</th>
                                 <th>Data</th>
                             </tr>
                         </thead>
                         <tbody>
-                            <tr
-                                v-for="sale in sales"
-                                :key="sale.uuid"
-                                class="row-main"
-                                @click="goToDetail(sale.id)"
-                            >
-                                <td>
-                                    <span class="order-number">{{ sale.order_number }}</span>
-                                </td>
+                            <tr v-for="order in orders" :key="order.id" class="row-main" @click="goToDetail(order.id)">
+                                <td><span class="order-number">{{ order.order_number }}</span></td>
                                 <td>
                                     <div class="item-cell">
-                                        <img
-                                            v-if="itemImage(sale)"
-                                            :src="itemImage(sale)!"
-                                            class="item-thumb"
-                                            :alt="itemName(sale)"
-                                        />
-                                        <div v-else class="item-thumb-placeholder">
-                                            <Icon icon="mdi:trophy-outline" />
-                                        </div>
-                                        <span class="item-name">{{ itemName(sale) }}</span>
+                                        <img v-if="itemImage(order)" :src="mediaUrl(itemImage(order)!)" class="item-thumb" :alt="itemName(order)" />
+                                        <div v-else class="item-thumb-placeholder"><Icon icon="mdi:package-variant" /></div>
+                                        <span class="item-name">{{ itemName(order) }}</span>
                                     </div>
                                 </td>
                                 <td>
                                     <div class="customer-cell">
-                                        <span class="customer-name">{{ sale.users?.username ?? '-' }}</span>
-                                        <span class="customer-email">{{ sale.users?.email ?? '-' }}</span>
+                                        <span class="customer-name">{{ order.users?.username ?? '-' }}</span>
+                                        <span class="customer-email">{{ order.users?.email ?? '-' }}</span>
                                     </div>
                                 </td>
-                                <td class="qty-cell">{{ line(sale)?.quantity ?? '-' }} × {{ line(sale) ? formatCurrency(line(sale).unit_price) : '-' }}</td>
-                                <td class="price-col">{{ line(sale) ? formatCurrency(line(sale).total_price) : '-' }}</td>
+                                <td class="price-col">{{ formatCurrency(order.total_amount) }}</td>
                                 <td>
-                                    <span class="status-badge" :class="paymentBadgeClass(sale.payment_status)">
-                                        {{ paymentLabel(sale.payment_status) }}
+                                    <span class="status-badge" :class="paymentBadgeClass(order.payment_status)">
+                                        {{ paymentLabel(order.payment_status) }}
                                     </span>
                                 </td>
                                 <td>
-                                    <span v-if="line(sale)?.delivery_status" class="status-badge" :class="deliveryBadgeClass(line(sale)?.delivery_status ?? null)">
-                                        {{ deliveryLabel(line(sale)?.delivery_status ?? null) }}
+                                    <span v-if="line(order)?.delivery_status" class="status-badge" :class="deliveryBadgeClass(line(order)?.delivery_status ?? null)">
+                                        {{ deliveryLabel(line(order)?.delivery_status ?? null) }}
                                     </span>
                                     <span v-else class="muted">-</span>
                                 </td>
-                                <td class="muted">{{ paymentMethodLabel(sale.payment_method) }}</td>
-                                <td class="date-col">{{ $dayjs(sale.created_at).format('DD/MM/YY HH:mm') }}</td>
+                                <td>
+                                    <span class="muted">{{ line(order)?.tracking_code ?? '-' }}</span>
+                                </td>
+                                <td class="date-col">{{ $dayjs(order.created_at).format('DD/MM/YY HH:mm') }}</td>
                             </tr>
 
-                            <tr v-if="sales.length === 0">
-                                <td colspan="9" class="empty-state">
-                                    <Icon icon="mdi:trophy-outline" class="empty-icon" />
-                                    <p>Nenhum pedido collector encontrado.</p>
+                            <tr v-if="orders.length === 0">
+                                <td colspan="8" class="empty-state">
+                                    <Icon icon="mdi:package-variant" class="empty-icon" />
+                                    <p>Nenhum pedido de produto físico encontrado.</p>
                                 </td>
                             </tr>
                         </tbody>
@@ -374,7 +351,7 @@ table
 .item-thumb
     width 36px
     height 36px
-    object-fit contain
+    object-fit cover
     border-radius 4px
     background rgba(255,255,255,0.04)
     flex-shrink 0
@@ -410,10 +387,6 @@ table
 .customer-email
     color #64748b
     font-size 0.78rem
-
-.qty-cell
-    color #94a3b8
-    white-space nowrap
 
 .price-col
     font-weight 600

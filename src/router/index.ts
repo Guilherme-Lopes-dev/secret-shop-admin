@@ -164,6 +164,31 @@ const routes = [
         component: () => import('@/views/coupons/CouponsList.vue'),
       },
       {
+        path: 'affiliates',
+        name: 'affiliates',
+        component: () => import('@/views/affiliates/AffiliatesList.vue'),
+      },
+      {
+        path: 'affiliates/config',
+        name: 'affiliate-config',
+        component: () => import('@/views/affiliates/AffiliateConfig.vue'),
+      },
+      {
+        path: 'affiliates/commissions',
+        name: 'affiliate-commissions',
+        component: () => import('@/views/affiliates/AffiliateCommissions.vue'),
+      },
+      {
+        path: 'affiliates/payouts',
+        name: 'affiliate-payouts',
+        component: () => import('@/views/affiliates/AffiliatePayouts.vue'),
+      },
+      {
+        path: 'affiliates/:uuid',
+        name: 'affiliate-details',
+        component: () => import('@/views/affiliates/AffiliateDetails.vue'),
+      },
+      {
         path: 'coupons/new',
         name: 'coupon-new',
         component: () => import('@/views/coupons/CouponForm.vue'),

@@ -33,6 +33,7 @@ const navItems = [
     { label: 'Relatórios', icon: 'mdi:file-chart-outline', to: '/reports', name: 'reports' },
     { label: 'Histórico', icon: 'mdi:history', to: '/historico', name: 'historico' },
     { label: 'Cupons', icon: 'mdi:ticket-percent-outline', to: '/coupons', name: 'coupons' },
+    { label: 'Afiliados', icon: 'mdi:account-cash-outline', to: '/affiliates', name: 'affiliates' },
     { label: 'WhatsApp Blast', icon: 'mdi:whatsapp', to: '/whatsapp/blast', name: 'whatsapp-blast' },
     { label: 'Partidas', icon: 'mdi:gamepad-variant-outline', to: '/match-history', name: 'match-history' },
     { label: 'Recomendações', icon: 'mdi:star-shooting-outline', to: '/recommendations', name: 'recommendations' },

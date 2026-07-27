@@ -6,6 +6,8 @@ import type { formatCurrency } from '@/utils/formatCurrency'
 
 interface ImportMetaEnv {
   readonly VITE_API_URL: string
+  /** Origem pública dos links de afiliado (/r/:code). Sem ela, cai no VITE_API_URL. */
+  readonly VITE_LINK_ORIGIN?: string
 }
 
 interface ImportMeta {

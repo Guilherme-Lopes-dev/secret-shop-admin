@@ -76,6 +76,38 @@ const resetInventoryCooldown = async () => {
     }
 }
 
+const AVAILABLE_ROLES = [
+    { value: 'seller', label: 'Vendedor', icon: 'mdi:store' },
+    { value: 'affiliate', label: 'Afiliado', icon: 'mdi:link-variant' },
+]
+
+const savingRole = ref('')
+
+const hasRole = (role: string) => Boolean(user.value?.roles?.includes(role))
+
+// O papel de afiliado sem cadastro em /affiliates deixa o painel do usuário quebrado.
+const startAffiliateSignup = () =>
+    router.push({ path: '/affiliates', query: { userId: route.params.uuid as string } })
+
+const toggleRole = async (role: string) => {
+    if (!user.value || savingRole.value) return
+    if (role === 'affiliate' && !hasRole(role)) return startAffiliateSignup()
+
+    const current: string[] = user.value.roles ?? []
+    const next = hasRole(role) ? current.filter((item) => item !== role) : [...current, role]
+
+    savingRole.value = role
+    try {
+        const response = await adminService.setUserRoles(route.params.uuid as string, next)
+        user.value = { ...user.value, roles: response.data.roles }
+        toast.success('Papéis atualizados.')
+    } catch (e: any) {
+        toast.error(e?.response?.data?.message || 'Erro ao atualizar papéis.')
+    } finally {
+        savingRole.value = ''
+    }
+}
+
 const getStatusClass = (status: string) => {
     if (!status) return ''
     const s = status.toLowerCase()
@@ -143,6 +175,30 @@ onMounted(fetchUser)
                         </button>
                     </div>
                 </div>
+            </div>
+
+            <div class="roles-card">
+                <div class="roles-head">
+                    <Icon icon="mdi:shield-account-outline" width="18" />
+                    <span class="roles-title">Papéis de acesso</span>
+                </div>
+                <div class="roles-chips">
+                    <button
+                        v-for="role in AVAILABLE_ROLES"
+                        :key="role.value"
+                        class="role-chip"
+                        :class="{ active: hasRole(role.value) }"
+                        :disabled="savingRole !== ''"
+                        @click="toggleRole(role.value)"
+                    >
+                        <Icon :icon="savingRole === role.value ? 'mdi:loading' : role.icon" :class="{ spin: savingRole === role.value }" />
+                        {{ role.label }}
+                    </button>
+                </div>
+                <p class="roles-hint">
+                    Vendedor libera anúncios no marketplace. Afiliado abre o cadastro em Afiliados — revogar aqui não
+                    suspende o cadastro nem interrompe as comissões.
+                </p>
             </div>
 
             <div class="user-stats">
@@ -348,6 +404,70 @@ onMounted(fetchUser)
     font-family monospace
     font-size 0.78rem
     color #64748b
+
+.roles-card
+    background #1a1a1e
+    border 1px solid rgba(255,255,255,0.05)
+    border-radius 12px
+    padding 1rem 1.25rem
+    margin-bottom 1.5rem
+
+.roles-head
+    display flex
+    align-items center
+    gap 0.5rem
+    color #94a3b8
+    margin-bottom 0.75rem
+
+.roles-title
+    font-size 0.8rem
+    font-weight 600
+    text-transform uppercase
+    letter-spacing 0.03em
+
+.roles-chips
+    display flex
+    gap 0.625rem
+    flex-wrap wrap
+
+.role-chip
+    display inline-flex
+    align-items center
+    gap 0.45rem
+    padding 0.5rem 0.9rem
+    border-radius 8px
+    border 1px solid rgba(255,255,255,0.08)
+    background rgba(255,255,255,0.03)
+    color #94a3b8
+    font-size 0.85rem
+    font-weight 600
+    cursor pointer
+    transition all 0.15s
+
+    &:hover:not(:disabled)
+        border-color rgba(255,255,255,0.18)
+        color #e2e8f0
+
+    &:disabled
+        cursor default
+        opacity 0.7
+
+    &.active
+        background rgba(99,102,241,0.14)
+        border-color rgba(99,102,241,0.45)
+        color #818cf8
+
+.roles-hint
+    margin 0.7rem 0 0
+    font-size 0.75rem
+    color #64748b
+
+.spin
+    animation spin 0.8s linear infinite
+
+@keyframes spin
+    to
+        transform rotate(360deg)
 
 .user-stats
     display flex

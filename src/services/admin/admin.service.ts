@@ -164,6 +164,10 @@ export const adminService = {
     return api.patch(`/admin/users/${uuid}/toggle-active`)
   },
 
+  async setUserRoles(uuid: string, roles: string[]) {
+    return api.patch<{ id: string; roles: string[] }>(`/admin/users/${uuid}/roles`, { roles })
+  },
+
   async toggleUserSwap(uuid: string) {
     return api.patch<{ id: string; swap_enabled: boolean }>(`/admin/users/${uuid}/toggle-swap`)
   },

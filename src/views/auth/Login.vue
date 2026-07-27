@@ -12,10 +12,11 @@ const handleLogin = () => {
 }
 
 onMounted(() => {
-    const params = new URLSearchParams(window.location.search)
-    if (params.get('error') === 'not_admin') {
-        toast.error('Acesso negado. Esta área é restrita a administradores.')
-    }
+    const error = new URLSearchParams(window.location.search).get('error')
+    if (!error) return
+
+    // O backend manda o motivo já escrito; `not_admin` vem do guard de rota.
+    toast.error(error === 'not_admin' ? 'Acesso negado. Esta área é restrita a administradores.' : error)
 })
 </script>
 

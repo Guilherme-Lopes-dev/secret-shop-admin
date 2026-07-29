@@ -24,6 +24,7 @@ const heroes = ref<DotaHero[]>([])
 const isSubmitting = ref(false)
 const submitError = ref<string | null>(null)
 const submitProgress = ref<{ current: number; total: number } | null>(null)
+const submitSummary = ref<{ created: number; updated: number; remaining: number } | null>(null)
 
 const CHUNK_SIZE = 200
 
@@ -60,31 +61,9 @@ function persistSelection() {
     })
 }
 
-function buildPayload() {
-    return {
-        steamId: steamId.value,
-        botId: botId.value ?? null,
-        items: items.value.map((item) => ({
-            assetId: item.assetId,
-            classId: item.classId,
-            instanceId: item.instanceId,
-            name: item.name,
-            marketHashName: item.marketHashName,
-            type: item.type ?? null,
-            iconUrl: item.iconUrl ?? null,
-            iconUrlLarge: item.iconUrlLarge ?? null,
-            amount: item.amount,
-            tradable: item.tradable,
-            marketable: item.marketable,
-            commodity: item.commodity,
-            price: parseCents(priceInputs.value[getCollectorItemKey(item)] ?? '') ?? null,
-            bot_id: botId.value ?? null,
-        })),
-    }
-}
-
 async function submit() {
     submitError.value = null
+    submitSummary.value = null
     isSubmitting.value = true
 
     const allItems = items.value.map((item) => ({
@@ -111,20 +90,33 @@ async function submit() {
 
     submitProgress.value = { current: 0, total: chunks.length }
 
+    const summary = { created: 0, updated: 0 }
+    let savedCount = 0
+
     try {
         for (const [index, chunk] of chunks.entries()) {
             submitProgress.value = { current: index + 1, total: chunks.length }
-            await adminService.bulkUpsertCollectors({
+            const { data } = await adminService.bulkUpsertCollectors({
                 steamId: steamId.value,
                 botId: botId.value ?? null,
                 items: chunk,
             })
+            summary.created += data.created
+            summary.updated += data.updated
+            savedCount += chunk.length
         }
         clearCollectorReviewSelection()
-        router.push('/collectors')
+        items.value = []
     } catch (err: unknown) {
         submitError.value = err instanceof Error ? err.message : 'Erro ao salvar collectors.'
+        // Retomada: os lotes que já entraram saem da lista; o resto fica com preço/herói
+        // preenchidos, então salvar de novo reenvia só o que falta.
+        items.value = items.value.slice(savedCount)
+        persistSelection()
     } finally {
+        if (savedCount > 0) {
+            submitSummary.value = { ...summary, remaining: items.value.length }
+        }
         isSubmitting.value = false
         submitProgress.value = null
     }
@@ -230,6 +222,25 @@ onMounted(async () => {
                     {{ isSubmitting ? (submitProgress ? `Lote ${submitProgress.current}/${submitProgress.total}...` : 'Salvando...') : 'Salvar Collectors' }}
                 </button>
             </div>
+        </div>
+
+        <div
+            v-if="submitSummary"
+            class="success-banner"
+            :class="{ 'success-banner--partial': submitSummary.remaining > 0 }"
+        >
+            <Icon :icon="submitSummary.remaining > 0 ? 'mdi:alert-outline' : 'mdi:check-circle-outline'" />
+            <span>
+                <strong>{{ submitSummary.created }}</strong> criado{{ submitSummary.created !== 1 ? 's' : '' }} ·
+                <strong>{{ submitSummary.updated }}</strong> atualizado{{ submitSummary.updated !== 1 ? 's' : '' }}
+                <template v-if="submitSummary.remaining > 0">
+                    — sobraram <strong>{{ submitSummary.remaining }}</strong> na lista. Clique em salvar
+                    para reenviar só eles; os que já entraram não serão sobrescritos.
+                </template>
+                <template v-else-if="submitSummary.updated > 0">
+                    — itens já existentes nesta conta tiveram preço e herói sobrescritos.
+                </template>
+            </span>
         </div>
 
         <div v-if="submitError" class="error-banner">
@@ -620,6 +631,23 @@ tr:hover td
 @keyframes spin
     from transform rotate(0deg)
     to   transform rotate(360deg)
+
+.success-banner
+    display flex
+    align-items center
+    gap 0.5rem
+    background rgba(74,222,128,0.1)
+    border 1px solid rgba(74,222,128,0.2)
+    border-radius 8px
+    color #4ade80
+    font-size 0.875rem
+    padding 0.75rem 1rem
+    margin-bottom 1rem
+
+    &--partial
+        background rgba(251,191,36,0.1)
+        border-color rgba(251,191,36,0.2)
+        color #fbbf24
 
 .error-banner
     display flex

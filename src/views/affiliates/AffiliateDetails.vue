@@ -33,12 +33,9 @@ const form = ref({
 const linkForm = ref({ code: '', label: '', couponCode: '' })
 const savingLink = ref(false)
 
-// O /r/:code é servido pelo backend, que registra o clique e redireciona para a loja.
-// Em produção a loja faz proxy desse path, então o link divulgado usa o domínio dela.
-const redirectOrigin =
-    import.meta.env.VITE_LINK_ORIGIN?.trim() ||
-    import.meta.env.VITE_API_URL?.trim() ||
-    window.location.origin
+// O /r/:code é servido pelo backend; a loja faz proxy desse path (vercel.json).
+// ponytail: domínio fixo — só existe uma loja. Vira env var quando houver outra.
+const redirectOrigin = 'https://secretshopgg.com'
 
 const fetchDetail = async () => {
     loading.value = true

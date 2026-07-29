@@ -422,7 +422,10 @@ export const adminService = {
       heroSlug?: string
     }>
   }) {
-    return api.post('/collectors/admin/bulk', payload)
+    return api.post<{ upserted: number; created: number; updated: number }>(
+      '/collectors/admin/bulk',
+      payload,
+    )
   },
 
   // Dota Heroes

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import { useAuthStore } from '@/stores/auth.store'
@@ -10,112 +10,180 @@ const route = useRoute()
 const authStore = useAuthStore()
 const sidebarOpen = ref(true)
 
-const NAV_ORDER_STORAGE_KEY = 'admin.sidebar.order'
+// Abaixo de 768px o CSS já força o modo trilho; o JS precisa saber pra não desenhar
+// cabeçalho de grupo sem largura pra rótulo.
+const narrowScreenQuery = window.matchMedia('(max-width: 768px)')
+const narrowScreen = ref(narrowScreenQuery.matches)
+narrowScreenQuery.addEventListener('change', (event) => {
+    narrowScreen.value = event.matches
+})
 
-const navItems = [
-    { label: 'Dashboard', icon: 'mdi:view-dashboard-outline', to: '/', name: 'dashboard' },
-    { label: 'Vendas', icon: 'mdi:cart-outline', to: '/sales', name: 'sales', exact: true },
-    { label: 'Resumo Vendas', icon: 'mdi:chart-bar', to: '/sales/summary', name: 'sales-summary' },
-    { label: 'Usuários', icon: 'mdi:account-group-outline', to: '/users', name: 'users' },
-    { label: 'Trade Offers', icon: 'mdi:swap-horizontal', to: '/trade-offers', name: 'trade-offers' },
-    { label: 'Trocas (Swaps)', icon: 'mdi:swap-horizontal-bold', to: '/swaps', name: 'swaps' },
-    { label: 'Inventário', icon: 'mdi:sword', to: '/inventory', name: 'inventory' },
-    { label: 'Evolução de Preços', icon: 'mdi:chart-line', to: '/skins/prices', name: 'skins-prices' },
-    { label: 'Config de Preços', icon: 'mdi:cash-edit', to: '/pricing-config', name: 'pricing-config' },
-    { label: 'Market Explorer', icon: 'mdi:cloud-search-outline', to: '/market-explorer', name: 'market-explorer' },
-    { label: 'Collectors', icon: 'mdi:trophy-outline', to: '/collectors', name: 'collectors', exact: true },
-    { label: 'Catálogo Col.', icon: 'mdi:trophy-variant-outline', to: '/collectors/catalog', name: 'collectors-catalog', exact: false },
-    { label: 'Pedidos Collector', icon: 'mdi:receipt-text-outline', to: '/collector-orders', name: 'collector-orders' },
-    { label: 'Envios Dropship', icon: 'mdi:package-variant-closed', to: '/dropship-orders', name: 'dropship-orders' },
-    { label: 'Secret Pass', icon: 'mdi:shield-star-outline', to: '/passes', name: 'passes' },
-    { label: 'Antifraude', icon: 'mdi:shield-alert-outline', to: '/antifraud', name: 'antifraud-policy' },
-    { label: 'Discord', icon: 'mdi:discord', to: '/discord', name: 'discord' },
-    { label: 'Relatórios', icon: 'mdi:file-chart-outline', to: '/reports', name: 'reports' },
-    { label: 'Histórico', icon: 'mdi:history', to: '/historico', name: 'historico' },
-    { label: 'Cupons', icon: 'mdi:ticket-percent-outline', to: '/coupons', name: 'coupons' },
-    { label: 'Afiliados', icon: 'mdi:account-cash-outline', to: '/affiliates', name: 'affiliates' },
-    { label: 'WhatsApp Blast', icon: 'mdi:whatsapp', to: '/whatsapp/blast', name: 'whatsapp-blast' },
-    { label: 'Partidas', icon: 'mdi:gamepad-variant-outline', to: '/match-history', name: 'match-history' },
-    { label: 'Recomendações', icon: 'mdi:star-shooting-outline', to: '/recommendations', name: 'recommendations' },
-    { label: 'Novidades', icon: 'mdi:bullhorn-outline', to: '/news', name: 'news' },
-    { label: 'Bots Steam', icon: 'mdi:robot-outline', to: '/bots', name: 'bots' },
-    { label: 'Produtos Físicos', icon: 'mdi:trophy-award', to: '/physical-products', name: 'physical-products' },
-    { label: 'Pedidos Físicos', icon: 'mdi:package-variant-closed', to: '/physical-orders', name: 'physical-orders' },
-    { label: 'Teste Upload', icon: 'mdi:cloud-upload-outline', to: '/uploads/test', name: 'upload-test' },
-    // { label: 'Add Produto', icon: 'mdi:plus-circle-outline', to: '/products/create', name: 'create-product' },
+const expanded = computed(() => sidebarOpen.value && !narrowScreen.value)
+
+const OPEN_GROUPS_STORAGE_KEY = 'admin.sidebar.groups'
+
+type NavItem = { label: string; icon: string; to: string; name: string }
+type NavGroup = { label: string; icon: string; key: string; items: NavItem[] }
+
+const dashboard: NavItem = {
+    label: 'Dashboard',
+    icon: 'mdi:view-dashboard-outline',
+    to: '/',
+    name: 'dashboard',
+}
+
+const navGroups: NavGroup[] = [
+    {
+        label: 'Vendas',
+        icon: 'mdi:cart-outline',
+        key: 'vendas',
+        items: [
+            { label: 'Vendas', icon: 'mdi:cart-outline', to: '/sales', name: 'sales' },
+            { label: 'Resumo', icon: 'mdi:chart-bar', to: '/sales/summary', name: 'sales-summary' },
+            { label: 'Pedidos Collector', icon: 'mdi:receipt-text-outline', to: '/collector-orders', name: 'collector-orders' },
+            { label: 'Envios Dropship', icon: 'mdi:package-variant-closed', to: '/dropship-orders', name: 'dropship-orders' },
+            { label: 'Pedidos Físicos', icon: 'mdi:truck-outline', to: '/physical-orders', name: 'physical-orders' },
+        ],
+    },
+    {
+        label: 'Catálogo',
+        icon: 'mdi:view-grid-outline',
+        key: 'catalogo',
+        items: [
+            { label: 'Inventário', icon: 'mdi:sword', to: '/inventory', name: 'inventory' },
+            { label: 'Collectors', icon: 'mdi:trophy-outline', to: '/collectors', name: 'collectors' },
+            { label: 'Catálogo Collectors', icon: 'mdi:trophy-variant-outline', to: '/collectors/catalog', name: 'collectors-catalog' },
+            { label: 'Produtos Físicos', icon: 'mdi:trophy-award', to: '/physical-products', name: 'physical-products' },
+        ],
+    },
+    {
+        label: 'Precificação',
+        icon: 'mdi:cash-multiple',
+        key: 'precificacao',
+        items: [
+            { label: 'Evolução de Preços', icon: 'mdi:chart-line', to: '/skins/prices', name: 'skins-prices' },
+            { label: 'Config de Preços', icon: 'mdi:cash-edit', to: '/pricing-config', name: 'pricing-config' },
+            { label: 'Market Explorer', icon: 'mdi:cloud-search-outline', to: '/market-explorer', name: 'market-explorer' },
+        ],
+    },
+    {
+        label: 'Steam & Bots',
+        icon: 'mdi:robot-outline',
+        key: 'steam',
+        items: [
+            { label: 'Bots Steam', icon: 'mdi:robot-outline', to: '/bots', name: 'bots' },
+            { label: 'Trade Offers', icon: 'mdi:swap-horizontal', to: '/trade-offers', name: 'trade-offers' },
+            { label: 'Trocas (Swaps)', icon: 'mdi:swap-horizontal-bold', to: '/swaps', name: 'swaps' },
+            { label: 'Partidas', icon: 'mdi:gamepad-variant-outline', to: '/match-history', name: 'match-history' },
+        ],
+    },
+    {
+        label: 'Usuários',
+        icon: 'mdi:account-group-outline',
+        key: 'usuarios',
+        items: [
+            { label: 'Usuários', icon: 'mdi:account-group-outline', to: '/users', name: 'users' },
+            { label: 'Secret Pass', icon: 'mdi:shield-star-outline', to: '/passes', name: 'passes' },
+            { label: 'Antifraude', icon: 'mdi:shield-alert-outline', to: '/antifraud', name: 'antifraud-policy' },
+        ],
+    },
+    {
+        label: 'Afiliados',
+        icon: 'mdi:account-cash-outline',
+        key: 'afiliados',
+        items: [
+            { label: 'Afiliados', icon: 'mdi:account-cash-outline', to: '/affiliates', name: 'affiliates' },
+            { label: 'Configuração', icon: 'mdi:tune-variant', to: '/affiliates/config', name: 'affiliate-config' },
+            { label: 'Comissões', icon: 'mdi:percent-outline', to: '/affiliates/commissions', name: 'affiliate-commissions' },
+            { label: 'Pagamentos', icon: 'mdi:cash-fast', to: '/affiliates/payouts', name: 'affiliate-payouts' },
+        ],
+    },
+    {
+        label: 'Marketing',
+        icon: 'mdi:bullhorn-outline',
+        key: 'marketing',
+        items: [
+            { label: 'Cupons', icon: 'mdi:ticket-percent-outline', to: '/coupons', name: 'coupons' },
+            { label: 'Novidades', icon: 'mdi:bullhorn-outline', to: '/news', name: 'news' },
+            { label: 'WhatsApp Blast', icon: 'mdi:whatsapp', to: '/whatsapp/blast', name: 'whatsapp-blast' },
+            { label: 'Recomendações', icon: 'mdi:star-shooting-outline', to: '/recommendations', name: 'recommendations' },
+            { label: 'Discord', icon: 'mdi:discord', to: '/discord', name: 'discord' },
+        ],
+    },
+    {
+        label: 'Relatórios',
+        icon: 'mdi:file-chart-outline',
+        key: 'relatorios',
+        items: [
+            { label: 'Relatórios', icon: 'mdi:file-chart-outline', to: '/reports', name: 'reports' },
+            { label: 'Histórico', icon: 'mdi:history', to: '/historico', name: 'historico' },
+        ],
+    },
+    {
+        label: 'Sistema',
+        icon: 'mdi:cog-outline',
+        key: 'sistema',
+        items: [
+            { label: 'Teste Upload', icon: 'mdi:cloud-upload-outline', to: '/uploads/test', name: 'upload-test' },
+        ],
+    },
 ]
 
-type NavItem = typeof navItems[0]
+const allItems = navGroups.flatMap((group) => group.items)
 
-const orderedItems = ref<NavItem[]>([...navItems])
-const dragIndex = ref<number | null>(null)
-const dragOverIndex = ref<number | null>(null)
+// Rota ativa = item de rota mais específica que casa com o path. Resolve /sales vs
+// /sales/summary sem flag manual, e deixa /sales/123 acender "Vendas".
+const activeItemName = computed(() => {
+    const path = route.path
+    if (path === '/') return dashboard.name
 
-const parseSavedOrder = (raw: string): string[] => {
-    try {
-        const parsed = JSON.parse(raw)
-        return Array.isArray(parsed) ? parsed : []
-    } catch {
-        return []
-    }
+    const matches = allItems.filter(
+        (item) => path === item.to || path.startsWith(`${item.to}/`),
+    )
+    if (!matches.length) return null
+
+    return matches.reduce((best, item) => (item.to.length > best.to.length ? item : best)).name
+})
+
+const activeGroupKey = computed(
+    () =>
+        navGroups.find((group) =>
+            group.items.some((item) => item.name === activeItemName.value),
+        )?.key ?? null,
+)
+
+const openGroups = ref<Record<string, boolean>>({})
+
+// Recolhida não tem largura pra cabeçalho: mostra todos os ícones direto.
+const isGroupOpen = (key: string) => !expanded.value || openGroups.value[key] === true
+
+const persistOpenGroups = () => {
+    localStorage.setItem(OPEN_GROUPS_STORAGE_KEY, JSON.stringify(openGroups.value))
 }
 
-const sortBySavedOrder = (savedNames: string[]): NavItem[] => {
-    const rank = (name: string) => {
-        const index = savedNames.indexOf(name)
-        return index === -1 ? Number.MAX_SAFE_INTEGER : index
-    }
-    return [...navItems].sort((a, b) => rank(a.name) - rank(b.name))
+const toggleGroup = (key: string) => {
+    openGroups.value = { ...openGroups.value, [key]: !openGroups.value[key] }
+    persistOpenGroups()
 }
 
-const loadOrder = () => {
-    const raw = localStorage.getItem(NAV_ORDER_STORAGE_KEY)
+const loadOpenGroups = () => {
+    const raw = localStorage.getItem(OPEN_GROUPS_STORAGE_KEY)
     if (!raw) return
 
-    const savedNames = parseSavedOrder(raw)
-    if (!savedNames.length) return
-
-    orderedItems.value = sortBySavedOrder(savedNames)
+    try {
+        const parsed = JSON.parse(raw)
+        if (parsed && typeof parsed === 'object') openGroups.value = parsed
+    } catch {
+        // preferência corrompida: começa do zero, sem quebrar o menu
+    }
 }
 
-const persistOrder = () => {
-    const names = orderedItems.value.map(item => item.name)
-    localStorage.setItem(NAV_ORDER_STORAGE_KEY, JSON.stringify(names))
-}
+const openActiveGroup = () => {
+    const key = activeGroupKey.value
+    if (!key) return
+    if (openGroups.value[key]) return
 
-const onDragStart = (index: number) => {
-    dragIndex.value = index
-}
-
-const onDragEnter = (index: number) => {
-    dragOverIndex.value = index
-}
-
-const onDragEnd = () => {
-    dragIndex.value = null
-    dragOverIndex.value = null
-}
-
-const onDrop = (index: number) => {
-    const from = dragIndex.value
-    onDragEnd()
-    if (from === null) return
-    if (from === index) return
-
-    const items = [...orderedItems.value]
-    const [moved] = items.splice(from, 1)
-    if (!moved) return
-
-    items.splice(index, 0, moved)
-
-    orderedItems.value = items
-    persistOrder()
-}
-
-const isActive = (item: NavItem) => {
-    if (item.name === 'dashboard') return route.path === '/'
-    if ((item as any).exact) return route.path === item.to || route.path === item.to + '/'
-    return route.path.startsWith(item.to)
+    openGroups.value = { ...openGroups.value, [key]: true }
 }
 
 const logout = async () => {
@@ -123,52 +191,76 @@ const logout = async () => {
     router.push('/login')
 }
 
-onMounted(loadOrder)
+watch(activeGroupKey, openActiveGroup)
+
+onMounted(() => {
+    loadOpenGroups()
+    openActiveGroup()
+})
 </script>
 
 <template>
     <div class="admin-shell">
-        <aside class="admin-sidebar" :class="{ collapsed: !sidebarOpen }">
+        <aside class="admin-sidebar" :class="{ collapsed: !expanded }">
             <div class="sidebar-header">
-                <span v-if="sidebarOpen" class="sidebar-brand">SecretShop<span class="brand-accent">ADM</span></span>
+                <span v-if="expanded" class="sidebar-brand">SecretShop<span class="brand-accent">ADM</span></span>
                 <button class="sidebar-toggle" @click="sidebarOpen = !sidebarOpen">
-                    <Icon :icon="sidebarOpen ? 'mdi:chevron-left' : 'mdi:chevron-right'" />
+                    <Icon :icon="expanded ? 'mdi:chevron-left' : 'mdi:chevron-right'" />
                 </button>
             </div>
 
             <nav class="sidebar-nav">
                 <router-link
-                    v-for="(item, index) in orderedItems"
-                    :key="item.name"
-                    :to="item.to"
+                    :to="dashboard.to"
                     class="nav-item"
-                    :class="{
-                        active: isActive(item),
-                        dragging: dragIndex === index,
-                        'drag-over': dragOverIndex === index && dragIndex !== index,
-                    }"
-                    draggable="true"
-                    @dragstart="onDragStart(index)"
-                    @dragenter.prevent="onDragEnter(index)"
-                    @dragover.prevent
-                    @drop.prevent="onDrop(index)"
-                    @dragend="onDragEnd"
+                    :class="{ active: activeItemName === dashboard.name }"
+                    :title="expanded ? undefined : dashboard.label"
                 >
-                    <Icon icon="mdi:drag-vertical" class="nav-drag-handle" />
-                    <Icon :icon="item.icon" class="nav-icon" />
-                    <span v-if="sidebarOpen" class="nav-label">{{ item.label }}</span>
+                    <Icon :icon="dashboard.icon" class="nav-icon" />
+                    <span v-if="expanded" class="nav-label">{{ dashboard.label }}</span>
                 </router-link>
+
+                <div v-for="group in navGroups" :key="group.key" class="nav-group">
+                    <button
+                        v-if="expanded"
+                        class="nav-group-header"
+                        :class="{ 'has-active': activeGroupKey === group.key }"
+                        @click="toggleGroup(group.key)"
+                    >
+                        <Icon :icon="group.icon" class="nav-icon" />
+                        <span class="nav-label">{{ group.label }}</span>
+                        <Icon
+                            icon="mdi:chevron-down"
+                            class="nav-chevron"
+                            :class="{ open: isGroupOpen(group.key) }"
+                        />
+                    </button>
+
+                    <div v-if="isGroupOpen(group.key)" class="nav-group-items">
+                        <router-link
+                            v-for="item in group.items"
+                            :key="item.name"
+                            :to="item.to"
+                            class="nav-item nav-item--child"
+                            :class="{ active: activeItemName === item.name }"
+                            :title="expanded ? undefined : item.label"
+                        >
+                            <Icon :icon="item.icon" class="nav-icon" />
+                            <span v-if="expanded" class="nav-label">{{ item.label }}</span>
+                        </router-link>
+                    </div>
+                </div>
             </nav>
 
             <div class="sidebar-footer">
-                <div class="user-info" v-if="sidebarOpen && authStore.user">
+                <div class="user-info" v-if="expanded && authStore.user">
                     <img v-if="authStore.user.avatar" :src="authStore.user.avatar" class="user-avatar" alt="" />
                     <div v-else class="user-avatar-placeholder"><Icon icon="mdi:account" /></div>
                     <span class="user-name">{{ authStore.user.username }}</span>
                 </div>
                 <button class="nav-item nav-item--logout" @click="logout">
                     <Icon icon="mdi:logout" class="nav-icon" />
-                    <span v-if="sidebarOpen" class="nav-label">Sair</span>
+                    <span v-if="expanded" class="nav-label">Sair</span>
                 </button>
             </div>
         </aside>
@@ -187,8 +279,8 @@ onMounted(loadOrder)
     color #fff
 
 .admin-sidebar
-    width 220px
-    min-width 220px
+    width 230px
+    min-width 230px
     background #0e0e10
     border-right 1px solid rgba(255,255,255,0.05)
     display flex
@@ -203,9 +295,6 @@ onMounted(loadOrder)
     &.collapsed
         width 60px
         min-width 60px
-
-        .nav-drag-handle
-            display none
 
 .sidebar-header
     display flex
@@ -242,8 +331,48 @@ onMounted(loadOrder)
 
 .sidebar-nav
     flex 1
-    padding 0.75rem 0
+    padding 0.5rem 0
     overflow-y auto
+
+.nav-group
+    border-top 1px solid rgba(255,255,255,0.03)
+    margin-top 0.25rem
+    padding-top 0.25rem
+
+.nav-group-header
+    display flex
+    align-items center
+    gap 0.75rem
+    width 100%
+    padding 0.6rem 1rem
+    background transparent
+    border none
+    color #64748b
+    font-size 0.72rem
+    font-weight 600
+    text-transform uppercase
+    letter-spacing 0.05em
+    cursor pointer
+    white-space nowrap
+    transition color 0.15s
+
+    &:hover
+        color #cbd5e1
+
+    &.has-active
+        color #cbd5e1
+
+    .nav-icon
+        font-size 1.05rem
+
+.nav-chevron
+    margin-left auto
+    font-size 1rem
+    flex-shrink 0
+    transition transform 0.15s
+
+    &.open
+        transform rotate(180deg)
 
 .sidebar-footer
     padding 0.75rem 0
@@ -285,7 +414,7 @@ onMounted(loadOrder)
     display flex
     align-items center
     gap 0.75rem
-    padding 0.7rem 1rem
+    padding 0.65rem 1rem
     color #94a3b8
     text-decoration none
     font-size 0.875rem
@@ -309,14 +438,9 @@ onMounted(loadOrder)
         background rgba(99, 102, 241, 0.08)
         border-left-color #6366f1
 
-    &.dragging
-        opacity 0.4
-
-    &.drag-over
-        border-top 2px solid #6366f1
-
-    &:hover .nav-drag-handle
-        opacity 1
+    &--child
+        padding-left 1.75rem
+        font-size 0.84rem
 
     &--logout
         color #64748b
@@ -324,17 +448,6 @@ onMounted(loadOrder)
         &:hover
             color #f44336
             background rgba(244,67,54,0.06)
-
-.nav-drag-handle
-    font-size 1rem
-    flex-shrink 0
-    color #475569
-    cursor grab
-    opacity 0
-    transition opacity 0.15s
-
-    &:active
-        cursor grabbing
 
 .nav-icon
     font-size 1.25rem
@@ -349,11 +462,22 @@ onMounted(loadOrder)
     min-width 0
     overflow auto
 
+.admin-sidebar.collapsed
+    .nav-item--child
+        padding-left 1rem
+
+    .nav-group
+        margin-top 0.35rem
+        padding-top 0.35rem
+
 @media (max-width: 768px)
     .admin-sidebar
         width 60px
         min-width 60px
 
-        .nav-label, .sidebar-brand, .user-info, .nav-drag-handle
+        .nav-label, .sidebar-brand, .user-info
             display none
+
+        .nav-item--child
+            padding-left 1rem
 </style>

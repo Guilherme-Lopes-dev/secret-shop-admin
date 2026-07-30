@@ -20,6 +20,15 @@ const points = computed(() => result.value?.points ?? [])
 const recentFirst = computed(() => [...points.value].reverse())
 const units = computed(() => result.value?.units ?? [])
 
+// preço atual = último ponto registrado (catálogo, com fallback pro mediano)
+const currentPrice = computed(() => {
+    const latest = points.value[points.value.length - 1]
+    return latest?.manual_price ?? latest?.median_price ?? null
+})
+const estimatedEntryCost = computed(() =>
+    currentPrice.value == null ? null : Math.round(currentPrice.value * 0.6),
+)
+
 const formatCurrencyOrDash = (v: number | null) => (v == null ? '—' : formatCurrency(v))
 const formatDateOrDash = (v: string | null) => (v == null ? '—' : dayjs(v).format('DD/MM/YYYY'))
 const formatPctOrDash = (v: number | null) => (v == null ? '—' : `${v > 0 ? '+' : ''}${v.toFixed(1)}%`)
@@ -30,16 +39,50 @@ const previewImageUrl = (hash: string | null) => {
     return `https://steamcommunity-a.akamaihd.net/economy/image/${hash}/184fx184f`
 }
 
-// latest_10_sales não tem shape documentado pelo steamwebapi — lista os campos crus
-// que vierem, em vez de assumir nomes que podem não bater com a resposta real.
-const saleEntries = (sale: unknown): [string, unknown][] => {
-    if (!sale || typeof sale !== 'object') return [['valor', sale]]
-    return Object.entries(sale as Record<string, unknown>)
+// latest_10_sales não tem shape documentado pelo steamwebapi — as colunas saem das
+// chaves que vierem, em vez de assumir nomes que podem não bater com a resposta real.
+const SALE_LABELS: Record<string, string> = {
+    price: 'Preço',
+    pricelatest: 'Preço',
+    date: 'Data',
+    time: 'Data',
+    created_at: 'Data',
+    sold_at: 'Data',
+    name: 'Item',
+    market_hash_name: 'Item',
+    markethashname: 'Item',
+    quantity: 'Qtd',
+    amount: 'Qtd',
+    currency: 'Moeda',
+    valor: 'Valor',
 }
-const formatSaleValue = (v: unknown): string => {
-    if (v == null) return '—'
-    if (typeof v === 'object') return JSON.stringify(v)
-    return String(v)
+
+const sales = computed(() =>
+    (skin.value?.latest_10_sales ?? []).map(s =>
+        s && typeof s === 'object' ? (s as Record<string, unknown>) : { valor: s },
+    ),
+)
+const saleColumns = computed(() => [...new Set(sales.value.flatMap(Object.keys))])
+
+const saleLabel = (key: string) => SALE_LABELS[key.toLowerCase()] ?? key.replace(/_/g, ' ')
+const isPriceKey = (key: string) => /price|preco|valor|value|total/i.test(key)
+const isDateKey = (key: string) => /date|time|_at$/i.test(key)
+
+const parseSaleDate = (value: string | number) => {
+    if (typeof value !== 'number') return dayjs(value)
+    return dayjs.unix(value > 1e12 ? value / 1000 : value)
+}
+
+const formatSaleCell = (key: string, value: unknown): string => {
+    if (value == null || value === '') return '—'
+    if (typeof value === 'object') return JSON.stringify(value)
+    // preços crus do steamwebapi vêm em unidade decimal, não em centavos
+    if (isPriceKey(key) && typeof value === 'number') return formatCurrency(value * 100)
+    if (isDateKey(key) && (typeof value === 'string' || typeof value === 'number')) {
+        const parsed = parseSaleDate(value)
+        return parsed.isValid() ? parsed.format('DD/MM/YYYY HH:mm') : String(value)
+    }
+    return String(value)
 }
 
 const renderChart = () => {
@@ -192,7 +235,8 @@ onUnmounted(() => chartInstance?.destroy())
                                 <th>Bot</th>
                                 <th>Entrada</th>
                                 <th>Saída</th>
-                                <th>Custo pago</th>
+                                <th>Custo pago (entrada)</th>
+                                <th class="col-estimated">Custo estimado de entrada</th>
                                 <th>Preço mercado (entrada)</th>
                                 <th>Preço mercado (saída)</th>
                                 <th>Var. mercado</th>
@@ -206,6 +250,7 @@ onUnmounted(() => chartInstance?.destroy())
                                 <td>{{ formatDateOrDash(u.entered_at) }}</td>
                                 <td>{{ u.exited_at ? formatDateOrDash(u.exited_at) : (u.is_sold ? 'Vendida' : 'Ativa') }}</td>
                                 <td class="price">{{ formatCurrencyOrDash(u.cost_price) }}</td>
+                                <td class="price col-estimated">{{ formatCurrencyOrDash(estimatedEntryCost) }}</td>
                                 <td class="price">{{ formatCurrencyOrDash(u.entry_market_price) }}</td>
                                 <td class="price">{{ formatCurrencyOrDash(u.exit_market_price) }}</td>
                                 <td :class="pctClass(u.market_variation_pct)">{{ formatPctOrDash(u.market_variation_pct) }}</td>
@@ -217,16 +262,29 @@ onUnmounted(() => chartInstance?.destroy())
                 </div>
             </div>
 
-            <div v-if="skin.latest_10_sales?.length" class="section sales-section">
-                <h2 class="section-title">Últimas vendas registradas</h2>
-                <div class="sales-list">
-                    <div v-for="(sale, i) in skin.latest_10_sales" :key="i" class="sale-row">
-                        <span class="sale-index">#{{ i + 1 }}</span>
-                        <span v-for="[key, value] in saleEntries(sale)" :key="key" class="sale-field">
-                            <span class="sale-field-label">{{ key }}</span>
-                            <span class="sale-field-value">{{ formatSaleValue(value) }}</span>
-                        </span>
-                    </div>
+            <div v-if="sales.length > 0" class="section">
+                <h2 class="section-title">Últimas vendas registradas (Steam)</h2>
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th class="col-index">#</th>
+                                <th v-for="key in saleColumns" :key="key">{{ saleLabel(key) }}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="(sale, i) in sales" :key="i">
+                                <td class="col-index">{{ i + 1 }}</td>
+                                <td
+                                    v-for="key in saleColumns"
+                                    :key="key"
+                                    :class="{ price: isPriceKey(key) }"
+                                >
+                                    {{ formatSaleCell(key, sale[key]) }}
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </template>
@@ -377,6 +435,9 @@ table
         &.col-avg
             color #22d3ee
 
+        &.col-estimated
+            color #fbbf24
+
         &.col-avg-24h
             color #38bdf8
 
@@ -397,39 +458,8 @@ table
             font-weight 600
             color #f87171
 
-.sales-list
-    display flex
-    flex-direction column
-    gap 0.5rem
-
-.sale-row
-    display flex
-    align-items center
-    flex-wrap wrap
-    gap 0.75rem
-    padding 0.6rem 0.75rem
-    background rgba(255,255,255,0.03)
-    border-radius 8px
-    border 1px solid rgba(255,255,255,0.05)
-
-.sale-index
-    font-size 0.75rem
-    font-weight 700
+.col-index
+    width 2.5rem
     color #64748b
-    min-width 1.75rem
-
-.sale-field
-    display flex
-    align-items baseline
-    gap 0.3rem
-
-.sale-field-label
-    font-size 0.68rem
-    text-transform uppercase
-    color #64748b
-
-.sale-field-value
-    font-size 0.82rem
     font-weight 600
-    color #cbd5e1
 </style>

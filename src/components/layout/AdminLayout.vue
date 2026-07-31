@@ -53,6 +53,7 @@ const navGroups: NavGroup[] = [
             { label: 'Inventário', icon: 'mdi:sword', to: '/inventory', name: 'inventory' },
             { label: 'Collectors', icon: 'mdi:trophy-outline', to: '/collectors', name: 'collectors' },
             { label: 'Catálogo Collectors', icon: 'mdi:trophy-variant-outline', to: '/collectors/catalog', name: 'collectors-catalog' },
+            { label: 'Preços por Set', icon: 'mdi:treasure-chest', to: '/collectors/sets', name: 'collectors-sets' },
             { label: 'Produtos Físicos', icon: 'mdi:trophy-award', to: '/physical-products', name: 'physical-products' },
         ],
     },

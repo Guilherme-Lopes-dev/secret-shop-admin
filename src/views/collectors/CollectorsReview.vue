@@ -21,10 +21,18 @@ const items = ref<CollectorInventoryItem[]>([])
 const priceInputs = ref<Record<string, string>>({})
 const heroSelects = ref<Record<string, string>>({})
 const heroes = ref<DotaHero[]>([])
+/** market_hash_name -> herói definido no catálogo de sets. É o que o import herda. */
+const setHeroByName = ref<Record<string, string>>({})
 const isSubmitting = ref(false)
 const submitError = ref<string | null>(null)
 const submitProgress = ref<{ current: number; total: number } | null>(null)
-const submitSummary = ref<{ created: number; updated: number; remaining: number } | null>(null)
+const submitSummary = ref<{
+    created: number
+    updated: number
+    remaining: number
+    skipped: number
+    skippedNames: string[]
+} | null>(null)
 
 const CHUNK_SIZE = 200
 
@@ -38,6 +46,10 @@ const pricePreview = (value: string): string => {
     const cents = parseCents(value)
     return cents ? formatCurrency(cents) : ''
 }
+
+/** Herói que o backend vai aplicar sozinho se ninguém escolher nada. */
+const inheritedHero = (item: CollectorInventoryItem): string | null =>
+    setHeroByName.value[item.marketHashName] ?? null
 
 const totalEnteredCents = computed(() =>
     items.value.reduce((sum, item) => {
@@ -90,7 +102,7 @@ async function submit() {
 
     submitProgress.value = { current: 0, total: chunks.length }
 
-    const summary = { created: 0, updated: 0 }
+    const summary = { created: 0, updated: 0, skipped: 0, skippedNames: [] as string[] }
     let savedCount = 0
 
     try {
@@ -103,6 +115,10 @@ async function submit() {
             })
             summary.created += data.created
             summary.updated += data.updated
+            summary.skipped += data.skipped ?? 0
+            summary.skippedNames = [
+                ...new Set([...summary.skippedNames, ...(data.skippedNames ?? [])]),
+            ]
             savedCount += chunk.length
         }
         clearCollectorReviewSelection()
@@ -155,12 +171,18 @@ function goBack() {
 }
 
 onMounted(async () => {
-    const [selection, fetchedHeroes] = await Promise.all([
+    const [selection, fetchedHeroes, fetchedSets] = await Promise.all([
         Promise.resolve(readCollectorReviewSelection()),
         adminService.getDotaHeroes().then((r) => (r as any).data ?? r).catch(() => [] as DotaHero[]),
+        adminService.getItemSets().then((r) => r.data).catch(() => []),
     ])
 
     heroes.value = fetchedHeroes
+    setHeroByName.value = Object.fromEntries(
+        fetchedSets
+            .filter((s) => s.hero_name)
+            .map((s) => [s.market_hash_name, s.hero_name as string]),
+    )
 
     if (!selection) {
         return
@@ -240,6 +262,12 @@ onMounted(async () => {
                 <template v-else-if="submitSummary.updated > 0">
                     — itens já existentes nesta conta tiveram preço e herói sobrescritos.
                 </template>
+                <template v-if="submitSummary.skipped > 0">
+                    <br />
+                    <strong>{{ submitSummary.skipped }}</strong> item(ns) descartado(s) por não
+                    estarem no catálogo de sets:
+                    <em>{{ submitSummary.skippedNames.join(', ') }}</em>
+                </template>
             </span>
         </div>
 
@@ -297,7 +325,9 @@ onMounted(async () => {
                                     class="field-input field-select"
                                     @change="updateHero(item, ($event.target as HTMLSelectElement).value)"
                                 >
-                                    <option value="">Selecionar herói</option>
+                                    <option value="">
+                                        {{ inheritedHero(item) ? `Automático — ${inheritedHero(item)}` : 'Selecionar herói' }}
+                                    </option>
                                     <option
                                         v-for="hero in heroes"
                                         :key="hero.uuid"
@@ -309,6 +339,10 @@ onMounted(async () => {
                                     class="field-preview"
                                 >
                                     Herói <strong>{{ heroes.find(h => h.slug === heroSelects[getCollectorItemKey(item)])?.name }}</strong> selecionado
+                                </span>
+                                <span v-else-if="inheritedHero(item)" class="field-preview field-preview--auto">
+                                    <Icon icon="mdi:auto-fix" />
+                                    <strong>{{ inheritedHero(item) }}</strong> vem do catálogo de sets
                                 </span>
                                 <span v-else class="field-hint">Selecione o herói desta skin</span>
                             </td>
@@ -554,6 +588,16 @@ tr:hover td
 
     strong
         font-weight 700
+
+    // Herói/preço que o backend aplica sozinho a partir de dota_item_sets.
+    &--auto
+        display flex
+        align-items center
+        gap 0.25rem
+        color #94a3b8
+
+        strong
+            color #cbd5e1
 
 .field-hint
     display block

@@ -27,6 +27,26 @@ import type {
 const collectorNotificationTypes = 'COLLECTOR_PURCHASE,COLLECTOR_SHIPPING_REMINDER'
 const dropshipNotificationTypes = 'DROPSHIP_PURCHASE'
 
+/** Set de Collector's Cache / Heroes' Hoard + estoque atual desse set. */
+export interface ItemSet {
+  defindex: string
+  market_hash_name: string
+  set_name: string
+  cache_id: string
+  cache_name: string
+  treasure_type: string
+  year: number
+  rarity: string
+  price: number | null
+  hero_name: string | null
+  hero_slug: string | null
+  hero_image: string | null
+  /** Linhas em collectors (1 linha = 1 unidade de 1 bot). */
+  rows: number
+  total: number
+  available: number
+}
+
 export const adminService = {
   async getSalesStats() {
     return api.get('/dashboard/stats')
@@ -368,6 +388,32 @@ export const adminService = {
     return api.patch(`/admin/notifications/${id}/read`)
   },
 
+  /**
+   * Import automático: um request só. O backend lê o inventário Steam, filtra
+   * pelo catálogo de sets e insere com preço/herói herdados.
+   * Timeout alto porque o inventário do Steam pagina.
+   */
+  async importCollectorsFromSteam(steamId: string, botId?: number | null) {
+    return api.post<{
+      scanned: number
+      totalInventoryCount: number
+      upserted: number
+      created: number
+      updated: number
+      skipped: number
+      skippedNames: string[]
+    }>(`/collectors/admin/import/${steamId}`, { botId: botId ?? null }, { timeout: 180_000 })
+  },
+
+  // Item sets (catálogo de Collector's Cache — allowlist do import + preço por set)
+  async getItemSets() {
+    return api.get<ItemSet[]>('/item-sets/admin')
+  },
+
+  async updateItemSetPrices(items: Array<{ defindex: string; price: number }>) {
+    return api.patch<{ sets: number; collectors: number }>('/item-sets/admin/prices', { items })
+  },
+
   // Collectors catalog
   async getCollectors(params: {
     page?: number
@@ -389,13 +435,9 @@ export const adminService = {
     return api.get(`/collectors/admin?${p}`)
   },
 
-  async updateCollectorPrice(uuid: string, price: number | null) {
-    return api.patch(`/collectors/admin/${uuid}/price`, { price })
-  },
-
-  async updateCollectorHero(uuid: string, heroSlug: string | null) {
-    return api.patch(`/collectors/admin/${uuid}/hero`, { heroSlug })
-  },
+  // Preço e herói não têm edição por linha: vivem em dota_item_sets e são
+  // propagados por PATCH /item-sets/admin/prices. Editar por unidade quebrava o
+  // agrupamento da vitrine (market_hash_name + hero_id) e divergia preço.
 
   async deleteCollector(uuid: string) {
     return api.delete(`/collectors/admin/${uuid}`)
@@ -422,10 +464,14 @@ export const adminService = {
       heroSlug?: string
     }>
   }) {
-    return api.post<{ upserted: number; created: number; updated: number }>(
-      '/collectors/admin/bulk',
-      payload,
-    )
+    return api.post<{
+      upserted: number
+      created: number
+      updated: number
+      /** Descartados por não estarem em dota_item_sets. */
+      skipped: number
+      skippedNames: string[]
+    }>('/collectors/admin/bulk', payload)
   },
 
   // Dota Heroes

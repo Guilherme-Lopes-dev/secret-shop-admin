@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
+import { RouterLink } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import { toast } from 'vue3-toastify'
 import { adminService } from '@/services/admin/admin.service'
@@ -41,24 +42,10 @@ const maxPriceInput = ref('')
 const noPriceOnly = ref(false)
 const noHeroOnly = ref(false)
 
-const bulkPriceInput = ref('')
-const bulkSaving = ref(false)
-
-const bulkHeroSlug = ref('')
-const bulkHeroSaving = ref(false)
-
-const heroes = ref<DotaHero[]>([])
-const heroValues = ref<Record<string, string>>({})
-const heroSavingKeys = ref<Set<string>>(new Set())
-
-const editingValues = ref<Record<string, string>>({})
-const savingKeys = ref<Set<string>>(new Set())
 const deletingUuid = ref<string | null>(null)
 const confirmDeleteUuid = ref<string | null>(null)
 
 const itemKey = (item: CollectorItem) => `${item.steam_id}__${item.asset_id}`
-const isEditing = (item: CollectorItem) => itemKey(item) in editingValues.value
-const isSaving = (item: CollectorItem) => savingKeys.value.has(itemKey(item))
 
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / limit.value)))
 
@@ -85,47 +72,10 @@ async function load() {
             bot_id: item.bot_id != null ? Number(item.bot_id) : null,
         }))
         total.value = data.total ?? 0
-        heroValues.value = {}
-        for (const item of items.value) {
-            heroValues.value[itemKey(item)] = item.dota_heroes?.slug ?? ''
-        }
     } catch {
         toast.error('Erro ao carregar collectors.')
     } finally {
         loading.value = false
-    }
-}
-
-function startEdit(item: CollectorItem) {
-    editingValues.value[itemKey(item)] = item.price != null ? String(item.price) : ''
-}
-
-function cancelEdit(item: CollectorItem) {
-    delete editingValues.value[itemKey(item)]
-}
-
-async function savePrice(item: CollectorItem) {
-    const key = itemKey(item)
-    const raw = (editingValues.value[key] ?? '').trim()
-    const price = raw === '' ? null : parseInt(raw, 10)
-
-    if (raw !== '' && (isNaN(price!) || price! < 0)) {
-        toast.error('Preço inválido.')
-        return
-    }
-
-    savingKeys.value = new Set([...savingKeys.value, key])
-    try {
-        await adminService.updateCollectorPrice(item.id, price)
-        item.price = price
-        toast.success('Preço atualizado.')
-        delete editingValues.value[key]
-    } catch {
-        toast.error('Erro ao salvar preço.')
-    } finally {
-        const next = new Set(savingKeys.value)
-        next.delete(key)
-        savingKeys.value = next
     }
 }
 
@@ -152,72 +102,6 @@ async function confirmDelete(uuid: string) {
     }
 }
 
-async function saveHero(item: CollectorItem) {
-    const key = itemKey(item)
-    const slug = heroValues.value[key] || null
-    heroSavingKeys.value = new Set([...heroSavingKeys.value, key])
-    try {
-        await adminService.updateCollectorHero(item.id, slug)
-        toast.success('Hero atualizado.')
-    } catch {
-        toast.error('Erro ao salvar hero.')
-    } finally {
-        const next = new Set(heroSavingKeys.value)
-        next.delete(key)
-        heroSavingKeys.value = next
-    }
-}
-
-async function bulkApplyHero() {
-    const slug = bulkHeroSlug.value || null
-    bulkHeroSaving.value = true
-    try {
-        const results = await Promise.allSettled(
-            items.value.map((item, idx) =>
-                adminService.updateCollectorHero(item.id, slug).then(() => {
-                    if (items.value[idx]) {
-                        heroValues.value[itemKey(items.value[idx]!)] = slug ?? ''
-                    }
-                })
-            )
-        )
-        const ok = results.filter(r => r.status === 'fulfilled').length
-        const fail = results.filter(r => r.status === 'rejected').length
-        if (ok > 0) toast.success(`Hero aplicado em ${ok} iten${ok !== 1 ? 's' : ''}.`)
-        if (fail > 0) toast.error(`${fail} iten${fail !== 1 ? 's' : ''} falharam.`)
-    } finally {
-        bulkHeroSaving.value = false
-    }
-}
-
-async function bulkApplyPrice() {
-    const raw = String(bulkPriceInput.value ?? '').trim()
-    const price = parseInt(raw, 10)
-    if (!raw || isNaN(price) || price < 0) {
-        toast.error('Preço inválido.')
-        return
-    }
-    bulkSaving.value = true
-    try {
-        const results = await Promise.allSettled(
-            items.value.map((item, idx) =>
-                adminService.updateCollectorPrice(item.id, price).then(() => {
-                    if (items.value[idx]) items.value[idx]!.price = price
-                })
-            )
-        )
-        const ok = results.filter(r => r.status === 'fulfilled').length
-        const fail = results.filter(r => r.status === 'rejected').length
-        if (ok > 0) {
-            toast.success(`Preço aplicado em ${ok} iten${ok !== 1 ? 's' : ''}.`)
-            bulkPriceInput.value = ''
-        }
-        if (fail > 0) toast.error(`${fail} iten${fail !== 1 ? 's' : ''} falharam.`)
-    } finally {
-        bulkSaving.value = false
-    }
-}
-
 function applyFilters() {
     page.value = 1
     load()
@@ -232,15 +116,7 @@ watch([search, steamIdFilter], ([searchValue, steamIdValue], [previousSearch, pr
     applyFilters()
 })
 
-onMounted(async () => {
-    try {
-        const res = await adminService.getDotaHeroes()
-        heroes.value = ((res as any).data ?? res) as DotaHero[]
-    } catch {
-        toast.error('Erro ao carregar heróis.')
-    }
-    load()
-})
+onMounted(load)
 </script>
 
 <template>
@@ -318,46 +194,15 @@ onMounted(async () => {
             </div>
 
             <div class="bulk-price-row">
-                <Icon icon="mdi:tag-multiple-outline" class="bulk-icon" />
-                <span class="bulk-label">Preço em bulk:</span>
-                <input
-                    v-model="bulkPriceInput"
-                    type="number"
-                    min="0"
-                    placeholder="centavos"
-                    class="price-input price-input--sm"
-                    @keyup.enter="bulkApplyPrice"
-                />
-                <span v-if="bulkPriceInput && !isNaN(parseInt(bulkPriceInput, 10))" class="bulk-preview">
-                    {{ formatCurrency(parseInt(bulkPriceInput, 10)) }}
+                <Icon icon="mdi:information-outline" class="bulk-icon" />
+                <span class="readonly-note">
+                    Preço e herói são definidos por <strong>set</strong>, não por unidade — esta tela
+                    é só consulta.
                 </span>
-                <button
-                    class="btn-primary btn-primary--bulk"
-                    :disabled="bulkSaving || !bulkPriceInput || items.length === 0"
-                    @click="bulkApplyPrice"
-                >
-                    <Icon :icon="bulkSaving ? 'mdi:loading' : 'mdi:tag-check-outline'" :class="{ spinning: bulkSaving }" />
-                    Aplicar em {{ items.length }} iten{{ items.length !== 1 ? 's' : '' }}
-                </button>
-            </div>
-
-            <div class="bulk-price-row">
-                <Icon icon="mdi:sword" class="bulk-icon" />
-                <span class="bulk-label">Hero em bulk:</span>
-                <select v-model="bulkHeroSlug" class="hero-select hero-select--bulk">
-                    <option value="">— sem hero —</option>
-                    <option v-for="hero in heroes" :key="hero.id" :value="hero.slug">
-                        {{ hero.name }}
-                    </option>
-                </select>
-                <button
-                    class="btn-primary btn-primary--bulk-hero"
-                    :disabled="bulkHeroSaving || items.length === 0"
-                    @click="bulkApplyHero"
-                >
-                    <Icon :icon="bulkHeroSaving ? 'mdi:loading' : 'mdi:sword-cross'" :class="{ spinning: bulkHeroSaving }" />
-                    Aplicar em {{ items.length }} iten{{ items.length !== 1 ? 's' : '' }}
-                </button>
+                <RouterLink to="/collectors/sets" class="btn-primary btn-primary--bulk">
+                    <Icon icon="mdi:treasure-chest" />
+                    Ir para Preços por Set
+                </RouterLink>
             </div>
 
             <p class="results-meta" v-if="!loading">
@@ -420,62 +265,21 @@ onMounted(async () => {
                                     </div>
                                 </td>
                                 <td class="hero-cell">
-                                    <div class="hero-select-wrap">
-                                        <select
-                                            v-model="heroValues[itemKey(item)]"
-                                            class="hero-select"
-                                            :disabled="heroSavingKeys.has(itemKey(item))"
-                                            @change="saveHero(item)"
-                                        >
-                                            <option value="">— sem hero —</option>
-                                            <option v-for="hero in heroes" :key="hero.id" :value="hero.slug">
-                                                {{ hero.name }}
-                                            </option>
-                                        </select>
-                                        <Icon
-                                            v-if="heroSavingKeys.has(itemKey(item))"
-                                            icon="mdi:loading"
-                                            class="hero-saving spinning"
+                                    <div class="hero-readonly" v-if="item.dota_heroes">
+                                        <img
+                                            v-if="item.dota_heroes.image"
+                                            :src="item.dota_heroes.image"
+                                            :alt="item.dota_heroes.name"
+                                            class="hero-img"
                                         />
+                                        <span>{{ item.dota_heroes.name }}</span>
                                     </div>
+                                    <span class="price-empty" v-else>— sem hero —</span>
                                 </td>
                                 <td class="price-cell">
-                                    <template v-if="isEditing(item)">
-                                        <div class="price-edit-row">
-                                            <input
-                                                :value="editingValues[itemKey(item)]"
-                                                type="number"
-                                                min="0"
-                                                class="price-edit-input"
-                                                placeholder="centavos"
-                                                autofocus
-                                                @input="editingValues[itemKey(item)] = ($event.target as HTMLInputElement).value"
-                                                @keyup.enter="savePrice(item)"
-                                                @keyup.esc="cancelEdit(item)"
-                                            />
-                                            <button
-                                                class="btn-icon btn-icon--ok"
-                                                :disabled="isSaving(item)"
-                                                @click="savePrice(item)"
-                                            >
-                                                <Icon :icon="isSaving(item) ? 'mdi:loading' : 'mdi:check'" :class="{ spinning: isSaving(item) }" />
-                                            </button>
-                                            <button class="btn-icon btn-icon--cancel" @click="cancelEdit(item)">
-                                                <Icon icon="mdi:close" />
-                                            </button>
-                                        </div>
-                                        <small v-if="editingValues[itemKey(item)]" class="price-preview">
-                                            {{ formatCurrency(parseInt(editingValues[itemKey(item)]!, 10)) }}
-                                        </small>
-                                    </template>
-                                    <template v-else>
-                                        <button class="price-display" @click="startEdit(item)">
-                                            <span :class="item.price != null ? 'price-value' : 'price-empty'">
-                                                {{ item.price != null ? formatCurrency(item.price) : '— sem preço —' }}
-                                            </span>
-                                            <Icon icon="mdi:pencil-outline" class="price-edit-icon" />
-                                        </button>
-                                    </template>
+                                    <span :class="item.price != null ? 'price-value' : 'price-empty'">
+                                        {{ item.price != null ? formatCurrency(item.price) : '— sem preço —' }}
+                                    </span>
                                 </td>
                                 <td class="actions-col">
                                     <template v-if="confirmDeleteUuid === item.id">
@@ -673,33 +477,23 @@ onMounted(async () => {
     font-size 0.88rem
     white-space nowrap
 
-.bulk-preview
-    color #4ade80
-    font-size 0.82rem
-    font-weight 700
-    white-space nowrap
+.readonly-note
+    flex 1
+    min-width 240px
+    color #94a3b8
+    font-size 0.85rem
+    line-height 1.45
 
-.price-input--sm
-    width 160px
+    strong
+        color #cbd5e1
 
 .btn-primary--bulk
     background #f59e0b
     color #000
+    text-decoration none
 
     &:hover:not(:disabled)
         background #d97706
-
-.btn-primary--bulk-hero
-    background #6366f1
-    color #fff
-
-    &:hover:not(:disabled)
-        background #5457de
-
-.hero-select--bulk
-    max-width 220px
-    padding 0.62rem 0.75rem
-    font-size 0.88rem
 
 .results-meta
     margin-top 0.75rem
@@ -826,59 +620,21 @@ tr:hover td
 .hero-cell
     min-width 180px
 
-.hero-select-wrap
+.hero-readonly
     display flex
     align-items center
-    gap 0.4rem
+    gap 0.5rem
+    white-space nowrap
 
-.hero-select
-    background #121214
-    border 1px solid rgba(255,255,255,0.08)
-    border-radius 8px
-    color #fff
-    padding 0.45rem 0.6rem
-    font-size 0.82rem
-    outline none
-    cursor pointer
-    width 100%
-    max-width 180px
-
-    option
-        background #1a1a1e
-
-    &:focus
-        border-color rgba(99,102,241,0.45)
-
-    &:disabled
-        opacity 0.6
-        cursor not-allowed
-
-.hero-saving
-    font-size 1rem
-    color #6366f1
+.hero-img
+    width 28px
+    height 28px
+    border-radius 6px
+    object-fit cover
     flex-shrink 0
 
 .price-cell
-    min-width 200px
-
-.price-display
-    display inline-flex
-    align-items center
-    gap 0.4rem
-    background transparent
-    border 1px solid rgba(255,255,255,0.06)
-    border-radius 6px
-    padding 0.35rem 0.6rem
-    cursor pointer
-    transition all 0.15s
-    color inherit
-
-    &:hover
-        border-color rgba(99,102,241,0.4)
-        background rgba(99,102,241,0.05)
-
-        .price-edit-icon
-            opacity 1
+    min-width 140px
 
 .price-value
     font-weight 600
@@ -888,35 +644,6 @@ tr:hover td
     color #64748b
     font-style italic
     font-size 0.8rem
-
-.price-edit-icon
-    font-size 0.8rem
-    color #94a3b8
-    opacity 0
-    transition opacity 0.15s
-
-.price-edit-row
-    display flex
-    align-items center
-    gap 0.35rem
-
-.price-edit-input
-    width 110px
-    background #121214
-    border 1px solid rgba(99,102,241,0.4)
-    border-radius 6px
-    color #fff
-    padding 0.4rem 0.6rem
-    font-size 0.9rem
-    font-weight 600
-    color #4caf50
-    outline none
-
-.price-preview
-    display block
-    margin-top 0.3rem
-    font-size 0.75rem
-    color #4ade80
 
 .btn-icon
     display inline-flex

@@ -41,6 +41,16 @@ const selectedRarity = ref<Dota2Rarity | ''>('')
 const onlyMythicalBundles = ref(false)
 const onlyMythicalWearables = ref(false)
 const onlyNotTradable = ref(false)
+const autoImporting = ref(false)
+const autoImportResult = ref<{
+    scanned: number
+    totalInventoryCount: number
+    upserted: number
+    created: number
+    updated: number
+    skipped: number
+    skippedNames: string[]
+} | null>(null)
 
 const normalizedSteamId = computed(() => steamIdInput.value.trim())
 const hasValidSteamId = computed(() => /^\d{17}$/.test(normalizedSteamId.value))
@@ -233,6 +243,33 @@ function openCachedInventory() {
     toast.info('Inventario carregado do cache local.')
 }
 
+async function autoImport() {
+    if (!hasValidSteamId.value) return
+
+    autoImporting.value = true
+    autoImportResult.value = null
+
+    try {
+        const { data } = await adminService.importCollectorsFromSteam(normalizedSteamId.value)
+        autoImportResult.value = data
+
+        // Steam responde 200 com lista vazia quando a paginação falha — sem isso
+        // o import "dá certo" tendo importado nada.
+        if (data.scanned === 0 && data.totalInventoryCount > 0) {
+            toast.error(
+                `Nenhum item lido, mas a Steam reporta ${data.totalInventoryCount}. Tente de novo.`,
+            )
+            return
+        }
+
+        toast.success(`${data.upserted} item(ns) importado(s) de ${data.scanned} lidos.`)
+    } catch {
+        toast.error('Falha no import automático.')
+    } finally {
+        autoImporting.value = false
+    }
+}
+
 async function fetchInventory() {
     if (!ensureValidSteamId()) {
         return
@@ -344,6 +381,40 @@ onMounted(() => {
                     <Icon :icon="loading ? 'mdi:loading' : 'mdi:refresh'" :class="{ spinning: loading }" />
                     {{ loading ? 'Buscando...' : 'Buscar agora' }}
                 </button>
+
+                <button
+                    class="btn-auto-import"
+                    :disabled="autoImporting || !hasValidSteamId"
+                    @click="autoImport"
+                >
+                    <Icon
+                        :icon="autoImporting ? 'mdi:loading' : 'mdi:auto-fix'"
+                        :class="{ spinning: autoImporting }"
+                    />
+                    {{ autoImporting ? 'Importando...' : 'Importar automático' }}
+                </button>
+            </div>
+
+            <p class="auto-import-hint">
+                <Icon icon="mdi:information-outline" />
+                O import automático dispensa selecionar item por item: o backend lê o inventário,
+                importa só o que está no catálogo de sets e já aplica preço e herói de cada set.
+            </p>
+
+            <div v-if="autoImportResult" class="auto-import-result">
+                <Icon icon="mdi:check-circle-outline" />
+                <span>
+                    <strong>{{ autoImportResult.upserted }}</strong> importado(s) de
+                    <strong>{{ autoImportResult.scanned }}</strong> lidos —
+                    {{ autoImportResult.created }} novo(s), {{ autoImportResult.updated }} atualizado(s),
+                    <strong>{{ autoImportResult.skipped }}</strong> fora do catálogo.
+                    <template v-if="autoImportResult.skippedNames.length">
+                        <br />
+                        <small class="skipped-names">
+                            Descartados: {{ autoImportResult.skippedNames.join(', ') }}
+                        </small>
+                    </template>
+                </span>
             </div>
 
             <div v-if="inventory" class="hero-meta">
@@ -644,7 +715,8 @@ onMounted(() => {
         border-color rgba(99,102,241,0.45)
 
 .btn-primary,
-.btn-secondary
+.btn-secondary,
+.btn-auto-import
     display inline-flex
     align-items center
     justify-content center
@@ -676,6 +748,43 @@ onMounted(() => {
 
     &:hover:not(:disabled)
         background rgba(99,102,241,0.2)
+
+.btn-auto-import
+    background #f59e0b
+    color #000
+    min-width 190px
+
+    &:hover:not(:disabled)
+        background #d97706
+
+.auto-import-hint
+    display flex
+    align-items flex-start
+    gap 0.4rem
+    margin-top 0.85rem
+    color #64748b
+    font-size 0.8rem
+    line-height 1.45
+
+.auto-import-result
+    display flex
+    align-items flex-start
+    gap 0.5rem
+    margin-top 0.85rem
+    padding 0.85rem 1rem
+    border-radius 10px
+    background rgba(74,222,128,0.08)
+    border 1px solid rgba(74,222,128,0.2)
+    color #bbf7d0
+    font-size 0.85rem
+    line-height 1.5
+
+    strong
+        color #4ade80
+
+.skipped-names
+    color #94a3b8
+    font-size 0.76rem
 
 .spinning
     animation spin 1s linear infinite

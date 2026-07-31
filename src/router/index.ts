@@ -109,6 +109,11 @@ const routes = [
         component: () => import('@/views/collectors/CollectorsCatalog.vue'),
       },
       {
+        path: 'collectors/sets',
+        name: 'collectors-sets',
+        component: () => import('@/views/collectors/ItemSetsPricing.vue'),
+      },
+      {
         path: 'collector-orders',
         name: 'collector-orders',
         component: () => import('@/views/collector-orders/CollectorOrdersList.vue'),

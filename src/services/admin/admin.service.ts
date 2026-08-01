@@ -41,6 +41,8 @@ export interface ItemSet {
   hero_name: string | null
   hero_slug: string | null
   hero_image: string | null
+  /** Ícone vindo do estoque — null pra set que nunca foi importado. */
+  icon_url: string | null
   /** Linhas em collectors (1 linha = 1 unidade de 1 bot). */
   rows: number
   total: number

@@ -4,6 +4,7 @@ import { Icon } from '@iconify/vue'
 import { toast } from 'vue3-toastify'
 import { adminService } from '@/services/admin/admin.service'
 import { formatCurrency } from '@/utils/formatCurrency'
+import { buildSteamImageUrl } from '@/utils/steamImage'
 import type { ItemSet } from '@/services/admin/admin.service'
 
 const sets = ref<ItemSet[]>([])
@@ -406,9 +407,21 @@ onMounted(loadSets)
                                 <input type="checkbox" v-model="selected" :value="set.defindex" />
                             </td>
                             <td>
-                                <div class="item-cell">
-                                    <span class="item-name">{{ set.set_name }}</span>
-                                    <span class="item-sub">#{{ set.defindex }}</span>
+                                <div class="set-cell">
+                                    <img
+                                        v-if="set.icon_url"
+                                        :src="buildSteamImageUrl(set.icon_url) ?? ''"
+                                        :alt="set.set_name"
+                                        class="item-thumb"
+                                        loading="lazy"
+                                    />
+                                    <div v-else class="item-thumb item-thumb--empty">
+                                        <Icon icon="mdi:image-off-outline" />
+                                    </div>
+                                    <div class="item-cell">
+                                        <span class="item-name">{{ set.set_name }}</span>
+                                        <span class="item-sub">#{{ set.defindex }}</span>
+                                    </div>
                                 </div>
                             </td>
                             <td>
@@ -771,6 +784,26 @@ tr.row-dirty td
         width 16px
         height 16px
         cursor pointer
+
+.set-cell
+    display flex
+    align-items center
+    gap 0.7rem
+
+.item-thumb
+    width 100px
+    height 100px
+    object-fit contain
+    border-radius 8px
+    background rgba(255,255,255,0.04)
+    flex-shrink 0
+
+    &--empty
+        display flex
+        align-items center
+        justify-content center
+        color #3f3f46
+        font-size 2rem
 
 .item-cell
     display flex

@@ -72,6 +72,9 @@
                 <td>
                   <span v-if="item.comment" class="comment">{{ item.comment }}</span>
                   <span v-else class="text-muted">— sem comentário</span>
+                  <p v-if="item.reply" class="reply-preview">
+                    <strong>Resposta:</strong> {{ item.reply }}
+                  </p>
                 </td>
                 <td>
                   <button
@@ -97,15 +100,20 @@
                 </td>
                 <td class="text-muted">{{ $dayjs(item.created_at).format('DD/MM/YY HH:mm') }}</td>
                 <td>
-                  <span v-if="item.handled_at" class="status-badge status-active">Tratado</span>
-                  <button
-                    v-else
-                    class="btn-view"
-                    :disabled="handlingUuid === item.id"
-                    @click="markHandled(item)"
-                  >
-                    {{ handlingUuid === item.id ? 'Salvando...' : 'Marcar tratado' }}
-                  </button>
+                  <div class="action-row">
+                    <button class="btn-view" @click="openReply(item)">
+                      {{ item.reply ? 'Editar resposta' : 'Responder' }}
+                    </button>
+                    <span v-if="item.handled_at" class="status-badge status-active">Tratado</span>
+                    <button
+                      v-else
+                      class="btn-ghost"
+                      :disabled="handlingUuid === item.id"
+                      @click="markHandled(item)"
+                    >
+                      {{ handlingUuid === item.id ? 'Salvando...' : 'Marcar tratado' }}
+                    </button>
+                  </div>
                 </td>
               </tr>
               <tr v-if="feedbacks.length === 0">
@@ -114,6 +122,35 @@
             </template>
           </tbody>
         </table>
+      </div>
+    </div>
+
+    <div v-if="replyTarget" class="modal-overlay" @click.self="closeReply">
+      <div class="modal">
+        <h3>Responder feedback</h3>
+        <p class="modal-quote">
+          <span class="rating" :class="ratingClass(replyTarget.rating)">
+            {{ '★'.repeat(replyTarget.rating) }}{{ '☆'.repeat(5 - replyTarget.rating) }}
+          </span>
+          {{ replyTarget.comment || 'Sem comentário.' }}
+        </p>
+        <p class="modal-hint">O comprador vê essa resposta no detalhe do pedido dele.</p>
+        <textarea
+          v-model="replyText"
+          class="modal-textarea"
+          rows="5"
+          :maxlength="REPLY_MAX_LENGTH"
+          placeholder="Escreva a resposta..."
+        />
+        <span class="modal-counter" :class="{ 'modal-counter--full': replyText.length >= REPLY_MAX_LENGTH }">
+          {{ replyText.length }}/{{ REPLY_MAX_LENGTH }}
+        </span>
+        <div class="modal-actions">
+          <button class="btn-ghost" @click="closeReply">Cancelar</button>
+          <button class="btn-primary" :disabled="!replyText.trim() || replying" @click="sendReply">
+            {{ replying ? 'Enviando...' : 'Enviar resposta' }}
+          </button>
+        </div>
       </div>
     </div>
 
@@ -128,8 +165,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { toast } from 'vue3-toastify'
 import { adminService } from '@/services/admin/admin.service'
 
 const ORDER_TYPE_LABELS: Record<string, string> = {
@@ -160,6 +198,7 @@ const goToOrder = (item: any) => {
 }
 
 const LIMIT = 20
+const REPLY_MAX_LENGTH = 2000
 
 const feedbacks = ref<any[]>([])
 const total = ref(0)
@@ -169,6 +208,9 @@ const average = ref<number | null>(null)
 const page = ref(1)
 const loading = ref(true)
 const handlingUuid = ref<string | null>(null)
+const replyTarget = ref<any>(null)
+const replyText = ref('')
+const replying = ref(false)
 const handledFilter = ref<'pending' | 'handled' | 'all'>('pending')
 const ratingFilter = ref('')
 
@@ -219,6 +261,52 @@ const changePage = (next: number) => {
   void fetchFeedbacks()
 }
 
+const openReply = (item: any) => {
+  replyTarget.value = item
+  replyText.value = item.reply ?? ''
+}
+
+const closeReply = () => {
+  replyTarget.value = null
+  replyText.value = ''
+}
+
+const closeReplyOnEsc = (event: KeyboardEvent) => {
+  if (event.key === 'Escape') closeReply()
+}
+
+// Listener só existe enquanto o modal está aberto.
+watch(replyTarget, (target) => {
+  if (target) document.addEventListener('keydown', closeReplyOnEsc)
+  else document.removeEventListener('keydown', closeReplyOnEsc)
+})
+
+onUnmounted(() => document.removeEventListener('keydown', closeReplyOnEsc))
+
+const errorMessage = (err: any, fallback: string) =>
+  err?.response?.data?.message ?? fallback
+
+const sendReply = async () => {
+  if (!replyTarget.value || !replyText.value.trim()) return
+
+  replying.value = true
+  try {
+    const wasPending = !replyTarget.value.handled_at
+    await adminService.replyFeedback(replyTarget.value.id, replyText.value.trim())
+    closeReply()
+
+    // Some da lista filtrada em "Pendentes" — recua pra não ficar em página vazia.
+    if (wasPending && feedbacks.value.length === 1 && page.value > 1) page.value--
+
+    await fetchFeedbacks()
+    toast.success('Resposta enviada.')
+  } catch (err: any) {
+    toast.error(errorMessage(err, 'Não foi possível enviar a resposta.'))
+  } finally {
+    replying.value = false
+  }
+}
+
 const markHandled = async (item: any) => {
   handlingUuid.value = item.id
   try {
@@ -228,6 +316,8 @@ const markHandled = async (item: any) => {
     if (feedbacks.value.length === 1 && page.value > 1) page.value--
 
     await fetchFeedbacks()
+  } catch (err: any) {
+    toast.error(errorMessage(err, 'Não foi possível marcar como tratado.'))
   } finally {
     handlingUuid.value = null
   }
@@ -432,6 +522,110 @@ tbody tr:hover td
   justify-content center
   gap 12px
   margin-top 1rem
+
+.action-row
+  display flex
+  align-items center
+  gap 6px
+
+.reply-preview
+  margin 6px 0 0
+  padding-left 10px
+  border-left 2px solid rgba(99,102,241,0.4)
+  color rgba(255,255,255,0.6)
+  font-size 0.8rem
+  max-width 420px
+  white-space pre-wrap
+  word-break break-word
+
+  strong
+    color #a5b4fc
+
+.modal-overlay
+  position fixed
+  inset 0
+  background rgba(0,0,0,0.65)
+  z-index 100
+  display flex
+  align-items center
+  justify-content center
+
+.modal
+  background #1e1e24
+  border 1px solid rgba(255,255,255,0.1)
+  border-radius 14px
+  padding 1.75rem
+  width 520px
+  max-width 95vw
+
+  h3
+    margin 0 0 12px
+    font-size 1.1rem
+    font-weight 700
+
+.modal-quote
+  background rgba(255,255,255,0.04)
+  border-radius 10px
+  padding 12px 14px
+  margin 0 0 10px
+  color rgba(255,255,255,0.75)
+  font-size 0.875rem
+  white-space pre-wrap
+  word-break break-word
+
+.modal-hint
+  color rgba(255,255,255,0.4)
+  font-size 0.8rem
+  margin 0 0 10px
+
+.modal-textarea
+  width 100%
+  background #16161a
+  border 1px solid rgba(255,255,255,0.12)
+  border-radius 10px
+  color #fff
+  padding 0.75rem
+  font-family inherit
+  font-size 0.875rem
+  resize vertical
+
+  &:focus
+    outline none
+    border-color #6366f1
+
+.modal-counter
+  display block
+  text-align right
+  margin-top 4px
+  font-size 0.75rem
+  color rgba(255,255,255,0.35)
+
+.modal-counter--full
+  color #fbbf24
+
+.modal-actions
+  display flex
+  justify-content flex-end
+  gap 8px
+  margin-top 1rem
+
+.btn-primary
+  display inline-flex
+  align-items center
+  gap 6px
+  padding 0.5rem 1rem
+  background #6366f1
+  border none
+  border-radius 8px
+  color #fff
+  font-weight 600
+  font-size 0.875rem
+  cursor pointer
+  &:hover:not(:disabled)
+    background #4f46e5
+  &:disabled
+    opacity 0.5
+    cursor not-allowed
 
 .skeleton-row td
   padding 0.85rem 1rem

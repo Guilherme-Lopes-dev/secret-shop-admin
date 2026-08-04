@@ -975,6 +975,10 @@ export const adminService = {
     return api.patch(`/admin/feedbacks/${uuid}/handle`)
   },
 
+  async replyFeedback(uuid: string, reply: string) {
+    return api.patch(`/admin/feedbacks/${uuid}/reply`, { reply })
+  },
+
   async getSwaps(status?: string) {
     const query = status ? `?status=${status}` : ''
     return api.get(`/swaps${query}`)

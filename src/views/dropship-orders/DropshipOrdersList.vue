@@ -9,6 +9,7 @@ import type {
     DropshipNotificationItem,
 } from '@/services/admin/types'
 import { formatCurrency } from '@/utils/formatCurrency'
+import ConfirmActionModal from '@/components/common/ConfirmActionModal.vue'
 
 interface ShippingRow {
     key: string
@@ -102,15 +103,41 @@ const openDetail = (notification: DropshipNotificationDto) => {
     })
 }
 
-const markResolved = async (notification: DropshipNotificationDto) => {
+// Modais de confirmação — guardam a notificação alvo enquanto o contador roda.
+const pendingResolve = ref<DropshipNotificationDto | null>(null)
+const pendingUnresolve = ref<DropshipNotificationDto | null>(null)
+
+const markResolved = async () => {
+    const notification = pendingResolve.value
+    if (!notification) return
+
     resolvingId.value = notification.id
     try {
         await adminService.markDropshipNotificationRead(notification.id)
         toast.success(`Pedido ${notification.metadata?.orderNumber ?? ''} removido da fila.`)
+        pendingResolve.value = null
         await fetchQueue(currentPage.value)
     } catch (error) {
         console.error('Erro ao resolver alerta dropship:', error)
         toast.error('Não foi possível marcar o envio como resolvido.')
+    } finally {
+        resolvingId.value = null
+    }
+}
+
+const markUnresolved = async () => {
+    const notification = pendingUnresolve.value
+    if (!notification) return
+
+    resolvingId.value = notification.id
+    try {
+        await adminService.markDropshipNotificationUnread(notification.id)
+        toast.success(`Pedido ${notification.metadata?.orderNumber ?? ''} voltou para a fila.`)
+        pendingUnresolve.value = null
+        await fetchQueue(currentPage.value)
+    } catch (error) {
+        console.error('Erro ao desconfirmar alerta dropship:', error)
+        toast.error('Não foi possível desconfirmar este envio.')
     } finally {
         resolvingId.value = null
     }
@@ -268,7 +295,7 @@ onMounted(() => fetchQueue())
                                             v-if="!row.notification.is_read"
                                             class="resolve-btn"
                                             :disabled="resolvingId === row.notification.id"
-                                            @click.stop="markResolved(row.notification)"
+                                            @click.stop="pendingResolve = row.notification"
                                         >
                                             <Icon
                                                 :icon="resolvingId === row.notification.id
@@ -277,6 +304,20 @@ onMounted(() => fetchQueue())
                                                 :class="{ spin: resolvingId === row.notification.id }"
                                             />
                                             Resolver
+                                        </button>
+                                        <button
+                                            v-else
+                                            class="undo-btn"
+                                            :disabled="resolvingId === row.notification.id"
+                                            @click.stop="pendingUnresolve = row.notification"
+                                        >
+                                            <Icon
+                                                :icon="resolvingId === row.notification.id
+                                                    ? 'mdi:loading'
+                                                    : 'mdi:undo-variant'"
+                                                :class="{ spin: resolvingId === row.notification.id }"
+                                            />
+                                            Desconfirmar
                                         </button>
                                     </div>
                                 </td>
@@ -321,6 +362,31 @@ onMounted(() => fetchQueue())
                 </footer>
             </template>
         </section>
+
+        <ConfirmActionModal
+            :open="!!pendingResolve"
+            icon="mdi:check-circle-outline"
+            title="Marcar como resolvido"
+            :description="`Pedido ${pendingResolve?.metadata?.orderNumber ?? ''}: confirma que a skin já foi comprada no Steam Market e enviada pelo trade link do cliente. O alerta sai da fila e a venda é marcada como concluída.`"
+            confirm-label="Marcar como resolvido"
+            loading-label="Concluindo..."
+            :loading="!!pendingResolve && resolvingId === pendingResolve.id"
+            @update:open="pendingResolve = null"
+            @confirm="markResolved"
+        />
+
+        <ConfirmActionModal
+            :open="!!pendingUnresolve"
+            icon="mdi:undo-variant"
+            variant="danger"
+            title="Desconfirmar envio"
+            :description="`Pedido ${pendingUnresolve?.metadata?.orderNumber ?? ''}: o alerta volta para a fila de pendentes e a venda deixa de estar concluída. Use só para corrigir clique errado — se a entrega já aconteceu de verdade, não desfaça.`"
+            confirm-label="Desconfirmar envio"
+            loading-label="Desfazendo..."
+            :loading="!!pendingUnresolve && resolvingId === pendingUnresolve.id"
+            @update:open="pendingUnresolve = null"
+            @confirm="markUnresolved"
+        />
     </div>
 </template>
 
@@ -631,7 +697,8 @@ table
     gap 0.45rem
 
 .icon-btn,
-.resolve-btn
+.resolve-btn,
+.undo-btn
     height 34px
     display inline-flex
     align-items center
@@ -660,6 +727,21 @@ table
 
     &:hover:not(:disabled)
         background rgba(34,197,94,0.15)
+
+    &:disabled
+        opacity 0.55
+
+.undo-btn
+    gap 0.3rem
+    padding 0 0.65rem
+    border 1px solid rgba(245,158,11,0.22)
+    color #fbbf24
+    background rgba(245,158,11,0.1)
+    font-size 0.73rem
+    font-weight 650
+
+    &:hover:not(:disabled)
+        background rgba(245,158,11,0.2)
 
     &:disabled
         opacity 0.55

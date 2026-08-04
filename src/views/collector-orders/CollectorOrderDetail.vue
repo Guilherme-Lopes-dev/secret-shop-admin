@@ -5,6 +5,7 @@ import { adminService } from '@/services/admin/admin.service'
 import { formatCurrency } from '@/utils/formatCurrency'
 import { toast } from 'vue3-toastify'
 import { Icon } from '@iconify/vue'
+import ConfirmActionModal from '@/components/common/ConfirmActionModal.vue'
 
 const route  = useRoute()
 const router = useRouter()
@@ -46,11 +47,32 @@ const lastDeliveredAt = computed<string | null>(() => {
     return dates.reduce((a: string, b: string) => (a > b ? a : b))
 })
 
-// ── Delivery modal ────────────────────────────────────────────────────────────
-const deliveryModal   = ref(false)
-const deliveryStatus  = ref('')
+// ── Entrega: uma ação, uma linha ──────────────────────────────────────────────
+// Entrega é por linha no banco e a lista já mostra o badge por linha; o botão vive
+// junto do badge. Sem lote: cada clique move exatamente o item que você olhou.
+const ADVANCE_DELIVERY: Record<string, string> = {
+    AWAITING_SHIPPING: 'SHIPPED',
+    SHIPPED:           'DELIVERED',
+}
+const REVERT_DELIVERY: Record<string, string> = {
+    DELIVERED: 'SHIPPED',
+    SHIPPED:   'AWAITING_SHIPPING',
+}
+
+type DeliveryAction = { line: any; from: string; to: string; kind: 'advance' | 'revert' }
+
+const deliveryAction  = ref<DeliveryAction | null>(null)
 const deliveryNotes   = ref('')
 const deliveryLoading = ref(false)
+
+const lineStatus  = (sl: any) => sl.delivery_status ?? 'AWAITING_SHIPPING'
+const orderIsPaid = () => sale.value?.payment_status === 'PAID'
+
+const advanceTarget = (sl: any) => (orderIsPaid() ? ADVANCE_DELIVERY[lineStatus(sl)] : undefined)
+const revertTarget  = (sl: any) => (orderIsPaid() ? REVERT_DELIVERY[lineStatus(sl)] : undefined)
+
+const advanceLabel = (sl: any) =>
+    advanceTarget(sl) === 'SHIPPED' ? 'Marcar como Enviado' : 'Marcar como Entregue'
 
 // ── Cancel modal ──────────────────────────────────────────────────────────────
 const cancelModal   = ref(false)
@@ -170,14 +192,6 @@ const deliveryLabel = (s: string | null) => ({
 const paymentMethodLabel = (m: string | null) =>
     ({ PIX: 'PIX', BOLETO: 'Boleto', CREDIT_CARD: 'Cartão de Crédito' }[m ?? ''] ?? m ?? '-')
 
-const nextAction = computed((): { label: string; status: string } | null => {
-    if (!sale.value || sale.value.payment_status !== 'PAID') return null
-    return ({
-        AWAITING_SHIPPING: { label: 'Marcar como Enviado',  status: 'SHIPPED'   },
-        SHIPPED:           { label: 'Marcar como Entregue', status: 'DELIVERED' },
-    } as Record<string, { label: string; status: string }>)[aggregateDeliveryStatus.value ?? ''] ?? null
-})
-
 const canCancel = () =>
     sale.value && !['CANCELLED', 'REFUNDED', 'EXPIRED'].includes(sale.value.payment_status)
 
@@ -192,35 +206,46 @@ const formatHistoryEntry = (entry: any) => {
 }
 
 // ── Actions ───────────────────────────────────────────────────────────────────
-const openDeliveryModal = () => {
-    if (!nextAction.value) return
-    deliveryStatus.value = nextAction.value.status
+const openAdvance = (sl: any) => {
+    const to = advanceTarget(sl)
+    if (!to) return
     deliveryNotes.value  = ''
-    deliveryModal.value  = true
+    deliveryAction.value = { line: sl, from: lineStatus(sl), to, kind: 'advance' }
 }
 
-const confirmDelivery = async () => {
+const openRevert = (sl: any) => {
+    const to = revertTarget(sl)
+    if (!to) return
+    deliveryNotes.value  = ''
+    deliveryAction.value = { line: sl, from: lineStatus(sl), to, kind: 'revert' }
+}
+
+const runDeliveryAction = (action: DeliveryAction) => {
+    if (action.kind === 'revert') return adminService.revertCollectorDelivery(action.line.id)
+    return adminService.updateCollectorDelivery(
+        action.line.id,
+        action.to,
+        deliveryNotes.value || undefined,
+    )
+}
+
+const confirmDeliveryAction = async () => {
+    const action = deliveryAction.value
+    if (!action) return
+
     deliveryLoading.value = true
     try {
-        const targetStatus = deliveryStatus.value
-        const toAdvance = lines.value.filter((l: any) =>
-            (targetStatus === 'SHIPPED'   && l.delivery_status === 'AWAITING_SHIPPING') ||
-            (targetStatus === 'DELIVERED' && l.delivery_status === 'SHIPPED'),
+        await runDeliveryAction(action)
+        toast.success(
+            `${lineName(action.line)}: ${deliveryLabel(action.from)} → ${deliveryLabel(action.to)}.`,
         )
-        if (!toAdvance.length) {
-            toast.warning('Nenhuma linha elegível para avançar.')
-            return
-        }
-        for (const l of toAdvance) {
-            await adminService.updateCollectorDelivery(l.id, targetStatus, deliveryNotes.value || undefined)
-        }
-        toast.success(`${toAdvance.length} item(ns) atualizado(s).`)
-        deliveryModal.value = false
-        fetchSale()
     } catch (err: any) {
         toast.error(err?.response?.data?.message ?? 'Erro ao atualizar entrega.')
     } finally {
         deliveryLoading.value = false
+        deliveryAction.value  = null
+        // Sempre: em falha o estado do banco pode ter mudado e a tela não pode mentir.
+        fetchSale()
     }
 }
 
@@ -308,15 +333,6 @@ onMounted(fetchSale)
                         {{ fetchingReceipt ? 'Buscando...' : 'Comprovante Asaas' }}
                     </button>
                     <button
-                        v-if="nextAction"
-                        class="btn-action-main btn-ship"
-                        @click="openDeliveryModal"
-                    >
-                        <Icon icon="mdi:truck-outline" />
-                        {{ nextAction.label }}
-                        <span v-if="pendingLines.length > 1" class="btn-count">({{ pendingLines.length }})</span>
-                    </button>
-                    <button
                         v-if="canCancel()"
                         class="btn-action-main btn-danger-soft"
                         @click="openCancelModal"
@@ -369,9 +385,31 @@ onMounted(fetchSale)
                                         <span class="line-subtotal">{{ formatCurrency(sl.total_price) }}</span>
                                     </div>
                                 </div>
-                                <span v-if="sl.delivery_status" class="status-badge" :class="deliveryBadgeClass(sl.delivery_status)">
-                                    {{ deliveryLabel(sl.delivery_status) }}
-                                </span>
+                                <div class="line-delivery">
+                                    <span v-if="sl.delivery_status" class="status-badge" :class="deliveryBadgeClass(sl.delivery_status)">
+                                        {{ deliveryLabel(sl.delivery_status) }}
+                                    </span>
+                                    <div class="line-actions">
+                                        <button
+                                            v-if="advanceTarget(sl)"
+                                            class="line-btn line-btn-ship"
+                                            :title="advanceLabel(sl)"
+                                            @click="openAdvance(sl)"
+                                        >
+                                            <Icon icon="mdi:truck-outline" />
+                                            {{ advanceTarget(sl) === 'SHIPPED' ? 'Enviar' : 'Entregar' }}
+                                        </button>
+                                        <button
+                                            v-if="revertTarget(sl)"
+                                            class="line-btn line-btn-undo"
+                                            title="Desconfirmar este item"
+                                            @click="openRevert(sl)"
+                                        >
+                                            <Icon icon="mdi:undo-variant" />
+                                            Desconfirmar
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
                             <div class="kv-grid line-meta-grid">
                                 <div class="kv">
@@ -616,25 +654,28 @@ onMounted(fetchSale)
         </template>
 
         <!-- ── Delivery Modal ─────────────────────────────────────────────────── -->
-        <div v-if="deliveryModal" class="modal-backdrop" @click.self="deliveryModal = false">
-            <div class="modal">
-                <h2 class="modal-title">
-                    <Icon icon="mdi:truck-outline" />
-                    {{ deliveryStatus === 'SHIPPED' ? 'Marcar como Enviado' : 'Marcar como Entregue' }}
-                </h2>
-                <p class="modal-sub">Pedido <strong>{{ sale?.order_number }}</strong></p>
-                <div class="form-group">
-                    <label class="form-label">Notas (opcional)</label>
-                    <textarea v-model="deliveryNotes" class="form-textarea" rows="3" placeholder="Ex: enviado via Telegram, código de rastreio..." />
-                </div>
-                <div class="modal-actions">
-                    <button class="btn-secondary" @click="deliveryModal = false">Cancelar</button>
-                    <button class="btn-primary" :disabled="deliveryLoading" @click="confirmDelivery">
-                        {{ deliveryLoading ? 'Salvando...' : 'Confirmar' }}
-                    </button>
-                </div>
+        <ConfirmActionModal
+            :open="!!deliveryAction"
+            :icon="deliveryAction?.kind === 'revert' ? 'mdi:undo-variant' : 'mdi:truck-outline'"
+            :title="deliveryAction?.kind === 'revert'
+                ? 'Desconfirmar envio deste item'
+                : (deliveryAction?.to === 'SHIPPED' ? 'Marcar como Enviado' : 'Marcar como Entregue')"
+            :description="deliveryAction
+                ? (deliveryAction.kind === 'revert'
+                    ? `${lineName(deliveryAction.line)} volta de ${deliveryLabel(deliveryAction.from)} para ${deliveryLabel(deliveryAction.to)} e perde a data correspondente. Só este item muda — o resto do pedido ${sale?.order_number} fica como está.`
+                    : `${lineName(deliveryAction.line)} passa de ${deliveryLabel(deliveryAction.from)} para ${deliveryLabel(deliveryAction.to)} e recebe a data. O cliente vê essa mudança ao abrir o pedido ${sale?.order_number}. Só este item muda.`)
+                : ''"
+            :confirm-label="deliveryAction?.kind === 'revert' ? 'Desconfirmar' : 'Confirmar'"
+            :loading-label="deliveryAction?.kind === 'revert' ? 'Desfazendo...' : 'Salvando...'"
+            :loading="deliveryLoading"
+            @update:open="deliveryAction = null"
+            @confirm="confirmDeliveryAction"
+        >
+            <div v-if="deliveryAction?.kind === 'advance'" class="form-group">
+                <label class="form-label">Notas (opcional)</label>
+                <textarea v-model="deliveryNotes" class="form-textarea" rows="3" placeholder="Ex: enviado via Telegram, código de rastreio..." />
             </div>
-        </div>
+        </ConfirmActionModal>
 
         <!-- ── Cancel Modal ───────────────────────────────────────────────────── -->
         <div v-if="cancelModal" class="modal-backdrop" @click.self="cancelModal = false">
@@ -754,13 +795,43 @@ onMounted(fetchSale)
     border none
     transition all 0.2s
 
-.btn-action-main.btn-ship
+.line-delivery
+    display flex
+    flex-direction column
+    align-items flex-end
+    gap 0.4rem
+
+.line-actions
+    display flex
+    gap 0.35rem
+
+.line-btn
+    display inline-flex
+    align-items center
+    gap 0.25rem
+    height 28px
+    padding 0 0.6rem
+    border-radius 6px
+    font-size 0.72rem
+    font-weight 600
+    cursor pointer
+    transition all 0.2s
+
+.line-btn-ship
     background rgba(99,102,241,0.15)
     color #818cf8
     border 1px solid rgba(99,102,241,0.3)
 
     &:hover
         background rgba(99,102,241,0.3)
+
+.line-btn-undo
+    background rgba(245,158,11,0.1)
+    color #fbbf24
+    border 1px solid rgba(245,158,11,0.22)
+
+    &:hover
+        background rgba(245,158,11,0.2)
 
 .btn-action-main.btn-danger-soft
     background rgba(239,68,68,0.1)
@@ -847,10 +918,6 @@ onMounted(fetchSale)
         background rgba(59,130,246,0.1)
         color #60a5fa
         border-color rgba(59,130,246,0.2)
-
-.btn-count
-    font-size 0.75rem
-    opacity 0.8
 
 // ── Friendship card ───────────────────────────────────────────────────────────
 .friendship-card

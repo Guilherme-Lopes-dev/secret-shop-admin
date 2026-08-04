@@ -390,6 +390,11 @@ export const adminService = {
     return api.patch(`/admin/notifications/${id}/read`)
   },
 
+  // Desfaz o "resolvido": volta pra fila e reverte o fulfillment da venda.
+  async markDropshipNotificationUnread(id: string) {
+    return api.patch(`/admin/notifications/${id}/unread`)
+  },
+
   /**
    * Import automático: um request só. O backend lê o inventário Steam, filtra
    * pelo catálogo de sets e insere com preço/herói herdados.
@@ -591,6 +596,13 @@ export const adminService = {
   async updateCollectorDelivery(uuid: string, deliveryStatus: string, notes?: string) {
     return api.patch(`/collector-sales/admin/lines/${uuid}/delivery`, {
       delivery_status: deliveryStatus,
+      ...(notes ? { notes } : {}),
+    })
+  },
+
+  // Volta UM passo: DELIVERED → SHIPPED → AWAITING_SHIPPING (destino vem do backend).
+  async revertCollectorDelivery(uuid: string, notes?: string) {
+    return api.patch(`/collector-sales/admin/lines/${uuid}/delivery/revert`, {
       ...(notes ? { notes } : {}),
     })
   },

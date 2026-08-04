@@ -11,6 +11,7 @@ import type {
 import { formatCurrency } from '@/utils/formatCurrency'
 import { countryName } from '@/utils/countries'
 import { buildSteamImageUrl } from '@/utils/steamImage'
+import ConfirmActionModal from '@/components/common/ConfirmActionModal.vue'
 
 interface DropshipSnapshotItem {
     inventory_uuid?: string | null
@@ -35,6 +36,9 @@ const notification = ref<DropshipNotificationDto | null>(null)
 const loading = ref(true)
 const error = ref('')
 const resolving = ref(false)
+const resolveModal = ref(false)
+const unresolving = ref(false)
+const unresolveModal = ref(false)
 const copiedKey = ref('')
 let copyTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -134,6 +138,17 @@ const fetchDetail = async () => {
     }
 }
 
+// Só a venda: `fetchDetail` re-deriva a notificação do history state, que ficaria com o
+// is_read anterior e desfaria visualmente o clique que acabou de acontecer.
+const refreshSale = async () => {
+    try {
+        const response = await adminService.getSaleById(route.params.uuid as string)
+        sale.value = response.data
+    } catch (requestError) {
+        console.error('Erro ao recarregar a venda dropship:', requestError)
+    }
+}
+
 const itemImage = (item: OperationItem) =>
     buildSteamImageUrl(item.saleItem?.skin_image ?? item.saleItem?.bot_inventory?.skins?.icon_url_large)
 const itemName = (item: OperationItem) =>
@@ -190,12 +205,35 @@ const markResolved = async () => {
             is_read: true,
             read_at: new Date().toISOString(),
         }
+        resolveModal.value = false
         toast.success('Envio removido da fila pendente.')
+        void refreshSale()
     } catch (requestError) {
         console.error('Erro ao resolver envio dropship:', requestError)
         toast.error('Não foi possível resolver este envio.')
     } finally {
         resolving.value = false
+    }
+}
+
+const markUnresolved = async () => {
+    if (!notification.value || !notification.value.is_read) return
+    unresolving.value = true
+    try {
+        await adminService.markDropshipNotificationUnread(notification.value.id)
+        notification.value = {
+            ...notification.value,
+            is_read: false,
+            read_at: null,
+        }
+        unresolveModal.value = false
+        toast.success('Envio devolvido para a fila pendente.')
+        void refreshSale()
+    } catch (requestError) {
+        console.error('Erro ao desconfirmar envio dropship:', requestError)
+        toast.error('Não foi possível desconfirmar este envio.')
+    } finally {
+        unresolving.value = false
     }
 }
 
@@ -246,10 +284,20 @@ onUnmounted(() => {
                     v-if="notification && !isResolved"
                     class="complete-btn"
                     :disabled="resolving"
-                    @click="markResolved"
+                    @click="resolveModal = true"
                 >
-                    <Icon :icon="resolving ? 'mdi:loading' : 'mdi:check-circle-outline'" :class="{ spin: resolving }" />
-                    {{ resolving ? 'Concluindo...' : 'Marcar como resolvido' }}
+                    <Icon icon="mdi:check-circle-outline" />
+                    Marcar como resolvido
+                </button>
+
+                <button
+                    v-if="notification && isResolved"
+                    class="undo-btn"
+                    :disabled="unresolving"
+                    @click="unresolveModal = true"
+                >
+                    <Icon icon="mdi:undo-variant" />
+                    Desconfirmar envio
                 </button>
             </header>
 
@@ -402,6 +450,14 @@ onUnmounted(() => {
                             <div>
                                 <span>Status de fulfillment</span>
                                 <strong>{{ sale.fulfillment_status ?? '-' }}</strong>
+                            </div>
+                            <div>
+                                <span>Fulfillment atualizado em</span>
+                                <strong>
+                                    {{ sale.fulfillment_status_changed_at
+                                        ? $dayjs(sale.fulfillment_status_changed_at).format('DD/MM/YYYY [às] HH:mm:ss')
+                                        : '-' }}
+                                </strong>
                             </div>
                             <div>
                                 <span>Provedor</span>
@@ -603,6 +659,29 @@ onUnmounted(() => {
                 </aside>
             </div>
         </template>
+
+        <ConfirmActionModal
+            v-model:open="resolveModal"
+            icon="mdi:check-circle-outline"
+            title="Marcar como resolvido"
+            :description="`Pedido ${orderNumber}: confirma que você já comprou a skin no Steam Market e enviou pelo trade link do cliente. O alerta sai da fila e a venda é marcada como concluída (se não houver trade de bot pendente).`"
+            confirm-label="Marcar como resolvido"
+            loading-label="Concluindo..."
+            :loading="resolving"
+            @confirm="markResolved"
+        />
+
+        <ConfirmActionModal
+            v-model:open="unresolveModal"
+            icon="mdi:undo-variant"
+            variant="danger"
+            title="Desconfirmar envio"
+            :description="`Pedido ${orderNumber}: o alerta volta para a fila de pendentes e a venda deixa de estar concluída. Use só para corrigir clique errado — se a entrega já aconteceu de verdade, não desfaça.`"
+            confirm-label="Desconfirmar envio"
+            loading-label="Desfazendo..."
+            :loading="unresolving"
+            @confirm="markUnresolved"
+        />
     </div>
 </template>
 
@@ -700,6 +779,27 @@ onUnmounted(() => {
         border-color rgba(34,197,94,0.22)
         color #4ade80
         background rgba(34,197,94,0.1)
+
+.undo-btn
+    height 42px
+    display inline-flex
+    align-items center
+    gap 0.45rem
+    padding 0 1rem
+    border 1px solid rgba(245,158,11,0.25)
+    border-radius 9px
+    color #fbbf24
+    background rgba(245,158,11,0.12)
+    cursor pointer
+    font-size 0.8rem
+    font-weight 650
+
+    &:hover:not(:disabled)
+        background rgba(245,158,11,0.24)
+
+    &:disabled
+        opacity 0.55
+        cursor not-allowed
 
 .complete-btn
     height 42px

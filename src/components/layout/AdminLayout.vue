@@ -106,6 +106,7 @@ const navGroups: NavGroup[] = [
         items: [
             { label: 'Cupons', icon: 'mdi:ticket-percent-outline', to: '/coupons', name: 'coupons' },
             { label: 'Novidades', icon: 'mdi:bullhorn-outline', to: '/news', name: 'news' },
+            { label: 'Feedbacks', icon: 'mdi:comment-quote-outline', to: '/feedbacks', name: 'feedbacks' },
             { label: 'WhatsApp Blast', icon: 'mdi:whatsapp', to: '/whatsapp/blast', name: 'whatsapp-blast' },
             { label: 'Recomendações', icon: 'mdi:star-shooting-outline', to: '/recommendations', name: 'recommendations' },
             { label: 'Discord', icon: 'mdi:discord', to: '/discord', name: 'discord' },

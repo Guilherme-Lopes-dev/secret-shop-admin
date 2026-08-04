@@ -244,6 +244,11 @@ const routes = [
         component: () => import('@/views/news/NewsForm.vue'),
       },
       {
+        path: 'feedbacks',
+        name: 'feedbacks',
+        component: () => import('@/views/feedbacks/FeedbacksList.vue'),
+      },
+      {
         path: 'uploads/test',
         name: 'upload-test',
         component: () => import('@/views/uploads/UploadTest.vue'),

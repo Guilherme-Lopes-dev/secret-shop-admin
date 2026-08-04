@@ -961,6 +961,20 @@ export const adminService = {
     return api.delete(`/news/${uuid}`)
   },
 
+  async getFeedbacks(params: { page?: number; limit?: number; rating?: number; handled?: boolean } = {}) {
+    const query = new URLSearchParams({
+      page: String(params.page ?? 1),
+      limit: String(params.limit ?? 20),
+    })
+    if (params.rating) query.append('rating', String(params.rating))
+    if (params.handled !== undefined) query.append('handled', String(params.handled))
+    return api.get(`/admin/feedbacks?${query}`)
+  },
+
+  async markFeedbackHandled(uuid: string) {
+    return api.patch(`/admin/feedbacks/${uuid}/handle`)
+  },
+
   async getSwaps(status?: string) {
     const query = status ? `?status=${status}` : ''
     return api.get(`/swaps${query}`)

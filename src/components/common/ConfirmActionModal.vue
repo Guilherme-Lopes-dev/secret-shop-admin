@@ -110,55 +110,63 @@ const close = () => emit('update:open', false)
 .modal
     background #1e1e24
     border 1px solid rgba(255,255,255,0.1)
-    border-radius 12px
-    padding 1.75rem
-    width 100%
-    max-width 440px
+    border-radius 14px
+    padding 2.5rem
+    width calc(100% - 2rem)
+    max-width 880px
 
 .modal-title
-    font-size 1.1rem
+    font-size 1.5rem
     font-weight 700
-    margin 0 0 0.5rem
+    margin 0 0 0.75rem
     display flex
     align-items center
-    gap 0.5rem
+    gap 0.65rem
     color #e2e8f0
 
 .title-danger
     color #ef4444
 
 .modal-description
-    color #94a3b8
-    font-size 0.875rem
-    line-height 1.55
-    margin 0 0 1.25rem
+    color #cbd5e1
+    font-size 1.05rem
+    line-height 1.6
+    margin 0 0 1.5rem
     white-space pre-line
+
+// Slot vive no escopo do pai; :slotted alcança o campo de notas sem vazar estilo.
+:slotted(.form-label)
+    font-size 0.9rem
+
+:slotted(.form-textarea)
+    font-size 1rem
+    padding 0.75rem 0.9rem
 
 .modal-hint
     display flex
     align-items center
-    gap 0.45rem
-    margin 1.25rem 0 0
-    padding 0.6rem 0.75rem
-    border-radius 7px
+    gap 0.5rem
+    margin 1.5rem 0 0
+    padding 0.8rem 1rem
+    border-radius 8px
     background rgba(255,255,255,0.04)
     border 1px solid rgba(255,255,255,0.07)
     color #94a3b8
-    font-size 0.8rem
+    font-size 0.95rem
 
 .modal-actions
     display flex
     justify-content flex-end
-    gap 0.75rem
-    margin-top 1.25rem
+    gap 0.9rem
+    margin-top 1.5rem
 
 .btn-secondary
     background #2a2a30
     color #94a3b8
     border 1px solid rgba(255,255,255,0.1)
-    padding 0.5rem 1.1rem
-    border-radius 7px
-    font-size 0.875rem
+    padding 0.7rem 1.5rem
+    border-radius 8px
+    font-size 1rem
     font-weight 500
     cursor pointer
     transition all 0.2s
@@ -173,12 +181,12 @@ const close = () => emit('update:open', false)
 .btn-confirm
     display inline-flex
     align-items center
-    gap 0.4rem
+    gap 0.45rem
     color #fff
     border none
-    padding 0.5rem 1.1rem
-    border-radius 7px
-    font-size 0.875rem
+    padding 0.7rem 1.5rem
+    border-radius 8px
+    font-size 1rem
     font-weight 600
     cursor pointer
     transition all 0.2s

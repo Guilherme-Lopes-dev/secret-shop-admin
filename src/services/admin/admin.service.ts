@@ -22,6 +22,7 @@ import type {
   DiscordWebhookCreatedDto,
   DropshipNotificationsResponse,
   PassProgressDto,
+  ProfileProgressDto,
 } from './types'
 
 const collectorNotificationTypes = 'COLLECTOR_PURCHASE,COLLECTOR_SHIPPING_REMINDER'
@@ -565,6 +566,10 @@ export const adminService = {
 
   async getUserPassProgress(uuid: string) {
     return api.get<PassProgressDto>(`/admin/passes/users/${uuid}/progress`)
+  },
+
+  async getUserProfileProgress(uuid: string) {
+    return api.get<ProfileProgressDto>(`/admin/profile-progress/users/${uuid}`)
   },
 
   // Antifraud — política de país (allowlist / blocklist)

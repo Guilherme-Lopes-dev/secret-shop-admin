@@ -6,6 +6,7 @@ import { formatCurrency } from '@/utils/formatCurrency'
 import { Icon } from '@iconify/vue'
 import { toast } from 'vue3-toastify'
 import UserPassCard from '@/components/passes/UserPassCard.vue'
+import UserProgressCard from '@/components/profile-progress/UserProgressCard.vue'
 import { countryName } from '@/utils/countries'
 
 const route = useRoute()
@@ -223,6 +224,8 @@ onMounted(fetchUser)
             </div>
 
             <UserPassCard :user-uuid="user.id" />
+
+            <UserProgressCard :user-uuid="user.id" />
 
             <div class="details-grid">
                 <div class="section">

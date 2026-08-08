@@ -61,6 +61,28 @@ export interface PassProgressDto {
   all_tiers:           PassTierEntry[]
 }
 
+export interface AchievementDto {
+  code:       string
+  label:      string
+  hint:       string
+  xp:         number
+  done:       boolean
+  awarded_at: string | null
+}
+
+export interface ProfileProgressDto {
+  xp:             number
+  tier:           number
+  tier_max:       number
+  tier_min_xp:    number
+  next_tier_xp:   number | null
+  progress_pct:   number
+  purchase_xp:     number
+  purchase_count:  number
+  tier_thresholds: number[]
+  achievements:    AchievementDto[]
+}
+
 export interface DiscordHealthDto {
   ok: boolean
   enabled: boolean

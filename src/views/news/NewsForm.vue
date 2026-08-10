@@ -95,6 +95,25 @@
         </section>
 
         <section class="form-section">
+          <h2 class="section-title">Cupom</h2>
+
+          <div class="field">
+            <label>Cupom de desconto</label>
+            <select v-model="form.coupon_code" class="form-input form-select">
+              <option value="">Nenhum</option>
+              <option v-if="orphanCouponCode" :value="orphanCouponCode">
+                {{ orphanCouponCode }} — removido
+              </option>
+              <option v-for="coupon in activeCoupons" :key="coupon.uuid" :value="coupon.code">
+                {{ coupon.code }} — {{ couponDiscount(coupon) }}
+              </option>
+            </select>
+            <p v-if="couponsError" class="field-hint field-hint--warn">Não foi possível carregar os cupons.</p>
+            <p class="field-hint">Aparece no popup como uma linha com botão de copiar.</p>
+          </div>
+        </section>
+
+        <section class="form-section">
           <h2 class="section-title">Publicação</h2>
 
           <div class="field">
@@ -174,6 +193,17 @@
             <h2 v-if="form.title" class="news-popup__title">{{ form.title }}</h2>
             <div v-if="editorHtml" class="news-popup__content" v-html="editorHtml" />
           </div>
+          <div v-if="form.coupon_code" class="news-popup__coupon">
+            <div>
+              <span class="coupon-label">Cupom de desconto</span>
+              <strong class="coupon-code">{{ form.coupon_code }}</strong>
+              <span v-if="selectedCoupon?.description" class="coupon-desc">{{ selectedCoupon.description }}</span>
+            </div>
+            <button type="button" class="coupon-copy" @click="copyCoupon">
+              <Icon icon="mdi:content-copy" width="14" /> {{ copied ? 'Copiado!' : 'Copiar' }}
+            </button>
+          </div>
+
           <div class="news-popup__footer">
             <button class="news-popup__dismiss">Não mostrar novamente</button>
             <button class="news-popup__close">Fechar</button>
@@ -192,6 +222,7 @@ import { Icon } from '@iconify/vue'
 import { useEditor, EditorContent } from '@tiptap/vue-3'
 import StarterKit from '@tiptap/starter-kit'
 import { adminService } from '@/services/admin/admin.service'
+import { formatCurrency } from '@/utils/formatCurrency'
 
 const router = useRouter()
 const route = useRoute()
@@ -215,9 +246,68 @@ const form = reactive({
   title: '',
   cover_url: '',
   size: 'md' as 'sm' | 'md' | 'lg' | 'full',
+  coupon_code: '',
   published_at: '',
   is_active: true,
 })
+
+interface Coupon {
+  uuid: string
+  code: string
+  description: string | null
+  is_active: boolean
+  expires_at: string | null
+  max_uses: number | null
+  discount_type: 'PERCENTAGE' | 'FIXED'
+  discount_value: number
+  _count?: { redemptions: number }
+}
+
+const coupons = ref<Coupon[]>([])
+const couponsError = ref(false)
+
+// mesmo critério do popup: fora do ar aqui = não aparece pro usuário
+const isCouponAlive = (coupon: Coupon) => {
+  if (!coupon.is_active) return false
+  if (coupon.expires_at && new Date(coupon.expires_at) <= new Date()) return false
+  if (coupon.max_uses && (coupon._count?.redemptions ?? 0) >= coupon.max_uses) return false
+
+  return true
+}
+
+// mantém o cupom já salvo na lista mesmo se expirou, senão o select apaga ele sozinho ao editar
+const activeCoupons = computed(() =>
+  coupons.value.filter(coupon => isCouponAlive(coupon) || coupon.code === form.coupon_code),
+)
+
+// cupom salvo que foi deletado não volta do backend — sem essa opção o select mostraria "Nenhum" mentindo
+const orphanCouponCode = computed(() => {
+  if (!form.coupon_code) return ''
+  if (activeCoupons.value.some(coupon => coupon.code === form.coupon_code)) return ''
+  return form.coupon_code
+})
+
+const copied = ref(false)
+let copiedTimer: ReturnType<typeof setTimeout>
+
+const copyCoupon = async () => {
+  if (!form.coupon_code) return
+  try {
+    await navigator.clipboard.writeText(form.coupon_code)
+  } catch {
+    return
+  }
+  copied.value = true
+  clearTimeout(copiedTimer)
+  copiedTimer = setTimeout(() => (copied.value = false), 2000)
+}
+
+const selectedCoupon = computed(() =>
+  coupons.value.find(coupon => coupon.code === form.coupon_code) ?? null,
+)
+
+const couponDiscount = (coupon: Coupon) =>
+  coupon.discount_type === 'PERCENTAGE' ? `${coupon.discount_value}%` : formatCurrency(coupon.discount_value)
 
 const sizeHint = computed(() => {
   const map = { sm: 'Popup estreito (400px).', md: 'Tamanho padrão (620px).', lg: 'Popup largo (860px).', full: 'Ocupa quase toda a tela (95vw).' }
@@ -272,6 +362,7 @@ const submit = async () => {
       body: editorHtml.value || null,
       cover_url: form.cover_url.trim() || null,
       size: form.size,
+      coupon_code: form.coupon_code || null,
       published_at: toISOorNull(form.published_at),
       is_active: form.is_active,
     }
@@ -294,12 +385,24 @@ const fillForm = (data: any) => {
   form.title = data.title ?? ''
   form.cover_url = data.cover_url ?? ''
   form.size = data.size ?? 'md'
+  form.coupon_code = data.coupon_code ?? ''
   form.published_at = data.published_at ? new Date(data.published_at).toISOString().slice(0, 16) : ''
   form.is_active = data.is_active ?? true
   editor.value?.commands.setContent(data.body ?? '')
 }
 
+const loadCoupons = async () => {
+  try {
+    const res = await adminService.getCoupons()
+    coupons.value = res.data ?? []
+  } catch {
+    couponsError.value = true
+  }
+}
+
 onMounted(async () => {
+  loadCoupons()
+
   if (!isEdit.value) return
   loadingItem.value = true
   try {
@@ -310,7 +413,10 @@ onMounted(async () => {
   }
 })
 
-onBeforeUnmount(() => editor.value?.destroy())
+onBeforeUnmount(() => {
+  clearTimeout(copiedTimer)
+  editor.value?.destroy()
+})
 </script>
 
 <style lang="stylus" scoped>
@@ -450,6 +556,7 @@ onBeforeUnmount(() => editor.value?.destroy())
   color #fc8181
 
 .form-input
+  color-scheme dark
   background rgba(0,0,0,0.25)
   border 1px solid rgba(255,255,255,0.1)
   border-radius 8px
@@ -461,6 +568,21 @@ onBeforeUnmount(() => editor.value?.destroy())
   box-sizing border-box
   &:focus
     border-color rgba(99,102,241,0.5)
+
+// com color-scheme dark o select ganha o cinza padrão do UA se o fundo não for opaco
+.form-select
+  appearance none
+  background-color #1c1c22
+  background-image url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23a5b4fc' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")
+  background-repeat no-repeat
+  background-position right 0.6rem center
+  background-size 16px
+  padding-right 2.2rem
+  cursor pointer
+
+  option
+    background #1c1c22
+    color #fff
 
 .editor-wrap
   border 1px solid rgba(255,255,255,0.1)
@@ -709,6 +831,51 @@ onBeforeUnmount(() => editor.value?.destroy())
   font-size 0.9rem
   color rgba(255,255,255,0.7)
   line-height 1.6
+
+.news-popup__coupon
+  display flex
+  align-items center
+  justify-content space-between
+  gap 1rem
+  margin 0 1.5rem 1.25rem
+  padding 0.75rem 1rem
+  border 1px dashed rgba(99,102,241,0.45)
+  border-radius 10px
+  background rgba(99,102,241,0.08)
+
+.coupon-label
+  display block
+  font-size 0.7rem
+  text-transform uppercase
+  letter-spacing 0.06em
+  color rgba(255,255,255,0.4)
+
+.coupon-code
+  display block
+  font-size 1.05rem
+  font-weight 700
+  letter-spacing 0.08em
+  color #a5b4fc
+
+.coupon-desc
+  display block
+  margin-top 2px
+  font-size 0.76rem
+  line-height 1.4
+  color rgba(255,255,255,0.5)
+
+.coupon-copy
+  display inline-flex
+  align-items center
+  gap 5px
+  padding 6px 14px
+  background #6366f1
+  border none
+  border-radius 8px
+  color #fff
+  font-size 0.8rem
+  font-weight 600
+  cursor pointer
 
 .news-popup__footer
   display flex

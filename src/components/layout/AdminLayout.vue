@@ -133,6 +133,32 @@ const navGroups: NavGroup[] = [
 
 const allItems = navGroups.flatMap((group) => group.items)
 
+// Busca no menu: acento não pode atrapalhar ("usuarios" tem que achar "Usuários")
+const normalize = (value: string) =>
+    value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+
+const searchableItems = [
+    { ...dashboard, group: 'Geral' },
+    ...navGroups.flatMap((group) => group.items.map((item) => ({ ...item, group: group.label }))),
+]
+
+const searchQuery = ref('')
+
+const searchResults = computed(() => {
+    const term = normalize(searchQuery.value.trim())
+    if (!term) return []
+
+    return searchableItems.filter((item) => normalize(`${item.label} ${item.group}`).includes(term))
+})
+
+const goToFirstResult = () => {
+    const first = searchResults.value[0]
+    if (!first) return
+
+    router.push(first.to)
+    searchQuery.value = ''
+}
+
 // Rota ativa = item de rota mais específica que casa com o path. Resolve /sales vs
 // /sales/summary sem flag manual, e deixa /sales/123 acender "Vendas".
 const activeItemName = computed(() => {
@@ -211,7 +237,41 @@ onMounted(() => {
                 </button>
             </div>
 
-            <nav class="sidebar-nav">
+            <div v-if="expanded" class="sidebar-search">
+                <Icon icon="mdi:magnify" class="search-icon" />
+                <input
+                    v-model="searchQuery"
+                    type="text"
+                    class="search-input"
+                    placeholder="Buscar no menu..."
+                    @keydown.enter="goToFirstResult"
+                    @keydown.esc="searchQuery = ''"
+                />
+                <button v-if="searchQuery" class="search-clear" @click="searchQuery = ''">
+                    <Icon icon="mdi:close" width="14" />
+                </button>
+            </div>
+
+            <nav v-if="searchQuery" class="sidebar-nav">
+                <router-link
+                    v-for="item in searchResults"
+                    :key="item.name"
+                    :to="item.to"
+                    class="nav-item nav-item--result"
+                    :class="{ active: activeItemName === item.name }"
+                    @click="searchQuery = ''"
+                >
+                    <Icon :icon="item.icon" class="nav-icon" />
+                    <span class="nav-label">
+                        {{ item.label }}
+                        <small class="result-group">{{ item.group }}</small>
+                    </span>
+                </router-link>
+
+                <p v-if="!searchResults.length" class="search-empty">Nada encontrado.</p>
+            </nav>
+
+            <nav v-else class="sidebar-nav">
                 <router-link
                     :to="dashboard.to"
                     class="nav-item"
@@ -330,6 +390,66 @@ onMounted(() => {
     &:hover
         color #fff
         background rgba(255,255,255,0.05)
+
+.sidebar-search
+    position relative
+    display flex
+    align-items center
+    padding 0.75rem 0.75rem 0.5rem
+
+.search-icon
+    position absolute
+    left 1.4rem
+    font-size 1rem
+    color #64748b
+    pointer-events none
+
+.search-input
+    width 100%
+    background rgba(255,255,255,0.04)
+    border 1px solid rgba(255,255,255,0.07)
+    border-radius 8px
+    color #fff
+    font-size 0.82rem
+    padding 0.45rem 1.75rem
+    outline none
+
+    &::placeholder
+        color #64748b
+
+    &:focus
+        border-color rgba(99,102,241,0.5)
+        background rgba(255,255,255,0.06)
+
+.search-clear
+    position absolute
+    right 1.4rem
+    display flex
+    background transparent
+    border none
+    color #64748b
+    cursor pointer
+    padding 0
+
+    &:hover
+        color #fff
+
+.search-empty
+    padding 0.75rem 1rem
+    font-size 0.8rem
+    color #64748b
+    margin 0
+
+.nav-item--result .nav-label
+    display flex
+    flex-direction column
+    line-height 1.25
+
+.result-group
+    font-size 0.68rem
+    color #64748b
+    text-transform uppercase
+    letter-spacing 0.04em
 
 .sidebar-nav
     flex 1

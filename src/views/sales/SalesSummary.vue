@@ -57,16 +57,38 @@ const onManualDateChange = () => {
     fetch()
 }
 
+// Collector não conhece APPROVED/COMPLETED — os três significam "pago" aqui
+const COLLECTOR_PAID_STATUS: Record<string, string> = {
+    PAID: 'PAID',
+    APPROVED: 'PAID',
+    COMPLETED: 'PAID',
+}
+
+const fetchCollectorOrders = async () => {
+    const { data } = await adminService.getCollectorSales({
+        limit: 1000,
+        paid_from: dateFrom.value,
+        paid_to: `${dateTo.value}T23:59:59.999Z`,
+        payment_status: COLLECTOR_PAID_STATUS[paymentStatus.value],
+    })
+
+    // faturamento do collector é o paid_at; o resto da tela agrupa por created_at
+    return (data?.data ?? []).map((order: any) => ({ ...order, created_at: order.paid_at }))
+}
+
 const fetch = async () => {
     if (!dateFrom.value || !dateTo.value) return
     loading.value = true
     try {
-        const { data } = await adminService.exportSalesReport({
-            from: dateFrom.value,
-            to: dateTo.value,
-            paymentStatus: paymentStatus.value || undefined,
-        })
-        sales.value = data?.data ?? []
+        const [salesRes, collectorOrders] = await Promise.all([
+            adminService.exportSalesReport({
+                from: dateFrom.value,
+                to: dateTo.value,
+                paymentStatus: paymentStatus.value || undefined,
+            }),
+            fetchCollectorOrders(),
+        ])
+        sales.value = [...(salesRes.data?.data ?? []), ...collectorOrders]
         renderChart()
     } catch (err) {
         console.error('Erro ao carregar resumo:', err)

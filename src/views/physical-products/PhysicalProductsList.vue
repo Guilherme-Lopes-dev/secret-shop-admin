@@ -251,7 +251,7 @@ onMounted(fetchProducts)
             <div class="form-row">
                 <div class="field field--full">
                     <label class="field-label">Mídias (fotos/vídeo) <span v-if="!editingUuid" class="required">*</span></label>
-                    <input type="file" multiple accept="image/png,image/jpeg,image/webp,video/mp4" @change="onFilesSelected" class="field-file" :disabled="uploading" />
+                    <input type="file" multiple accept="image/png,image/jpeg,image/webp" @change="onFilesSelected" class="field-file" :disabled="uploading" />
                     <span v-if="uploading" class="field-hint-ok"><Icon icon="mdi:loading" class="spinning" /> Enviando...</span>
 
                     <div v-if="existingMedia.length" class="media-grid">

@@ -49,7 +49,7 @@ const handleUpload = async () => {
         <p class="page-subtitle">Envia imagem ou vídeo pro /uploads/media do backend, pra validar o fluxo de mídia de produtos físicos</p>
 
         <div class="form-card">
-            <input type="file" accept="image/png,image/jpeg,image/webp,video/mp4" @change="onFileChange" class="field-file" />
+            <input type="file" accept="image/png,image/jpeg,image/webp" @change="onFileChange" class="field-file" />
 
             <div v-if="localPreview" class="preview-box">
                 <p class="preview-label">Preview local</p>

@@ -589,12 +589,16 @@ export const adminService = {
     delivery_status?: string
     search?: string
     from?: string
+    paid_from?: string
+    paid_to?: string
   } = {}) {
     const p = new URLSearchParams({ page: String(params.page ?? 1), limit: String(params.limit ?? 20) })
     if (params.payment_status) p.append('payment_status', params.payment_status)
     if (params.delivery_status) p.append('delivery_status', params.delivery_status)
     if (params.search) p.append('search', params.search)
     if (params.from) p.append('from', params.from)
+    if (params.paid_from) p.append('paid_from', params.paid_from)
+    if (params.paid_to) p.append('paid_to', params.paid_to)
     return api.get(`/collector-sales/admin/list?${p}`)
   },
 

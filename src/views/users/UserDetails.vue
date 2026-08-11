@@ -25,6 +25,18 @@ const whatsappHref = (phone?: string | null): string | null => {
     return digits.length >= 10 ? `https://wa.me/${digits}` : null
 }
 
+// Cada origem de pedido abre numa rota própria.
+const ORDER_ORIGINS: Record<string, { label: string; path: string }> = {
+    sale: { label: 'Skin', path: '/sales' },
+    collector: { label: 'Collector', path: '/collector-orders' },
+    physical: { label: 'Físico', path: '/physical-orders' },
+}
+
+const originOf = (kind: string) => ORDER_ORIGINS[kind] ?? { label: kind, path: '/sales' }
+
+const openOrder = (order: { kind: string; uuid: string }) =>
+    router.push(`${originOf(order.kind).path}/${order.uuid}`)
+
 const fetchUser = async () => {
     loading.value = true
     error.value = ''
@@ -208,7 +220,7 @@ onMounted(fetchUser)
                         <Icon icon="mdi:cash-multiple" width="22" />
                     </div>
                     <div class="stat-info">
-                        <span class="stat-label">Total Gasto</span>
+                        <span class="stat-label">Total Gasto (pago)</span>
                         <span class="stat-value">{{ formatCurrency(user.total_spent ?? 0) }}</span>
                     </div>
                 </div>
@@ -217,8 +229,8 @@ onMounted(fetchUser)
                         <Icon icon="mdi:cart-outline" width="22" />
                     </div>
                     <div class="stat-info">
-                        <span class="stat-label">Total de Pedidos</span>
-                        <span class="stat-value">{{ user._count?.sales ?? 0 }}</span>
+                        <span class="stat-label">Pedidos Pagos</span>
+                        <span class="stat-value">{{ user.orders_count ?? 0 }}</span>
                     </div>
                 </div>
             </div>
@@ -295,13 +307,14 @@ onMounted(fetchUser)
                 </div>
 
                 <div class="section">
-                    <h2 class="section-title">Últimos Pedidos ({{ user.sales?.length ?? 0 }})</h2>
-                    <div v-if="!user.sales?.length" class="empty-state">Nenhum pedido.</div>
+                    <h2 class="section-title">Últimos Pedidos ({{ user.recent_orders?.length ?? 0 }})</h2>
+                    <div v-if="!user.recent_orders?.length" class="empty-state">Nenhum pedido.</div>
                     <div v-else class="table-wrapper">
                         <table>
                             <thead>
                                 <tr>
                                     <th>Pedido</th>
+                                    <th>Origem</th>
                                     <th>Valor</th>
                                     <th>Status</th>
                                     <th>Data</th>
@@ -309,19 +322,20 @@ onMounted(fetchUser)
                             </thead>
                             <tbody>
                                 <tr
-                                    v-for="sale in user.sales"
-                                    :key="sale.uuid ?? sale.id"
+                                    v-for="order in user.recent_orders"
+                                    :key="`${order.kind}:${order.uuid}`"
                                     class="clickable-row"
-                                    @click="router.push(`/sales/${sale.uuid ?? sale.id}`)"
+                                    @click="openOrder(order)"
                                 >
-                                    <td><strong>{{ sale.order_number }}</strong></td>
-                                    <td>{{ formatCurrency(sale.total_amount) }}</td>
+                                    <td><strong>{{ order.order_number }}</strong></td>
+                                    <td>{{ originOf(order.kind).label }}</td>
+                                    <td>{{ formatCurrency(order.total_amount) }}</td>
                                     <td>
-                                        <span class="status-badge" :class="getStatusClass(sale.payment_status)">
-                                            {{ sale.payment_status }}
+                                        <span class="status-badge" :class="getStatusClass(order.payment_status)">
+                                            {{ order.payment_status }}
                                         </span>
                                     </td>
-                                    <td>{{ $dayjs(sale.created_at).format('DD/MM/YY HH:mm') }}</td>
+                                    <td>{{ $dayjs(order.created_at).format('DD/MM/YY HH:mm') }}</td>
                                 </tr>
                             </tbody>
                         </table>

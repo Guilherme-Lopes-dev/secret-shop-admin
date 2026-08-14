@@ -54,14 +54,14 @@ watch(() => props.userUuid, fetchProgress)
 </script>
 
 <template>
-  <section class="progress-section">
-    <div class="progress-header">
+  <details class="progress-section" open>
+    <summary class="progress-header">
       <div class="progress-header__title">
         <Icon icon="mdi:shield-star" width="20" />
         <h2>Nível do Perfil</h2>
       </div>
       <span v-if="data" class="tier-badge">Nível {{ data.tier }} / {{ data.tier_max }}</span>
-    </div>
+    </summary>
 
     <div v-if="loading" class="state state--loading">Carregando progresso...</div>
     <div v-else-if="error" class="state state--error">{{ error }}</div>
@@ -128,7 +128,7 @@ watch(() => props.userUuid, fetchProgress)
         </div>
       </div>
     </template>
-  </section>
+  </details>
 </template>
 
 <style lang="stylus" scoped>
@@ -139,6 +139,8 @@ watch(() => props.userUuid, fetchProgress)
     border 1px solid rgba(255,255,255,0.05)
     margin-bottom 1.5rem
 
+// <details> nativo faz o abre/fecha — sem estado, sem JS. Só escondemos o
+// marcador padrão (cada browser desenha o seu) e pomos a seta no título.
 .progress-header
     display flex
     align-items center
@@ -146,6 +148,25 @@ watch(() => props.userUuid, fetchProgress)
     gap 1rem
     flex-wrap wrap
     margin-bottom 1.25rem
+    cursor pointer
+    list-style none
+    user-select none
+
+    &::-webkit-details-marker
+        display none
+
+.progress-header__title::before
+    content '▸'
+    display inline-block
+    margin-right 0.25rem
+    color #64748b
+    transition transform 0.15s
+
+details[open] > .progress-header .progress-header__title::before
+    transform rotate(90deg)
+
+details:not([open]) > .progress-header
+    margin-bottom 0
     padding-bottom 0.75rem
     border-bottom 1px solid rgba(255,255,255,0.05)
 

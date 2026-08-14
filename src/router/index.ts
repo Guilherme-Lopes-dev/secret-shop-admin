@@ -219,6 +219,16 @@ const routes = [
         component: () => import('@/views/recommendations/RecommendationsList.vue'),
       },
       {
+        path: 'rewards',
+        name: 'rewards',
+        component: () => import('@/views/rewards/RewardClaimsList.vue'),
+      },
+      {
+        path: 'rewards/simulate',
+        name: 'rewards-simulate',
+        component: () => import('@/views/rewards/RewardSimulation.vue'),
+      },
+      {
         path: 'swaps',
         name: 'swaps',
         component: () => import('@/views/swaps/SwapsList.vue'),

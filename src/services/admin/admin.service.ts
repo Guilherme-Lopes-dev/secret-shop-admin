@@ -242,25 +242,19 @@ export const adminService = {
   },
 
   // Inventory
-  async getInventory(
-    page: number = 1,
-    limit: number = 20,
-    botId?: string,
-    status?: string,
-    search?: string,
-    sort?: string,
-    minPrice?: number,
-    maxPrice?: number,
-    marketplace?: string,
-  ) {
-    const params = new URLSearchParams({ page: String(page), limit: String(limit) })
-    if (botId) params.append('botId', botId)
-    if (status) params.append('status', status)
-    if (search) params.append('search', search)
-    if (sort) params.append('sort', sort)
-    if (minPrice !== undefined) params.append('minPrice', String(minPrice))
-    if (maxPrice !== undefined) params.append('maxPrice', String(maxPrice))
-    if (marketplace) params.append('marketplace', marketplace)
+  async getInventory(filters: InventoryFilters = {}) {
+    const params = new URLSearchParams({
+      page: String(filters.page ?? 1),
+      limit: String(filters.limit ?? 20),
+    })
+    if (filters.botId) params.append('botId', filters.botId)
+    if (filters.status) params.append('status', filters.status)
+    if (filters.search) params.append('search', filters.search)
+    if (filters.sort) params.append('sort', filters.sort)
+    if (filters.minPrice !== undefined) params.append('minPrice', String(filters.minPrice))
+    if (filters.maxPrice !== undefined) params.append('maxPrice', String(filters.maxPrice))
+    if (filters.marketplace) params.append('marketplace', filters.marketplace)
+    if (filters.rewardBlocked !== undefined) params.append('rewardBlocked', String(filters.rewardBlocked))
     return api.get(`/skins/admin/inventory?${params}`)
   },
 
@@ -489,6 +483,55 @@ export const adminService = {
 
   async toggleSkinPriceLock(skinUuid: string, locked: boolean) {
     return api.patch(`/skins/admin/skin/${skinUuid}/price-lock`, { locked })
+  },
+
+  /** Veta (ou libera) a skin no sorteio de brindes de nível. */
+  async toggleSkinRewardBlock(skinUuid: string, blocked: boolean) {
+    return api.patch(`/skins/admin/skin/${skinUuid}/reward-block`, { blocked })
+  },
+
+  // Brindes — fila de liberação
+  async getRewardClaims(filters: RewardClaimFilters = {}) {
+    const params = new URLSearchParams({
+      page: String(filters.page ?? 1),
+      limit: String(filters.limit ?? 20),
+    })
+    if (filters.status) params.append('status', filters.status)
+    if (filters.search) params.append('search', filters.search)
+    if (filters.tier) params.append('tier', String(filters.tier))
+    if (filters.min_price != null) params.append('min_price', String(filters.min_price))
+    if (filters.max_price != null) params.append('max_price', String(filters.max_price))
+    if (filters.from) params.append('from', filters.from)
+    if (filters.to) params.append('to', filters.to)
+    return api.get<RewardClaimsPage>(`/admin/rewards/claims?${params}`)
+  },
+
+  async releaseRewardClaim(orderUuid: string) {
+    return api.post(`/admin/rewards/claims/${orderUuid}/release`)
+  },
+
+  async rejectRewardClaim(orderUuid: string, reason?: string) {
+    return api.post(`/admin/rewards/claims/${orderUuid}/reject`, { reason })
+  },
+
+  /** Sorteio de mentira: cada chamada re-sorteia, nada é reservado nem enviado. */
+  async simulateRewards(filters: { page?: number; limit?: number; search?: string; tier?: number } = {}) {
+    const params = new URLSearchParams({
+      page: String(filters.page ?? 1),
+      limit: String(filters.limit ?? 20),
+    })
+    if (filters.search) params.append('search', filters.search)
+    if (filters.tier) params.append('tier', String(filters.tier))
+    return api.get<RewardSimulationPage>(`/admin/rewards/simulate?${params}`)
+  },
+
+  async getRewardsConfig() {
+    return api.get<{ enabled: boolean }>('/admin/rewards/config')
+  },
+
+  /** Chave geral: desligada, ninguém resgata e a escada some da tela do usuário. */
+  async setRewardsEnabled(enabled: boolean) {
+    return api.post<{ enabled: boolean }>('/admin/rewards/config', { enabled })
   },
 
   // Preços — catálogo + evolução por skin
@@ -1063,6 +1106,103 @@ export const adminService = {
   async deleteArcanaHeroMultiplier(hero: string) {
     return api.post<ArcanaHeroMultiplier[]>('/skins/admin/pricing-config/arcana-heroes/delete', { hero })
   },
+}
+
+export interface RewardClaimFilters {
+  page?: number
+  limit?: number
+  /** Vazio = todo resgate já feito, de qualquer status. */
+  status?: string
+  /** Username ou número do pedido. */
+  search?: string
+  tier?: number
+  /** Faixa de valor do item sorteado, em centavos. */
+  min_price?: number
+  max_price?: number
+  /** Datas ISO do resgate. */
+  from?: string
+  to?: string
+}
+
+export interface RewardClaim {
+  order_uuid:   string
+  order_number: string
+  tier:         number | null
+  status:       string
+  created_at:   string
+  user: {
+    id:             string | null
+    username:       string | null
+    avatar:         string | null
+    /** Sem trade link a liberação falha — a tela avisa antes do clique. */
+    has_trade_link: boolean
+  }
+  item: {
+    name:           string | null
+    hero:           string | null
+    icon_url_large: string | null
+    retail_price:   number | null
+  }
+}
+
+export interface RewardClaimsPage {
+  data: RewardClaim[]
+  meta: {
+    total:           number
+    page:            number
+    limit:           number
+    totalPages:      number
+    awaiting_review: number
+  }
+}
+
+/** Por que a linha não tem item — `ok` é a única com brinde sorteado. */
+export type RewardSimulationReason = 'ok' | 'locked' | 'all_claimed' | 'no_stock'
+
+export interface RewardSimulationRow {
+  user: {
+    id:             string
+    username:       string | null
+    avatar:         string | null
+    has_trade_link: boolean
+  }
+  /** Gasto que dimensiona o brinde e o orçamento que ele compra, em centavos. */
+  spent:        number
+  budget:       number
+  reached_tier: number
+  /** Nível simulado — nulo quando não há o que resgatar. */
+  tier:         number | null
+  band:         { min_price: number; max_price: number } | null
+  item: {
+    id:             string
+    name:           string
+    hero:           string | null
+    icon_url_large: string | null
+    price:          number
+  } | null
+  /** Itens disponíveis na faixa dele agora. O sorteio não reserva — isso é o teto. */
+  stock:  number
+  reason: RewardSimulationReason
+}
+
+export interface RewardSimulationPage {
+  data: RewardSimulationRow[]
+  /** `max_reward_tier` = quantos baús a escada tem hoje; a tela não chuta o número. */
+  meta: { total: number; page: number; limit: number; totalPages: number; max_reward_tier: number }
+}
+
+export interface InventoryFilters {
+  page?: number
+  limit?: number
+  botId?: string
+  status?: string
+  search?: string
+  sort?: string
+  minPrice?: number
+  maxPrice?: number
+  marketplace?: string
+  /** true = só as vetadas como brinde, false = só as liberadas, undefined = todas. */
+  rewardBlocked?: boolean
 }
 
 export interface MarketExplorerFilters {

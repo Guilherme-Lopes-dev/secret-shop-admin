@@ -64,8 +64,8 @@ watch(() => props.userUuid, fetchProgress)
 </script>
 
 <template>
-  <section class="pass-section">
-    <div class="pass-header">
+  <details class="pass-section" open>
+    <summary class="pass-header">
       <div class="pass-header__title">
         <Icon icon="mdi:trophy-variant" width="20" />
         <h2>Secret Pass</h2>
@@ -84,7 +84,7 @@ watch(() => props.userUuid, fetchProgress)
           {{ data.current_tier.name }}
         </span>
       </div>
-    </div>
+    </summary>
 
     <div v-if="loading" class="state state--loading">Carregando pass...</div>
     <div v-else-if="error" class="state state--error">{{ error }}</div>
@@ -173,7 +173,7 @@ watch(() => props.userUuid, fetchProgress)
         </div>
       </div>
     </template>
-  </section>
+  </details>
 </template>
 
 <style lang="stylus" scoped>
@@ -184,6 +184,8 @@ watch(() => props.userUuid, fetchProgress)
     border 1px solid rgba(255,255,255,0.05)
     margin-bottom 1.5rem
 
+// <details> nativo faz o abre/fecha — sem estado, sem JS. Só escondemos o
+// marcador padrão (cada browser desenha o seu) e pomos a seta no título.
 .pass-header
     display flex
     align-items center
@@ -191,6 +193,25 @@ watch(() => props.userUuid, fetchProgress)
     gap 1rem
     flex-wrap wrap
     margin-bottom 1.25rem
+    cursor pointer
+    list-style none
+    user-select none
+
+    &::-webkit-details-marker
+        display none
+
+.pass-header__title::before
+    content '▸'
+    display inline-block
+    margin-right 0.25rem
+    color #64748b
+    transition transform 0.15s
+
+details[open] > .pass-header .pass-header__title::before
+    transform rotate(90deg)
+
+details:not([open]) > .pass-header
+    margin-bottom 0
     padding-bottom 0.75rem
     border-bottom 1px solid rgba(255,255,255,0.05)
 

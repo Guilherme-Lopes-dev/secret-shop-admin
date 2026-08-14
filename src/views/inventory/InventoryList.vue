@@ -23,23 +23,46 @@ const minPriceInput = ref('')
 const maxPriceInput = ref('')
 let searchTimeout: ReturnType<typeof setTimeout> | null = null
 
-const togglingLock = ref<Set<string>>(new Set())
+// Os dois toggles da linha são a mesma dança (chama a API, espelha o campo,
+// avisa) — só muda o endpoint e o texto. Um mapa evita duas cópias da função.
+const SKIN_FLAGS = {
+    price_locked: {
+        save: (uuid: string, value: boolean) => adminService.toggleSkinPriceLock(uuid, value),
+        on: 'Preço bloqueado para sync automático.',
+        off: 'Preço desbloqueado.',
+    },
+    reward_blocked: {
+        save: (uuid: string, value: boolean) => adminService.toggleSkinRewardBlock(uuid, value),
+        on: 'Skin vetada — não sai mais como brinde.',
+        off: 'Skin liberada para os brindes de nível.',
+    },
+} as const
 
-const handleToggleLock = async (item: any, event: MouseEvent) => {
+type SkinFlag = keyof typeof SKIN_FLAGS
+
+const toggling = ref<Set<string>>(new Set())
+
+const isToggling = (item: any, flag: SkinFlag) => toggling.value.has(`${item.skins?.id}:${flag}`)
+
+const toggleSkinFlag = async (item: any, flag: SkinFlag, event: MouseEvent) => {
     event.stopPropagation()
-    const skinUuid = item.skins?.id
-    if (!skinUuid || togglingLock.value.has(skinUuid)) return
 
-    const locked = !item.skins?.price_locked
-    togglingLock.value = new Set([...togglingLock.value, skinUuid])
+    const skinUuid = item.skins?.id
+    if (!skinUuid || isToggling(item, flag)) return
+
+    const key = `${skinUuid}:${flag}`
+    const value = !item.skins[flag]
+    const { save, on, off } = SKIN_FLAGS[flag]
+
+    toggling.value = new Set([...toggling.value, key])
     try {
-        await adminService.toggleSkinPriceLock(skinUuid, locked)
-        item.skins.price_locked = locked
-        toast.success(locked ? 'Preço bloqueado para sync automático.' : 'Preço desbloqueado.')
+        await save(skinUuid, value)
+        item.skins[flag] = value
+        toast.success(value ? on : off)
     } catch (e: any) {
-        toast.error(e?.response?.data?.message || 'Erro ao alterar lock.')
+        toast.error(e?.response?.data?.message || 'Erro ao alterar a skin.')
     } finally {
-        togglingLock.value = new Set([...togglingLock.value].filter(id => id !== skinUuid))
+        toggling.value = new Set([...toggling.value].filter(k => k !== key))
     }
 }
 
@@ -54,6 +77,13 @@ const sortOptions = [
     { label: 'Mais recente', value: '' },
     { label: 'Maior preço', value: 'price_desc' },
     { label: 'Menor preço', value: 'price_asc' },
+]
+
+const rewardFilter = ref('')
+const rewardOptions = [
+    { label: 'Brinde: todas', value: '' },
+    { label: 'Brinde: liberadas', value: 'false' },
+    { label: 'Brinde: vetadas', value: 'true' },
 ]
 
 const marketplaceFilter = ref('')
@@ -75,17 +105,18 @@ const fetchInventory = async (page: number) => {
     try {
         const minPrice = minPriceInput.value ? Math.round(parseFloat(minPriceInput.value) * 100) : undefined
         const maxPrice = maxPriceInput.value ? Math.round(parseFloat(maxPriceInput.value) * 100) : undefined
-        const response = await adminService.getInventory(
+        const response = await adminService.getInventory({
             page,
-            limit.value,
-            botFilter.value || undefined,
-            statusFilter.value || undefined,
-            searchQuery.value || undefined,
-            sortFilter.value || undefined,
+            limit: limit.value,
+            botId: botFilter.value || undefined,
+            status: statusFilter.value || undefined,
+            search: searchQuery.value || undefined,
+            sort: sortFilter.value || undefined,
             minPrice,
             maxPrice,
-            marketplaceFilter.value || undefined,
-        )
+            marketplace: marketplaceFilter.value || undefined,
+            rewardBlocked: rewardFilter.value === '' ? undefined : rewardFilter.value === 'true',
+        })
         if (response.data) {
             items.value = response.data.data
             totalPages.value = response.data.pages
@@ -149,7 +180,7 @@ onMounted(() => {
             <div class="header-actions">
                 <select v-model="botFilter" @change="onFilterChange" class="filter-select">
                     <option value="">Todos os bots</option>
-                    <option v-for="bot in bots" :key="bot.id ?? bot.uuid" :value="bot.id ?? bot.uuid">{{ bot.name }}</option>
+                    <option v-for="bot in bots" :key="bot.id" :value="bot.id">{{ bot.name }}</option>
                 </select>
                 <select v-model="statusFilter" @change="onFilterChange" class="filter-select">
                     <option v-for="opt in statusOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
@@ -180,6 +211,9 @@ onMounted(() => {
             </select>
             <select v-model="marketplaceFilter" @change="onFilterChange" class="filter-select">
                 <option v-for="opt in marketplaceOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+            </select>
+            <select v-model="rewardFilter" @change="onFilterChange" class="filter-select">
+                <option v-for="opt in rewardOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
             </select>
             <div class="price-range">
                 <input
@@ -217,6 +251,7 @@ onMounted(() => {
                                 <th>Tradable</th>
                                 <th>Status</th>
                                 <th>Preço Lock</th>
+                                <th>Brinde</th>
                                 <th>Criado em</th>
                             </tr>
                         </thead>
@@ -255,20 +290,34 @@ onMounted(() => {
                                     <button
                                         class="lock-btn"
                                         :class="{ locked: item.skins?.price_locked }"
-                                        :disabled="togglingLock.has(item.skins?.id)"
+                                        :disabled="isToggling(item, 'price_locked')"
                                         :title="item.skins?.price_locked ? 'Preço bloqueado — clique para desbloquear' : 'Preço livre — clique para bloquear'"
-                                        @click="handleToggleLock(item, $event)"
+                                        @click="toggleSkinFlag(item, 'price_locked', $event)"
                                     >
                                         <Icon
-                                            :icon="togglingLock.has(item.skins?.id) ? 'mdi:loading' : item.skins?.price_locked ? 'mdi:lock' : 'mdi:lock-open-outline'"
-                                            :class="{ spinning: togglingLock.has(item.skins?.id) }"
+                                            :icon="isToggling(item, 'price_locked') ? 'mdi:loading' : item.skins?.price_locked ? 'mdi:lock' : 'mdi:lock-open-outline'"
+                                            :class="{ spinning: isToggling(item, 'price_locked') }"
+                                        />
+                                    </button>
+                                </td>
+                                <td class="center" @click.stop>
+                                    <button
+                                        class="lock-btn"
+                                        :class="{ locked: item.skins?.reward_blocked }"
+                                        :disabled="isToggling(item, 'reward_blocked')"
+                                        :title="item.skins?.reward_blocked ? 'Vetada dos brindes — clique para liberar' : 'Pode sair como brinde — clique para vetar'"
+                                        @click="toggleSkinFlag(item, 'reward_blocked', $event)"
+                                    >
+                                        <Icon
+                                            :icon="isToggling(item, 'reward_blocked') ? 'mdi:loading' : item.skins?.reward_blocked ? 'mdi:gift-off-outline' : 'mdi:gift-outline'"
+                                            :class="{ spinning: isToggling(item, 'reward_blocked') }"
                                         />
                                     </button>
                                 </td>
                                 <td>{{ $dayjs(item.created_at).format('DD/MM/YY') }}</td>
                             </tr>
                             <tr v-if="items.length === 0">
-                                <td colspan="8" class="empty-state">Nenhum item encontrado.</td>
+                                <td colspan="10" class="empty-state">Nenhum item encontrado.</td>
                             </tr>
                         </tbody>
                     </table>

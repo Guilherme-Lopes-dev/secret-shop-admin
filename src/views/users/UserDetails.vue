@@ -37,6 +37,16 @@ const originOf = (kind: string) => ORDER_ORIGINS[kind] ?? { label: kind, path: '
 const openOrder = (order: { kind: string; uuid: string }) =>
     router.push(`${originOf(order.kind).path}/${order.uuid}`)
 
+// Brinde é uma venda de skin — abre na mesma tela de pedido.
+const openGift = (claim: { order_uuid: string }) => router.push(`/sales/${claim.order_uuid}`)
+
+const skinThumb = (icon?: string | null): string | null =>
+    icon ? `https://steamcommunity-a.akamaihd.net/economy/image/${icon}/62fx62f` : null
+
+// Quanto o estoque saiu de graça: o pedido do brinde vale zero.
+const giftCost = (claims: any[] = []) =>
+    claims.reduce((total, claim) => total + (claim.item?.retail_price ?? 0), 0)
+
 const fetchUser = async () => {
     loading.value = true
     error.value = ''
@@ -125,7 +135,8 @@ const getStatusClass = (status: string) => {
     if (!status) return ''
     const s = status.toLowerCase()
     if (['completed', 'approved', 'paid'].includes(s)) return 'status-completed'
-    if (['pending', 'processing'].includes(s)) return 'status-pending'
+    // awaiting_review é brinde esperando liberação — amarelo, não vermelho.
+    if (['pending', 'processing', 'awaiting_review', 'in_progress'].includes(s)) return 'status-pending'
     return 'status-canceled'
 }
 
@@ -240,8 +251,8 @@ onMounted(fetchUser)
             <UserProgressCard :user-uuid="user.id" />
 
             <div class="details-grid">
-                <div class="section">
-                    <h2 class="section-title">Informações</h2>
+                <details class="section" open>
+                    <summary class="section-title">Informações</summary>
                     <div class="info-list">
                         <div class="info-row">
                             <span class="info-label">Steam ID</span>
@@ -304,10 +315,10 @@ onMounted(fetchUser)
                             <span class="info-value">{{ $dayjs(user.created_at).format('DD/MM/YYYY HH:mm') }}</span>
                         </div>
                     </div>
-                </div>
+                </details>
 
-                <div class="section">
-                    <h2 class="section-title">Últimos Pedidos ({{ user.recent_orders?.length ?? 0 }})</h2>
+                <details class="section" open>
+                    <summary class="section-title">Últimos Pedidos ({{ user.recent_orders?.length ?? 0 }})</summary>
                     <div v-if="!user.recent_orders?.length" class="empty-state">Nenhum pedido.</div>
                     <div v-else class="table-wrapper">
                         <table>
@@ -340,7 +351,66 @@ onMounted(fetchUser)
                             </tbody>
                         </table>
                     </div>
-                </div>
+                </details>
+
+                <details class="section" open>
+                    <summary class="section-title">
+                        Brindes sorteados ({{ user.reward_claims?.length ?? 0 }})
+                        <span v-if="user.reward_claims?.length" class="section-note">
+                            {{ formatCurrency(giftCost(user.reward_claims)) }} em estoque
+                        </span>
+                    </summary>
+                    <div v-if="!user.reward_claims?.length" class="empty-state">Nenhum brinde resgatado.</div>
+                    <div v-else class="table-wrapper">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Item</th>
+                                    <th>Nível</th>
+                                    <th>Valor de vitrine</th>
+                                    <th>Entrega</th>
+                                    <th>Pedido</th>
+                                    <th>Data</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr
+                                    v-for="claim in user.reward_claims"
+                                    :key="claim.order_uuid"
+                                    class="clickable-row"
+                                    @click="openGift(claim)"
+                                >
+                                    <td>
+                                        <div class="gift-cell">
+                                            <img
+                                                v-if="skinThumb(claim.item?.icon_url_large)"
+                                                :src="skinThumb(claim.item?.icon_url_large)!"
+                                                class="gift-thumb"
+                                                alt=""
+                                            />
+                                            <div v-else class="gift-thumb gift-thumb--empty">
+                                                <Icon icon="mdi:gift-outline" />
+                                            </div>
+                                            <div>
+                                                <span class="gift-name">{{ claim.item?.name || '—' }}</span>
+                                                <small class="gift-hero">{{ claim.item?.hero || 'sem herói' }}</small>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>{{ claim.tier ?? '—' }}</td>
+                                    <td>{{ formatCurrency(claim.item?.retail_price) }}</td>
+                                    <td>
+                                        <span class="status-badge" :class="getStatusClass(claim.fulfillment_status)">
+                                            {{ claim.fulfillment_status }}
+                                        </span>
+                                    </td>
+                                    <td><strong>{{ claim.order_number }}</strong></td>
+                                    <td>{{ $dayjs(claim.created_at).format('DD/MM/YY HH:mm') }}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </details>
             </div>
         </template>
     </div>
@@ -551,6 +621,72 @@ onMounted(fetchUser)
     margin-bottom 1.25rem
     padding-bottom 0.75rem
     border-bottom 1px solid rgba(255,255,255,0.05)
+
+// <details> nativo faz o abre/fecha — sem estado, sem JS. Só falta esconder o
+// marcador padrão (que cada browser desenha diferente) e pôr a seta nossa.
+summary.section-title
+    display flex
+    align-items center
+    gap 0.5rem
+    cursor pointer
+    list-style none
+    user-select none
+
+    &::-webkit-details-marker
+        display none
+
+    &::before
+        content '▸'
+        display inline-block
+        color #64748b
+        font-size 0.85rem
+        transition transform 0.15s
+
+    &:hover::before
+        color #94a3b8
+
+details[open] > summary.section-title::before
+    transform rotate(90deg)
+
+// Fechado vira só a linha do título, sem sobra de espaçamento embaixo.
+details.section:not([open]) > summary.section-title
+    margin-bottom 0
+    padding-bottom 0
+    border-bottom none
+
+.section-note
+    margin-left 0.5rem
+    font-size 0.8rem
+    font-weight 500
+    color #94a3b8
+
+.gift-cell
+    display flex
+    align-items center
+    gap 0.625rem
+
+.gift-thumb
+    width 40px
+    height 40px
+    object-fit contain
+    border-radius 4px
+    background rgba(255,255,255,0.04)
+
+    &--empty
+        display flex
+        align-items center
+        justify-content center
+        color #64748b
+
+.gift-name
+    display block
+    font-weight 500
+    font-size 0.85rem
+
+.gift-hero
+    display block
+    color #64748b
+    font-size 0.73rem
 
 .info-list
     display flex

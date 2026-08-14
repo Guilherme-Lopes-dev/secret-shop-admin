@@ -25,6 +25,39 @@ import type {
   ProfileProgressDto,
 } from './types'
 
+/** Origem da trade: quem a API classificou como brinde, swap ou compra. */
+export type TradeOfferType = 'purchase' | 'gift' | 'swap'
+
+export interface TradeOfferFilters {
+  page?: number
+  limit?: number
+  status?: string
+  type?: TradeOfferType | ''
+  search?: string
+}
+
+/** `uuid` chega como `id`: o interceptor do backend renomeia na resposta. */
+export interface TradeOfferRow {
+  id: string
+  trade_offer_id: string | null
+  offer_status: string | null
+  status: string | null
+  user_steam_id: string | null
+  attempt_count: number
+  sent_at: string | null
+  type: TradeOfferType | null
+  steam_bots: { name: string } | null
+  sales: { id: string; order_number: string } | null
+  swaps: { id: string } | null
+}
+
+export interface TradeOffersPage {
+  data: TradeOfferRow[]
+  total: number
+  page: number
+  pages: number
+}
+
 const collectorNotificationTypes = 'COLLECTOR_PURCHASE,COLLECTOR_SHIPPING_REMINDER'
 const dropshipNotificationTypes = 'DROPSHIP_PURCHASE'
 
@@ -206,10 +239,13 @@ export const adminService = {
   },
 
   // Trade offers
-  async getTradeOffers(page: number = 1, limit: number = 20, status?: string) {
+  async getTradeOffers(filters: TradeOfferFilters = {}) {
+    const { page = 1, limit = 20, status, type, search } = filters
     const params = new URLSearchParams({ page: String(page), limit: String(limit) })
     if (status) params.append('status', status)
-    return api.get(`/admin/sales/trade-offers?${params}`)
+    if (type) params.append('type', type)
+    if (search) params.append('search', search)
+    return api.get<TradeOffersPage>(`/admin/sales/trade-offers?${params}`)
   },
 
   async getTradeOfferById(uuid: string) {
@@ -508,6 +544,21 @@ export const adminService = {
 
   async releaseRewardClaim(orderUuid: string) {
     return api.post(`/admin/rewards/claims/${orderUuid}/release`)
+  },
+
+  /** Quantos brindes o filtro pega e quem entra no próximo lote — não libera nada. */
+  async previewBulkRelease(filters: BulkReleaseFilters) {
+    return api.get<BulkReleasePreview>(
+      `/admin/rewards/claims/bulk-release?${bulkReleaseParams(filters)}`,
+    )
+  },
+
+  async releaseRewardClaimsBulk(filters: BulkReleaseFilters) {
+    // Timeout do axios é 10s; o servidor libera em série e cada brinde é uma
+    // transação. Estourar aqui marcaria como falha algo que já foi liberado.
+    return api.post<BulkReleaseResult>('/admin/rewards/claims/bulk-release', filters, {
+      timeout: 60_000,
+    })
   },
 
   async rejectRewardClaim(orderUuid: string, reason?: string) {
@@ -1136,6 +1187,8 @@ export interface RewardClaim {
     avatar:         string | null
     /** Sem trade link a liberação falha — a tela avisa antes do clique. */
     has_trade_link: boolean
+    /** Gasto total em centavos — mesma régua do filtro de lote. */
+    spent: number | null
   }
   item: {
     name:           string | null
@@ -1154,6 +1207,61 @@ export interface RewardClaimsPage {
     totalPages:      number
     awaiting_review: number
   }
+}
+
+/** Filtros da liberação em lote. Valores em centavos, como na fila. */
+export interface BulkReleaseFilters {
+  limit?:     number
+  /** Seleção manual da tela. Presente, manda nos demais filtros. */
+  order_uuids?: string[]
+  search?:    string
+  tier?:      number
+  min_price?: number
+  max_price?: number
+  /** Gasto total do usuário — filtro que só existe no lote. */
+  min_spent?: number
+  max_spent?: number
+  from?:      string
+  to?:        string
+}
+
+/** Linha do console de liberação: o que sai da prévia e o que a tabela já tem. */
+export interface BulkReleaseGift {
+  order_uuid:     string
+  order_number:   string
+  username:       string | null
+  avatar:         string | null
+  has_trade_link: boolean
+  spent:          number | null
+  tier:           number | null
+  item: {
+    name:           string | null
+    icon_url_large: string | null
+    retail_price:   number | null
+  }
+}
+
+export interface BulkReleasePreview {
+  /** Total na fila de análise pelo filtro, antes do corte por gasto. */
+  matched:    number
+  batch_size: number
+  gifts:      BulkReleaseGift[]
+}
+
+export interface BulkReleaseResult {
+  released:      number
+  order_numbers: string[]
+  failed:        { order_number: string; reason: string }[]
+}
+
+const bulkReleaseParams = (filters: BulkReleaseFilters) => {
+  const params = new URLSearchParams()
+  Object.entries(filters).forEach(([key, value]) => {
+    if (value === undefined || value === '') return
+    params.append(key, String(value))
+  })
+
+  return params
 }
 
 /** Por que a linha não tem item — `ok` é a única com brinde sorteado. */

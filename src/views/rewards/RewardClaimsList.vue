@@ -4,7 +4,13 @@ import { useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import { toast } from 'vue3-toastify'
 import ConfirmActionModal from '@/components/common/ConfirmActionModal.vue'
-import { adminService, type RewardClaim } from '@/services/admin/admin.service'
+import {
+  adminService,
+  type BulkReleaseFilters,
+  type BulkReleaseGift,
+  type RewardClaim,
+} from '@/services/admin/admin.service'
+import BulkReleaseConsole from './BulkReleaseConsole.vue'
 import { formatCurrency } from '@/utils/formatCurrency'
 
 const router = useRouter()
@@ -22,8 +28,43 @@ const tierFilter = ref('')
 // Valor digitado em reais; a API filtra em centavos.
 const minPrice = ref('')
 const maxPrice = ref('')
+// Gasto do usuário: só a liberação em lote filtra por ele — não é coluna, é
+// soma de skins + collector + físico, cara demais pra paginar a fila inteira.
+const minSpent = ref('')
+const maxSpent = ref('')
 const dateFrom = ref('')
 const dateTo = ref('')
+const bulkLimit = ref(20)
+const pageSize = ref(50)
+const pageSizes = [20, 50, 100]
+
+// Seleção manual: some ao trocar de página ou filtro — marcar 100 e liberar
+// outra página seria o pior erro possível nesta tela.
+const selected = ref<Set<string>>(new Set())
+
+const isSelectable = (claim: RewardClaim) =>
+  claim.status === 'AWAITING_REVIEW' && claim.user.has_trade_link
+
+const selectableClaims = computed(() => claims.value.filter(isSelectable))
+
+const isSelected = (claim: RewardClaim) => selected.value.has(claim.order_uuid)
+
+const toggleSelected = (claim: RewardClaim) => {
+  const next = new Set(selected.value)
+  if (!next.delete(claim.order_uuid)) next.add(claim.order_uuid)
+
+  selected.value = next
+}
+
+const allSelected = computed(
+  () => selectableClaims.value.length > 0 && selected.value.size === selectableClaims.value.length,
+)
+
+const toggleAll = () => {
+  selected.value = allSelected.value
+    ? new Set()
+    : new Set(selectableClaims.value.map(claim => claim.order_uuid))
+}
 let searchTimeout: ReturnType<typeof setTimeout> | null = null
 
 const toCents = (value: string) => {
@@ -60,6 +101,7 @@ const fetchClaims = async (page: number) => {
   try {
     const { data } = await adminService.getRewardClaims({
       page,
+      limit: pageSize.value,
       status: statusFilter.value || undefined,
       search: searchQuery.value || undefined,
       tier: Number(tierFilter.value) || undefined,
@@ -70,6 +112,7 @@ const fetchClaims = async (page: number) => {
       to: dateTo.value ? `${dateTo.value}T23:59:59.999Z` : undefined,
     })
     claims.value = data.data
+    selected.value = new Set()
     totalPages.value = data.meta.totalPages
     totalItems.value = data.meta.total
     currentPage.value = data.meta.page
@@ -169,6 +212,88 @@ const toggleSystem = async () => {
   }
 }
 
+const bulkFilters = (): BulkReleaseFilters => ({
+  limit: bulkLimit.value,
+  search: searchQuery.value || undefined,
+  tier: Number(tierFilter.value) || undefined,
+  min_price: toCents(minPrice.value),
+  max_price: toCents(maxPrice.value),
+  min_spent: toCents(minSpent.value),
+  max_spent: toCents(maxSpent.value),
+  from: dateFrom.value || undefined,
+  to: dateTo.value ? `${dateTo.value}T23:59:59.999Z` : undefined,
+})
+
+const bulkOpen = ref(false)
+const bulkRunning = ref(false)
+// O que o console de tela cheia vai mostrar — é a lista final, não um filtro.
+const bulkGifts = ref<BulkReleaseGift[]>([])
+const bulkNote = ref('')
+
+const bulkWarning = (size: number) =>
+  size > 50 ? 'lote grande, o bot envia uma trade por vez' : ''
+
+/**
+ * Lote pelos filtros: a prévia vem do backend porque o gasto é calculado lá, e
+ * o que ela devolve vira a lista final. Reenviar os filtros no confirmar deixaria
+ * o servidor re-selecionar — outro admin liberando no meio mudaria o conjunto,
+ * e a tela teria prometido um número diferente do que sai.
+ */
+const askBulkByFilters = async () => {
+  bulkRunning.value = true
+  try {
+    const { data } = await adminService.previewBulkRelease(bulkFilters())
+
+    if (!data.batch_size) {
+      toast.info('Nenhum brinde em análise bate com os filtros atuais.')
+      return
+    }
+
+    openConsole(
+      data.gifts,
+      [`${data.matched} na fila com esses filtros`, bulkWarning(data.batch_size)]
+        .filter(Boolean)
+        .join(' · '),
+    )
+  } catch (e: any) {
+    toast.error(e?.response?.data?.message || 'Não deu para calcular o lote.')
+  } finally {
+    bulkRunning.value = false
+  }
+}
+
+/** Lote pela seleção: as linhas marcadas na tabela já são a lista final. */
+const askBulkBySelection = () => {
+  const chosen = claims.value.filter(claim => selected.value.has(claim.order_uuid))
+  if (!chosen.length) return
+
+  openConsole(chosen.map(toBulkGift), bulkWarning(chosen.length))
+}
+
+const toBulkGift = (claim: RewardClaim): BulkReleaseGift => ({
+  order_uuid: claim.order_uuid,
+  order_number: claim.order_number,
+  username: claim.user.username,
+  avatar: claim.user.avatar,
+  has_trade_link: claim.user.has_trade_link,
+  spent: claim.user.spent,
+  tier: claim.tier,
+  // Fragmento cru: quem resolve a URL do Steam é o console, igual pro lote que
+  // vem da prévia do backend.
+  item: {
+    name: claim.item.name,
+    icon_url_large: claim.item.icon_url_large,
+    retail_price: claim.item.retail_price,
+  },
+})
+
+const openConsole = (gifts: BulkReleaseGift[], note: string) => {
+  bulkGifts.value = gifts
+  bulkNote.value = note
+  bulkOpen.value = true
+}
+
+
 const onFilterChange = () => fetchClaims(1)
 // Campo digitado espera a pessoa parar de digitar; select e data batem na hora.
 const onTypedFilter = () => {
@@ -182,6 +307,8 @@ const hasFilters = computed(() =>
     tierFilter.value ||
     minPrice.value ||
     maxPrice.value ||
+    minSpent.value ||
+    maxSpent.value ||
     dateFrom.value ||
     dateTo.value,
   ),
@@ -192,6 +319,8 @@ const clearFilters = () => {
   tierFilter.value = ''
   minPrice.value = ''
   maxPrice.value = ''
+  minSpent.value = ''
+  maxSpent.value = ''
   dateFrom.value = ''
   dateTo.value = ''
   fetchClaims(1)
@@ -261,6 +390,14 @@ onMounted(() => {
       </label>
 
       <label class="filter-field">
+        <span title="Só a liberação em lote usa este filtro">Gasto do usuário (R$) *</span>
+        <div class="filter-pair">
+          <input v-model="minSpent" type="number" min="0" step="0.01" placeholder="mín" class="filter-input" />
+          <input v-model="maxSpent" type="number" min="0" step="0.01" placeholder="máx" class="filter-input" />
+        </div>
+      </label>
+
+      <label class="filter-field">
         <span>Resgatado em</span>
         <div class="filter-pair">
           <input v-model="dateFrom" @change="onFilterChange" type="date" class="filter-input" />
@@ -273,6 +410,48 @@ onMounted(() => {
       </button>
     </div>
 
+    <div class="bulk-row">
+      <button
+        class="btn-bulk btn-bulk--selection"
+        :disabled="bulkRunning || selected.size === 0"
+        @click="askBulkBySelection"
+      >
+        <Icon icon="mdi:checkbox-multiple-marked-outline" />
+        Liberar selecionados ({{ selected.size }})
+      </button>
+
+      <label class="filter-field">
+        <span>Ou pelos filtros</span>
+        <div class="filter-pair">
+          <input v-model.number="bulkLimit" type="number" min="1" max="100" class="filter-input" />
+          <button class="btn-bulk" :disabled="bulkRunning" @click="askBulkByFilters">
+            <Icon icon="mdi:send-check-outline" />
+            Liberar mais antigos
+          </button>
+        </div>
+      </label>
+
+      <label class="filter-field">
+        <span>Por página</span>
+        <select v-model.number="pageSize" @change="onFilterChange" class="filter-select">
+          <option v-for="size in pageSizes" :key="size" :value="size">{{ size }}</option>
+        </select>
+      </label>
+
+      <p class="bulk-hint">
+        Teto de 100 por vez. O bot envia uma trade por vez — lote grande não entrega
+        mais rápido, só alonga a fila.
+      </p>
+    </div>
+
+    <BulkReleaseConsole
+      v-model:open="bulkOpen"
+      :gifts="bulkGifts"
+      :note="bulkNote"
+      :arm-seconds="5"
+      @finished="fetchClaims(currentPage)"
+    />
+
     <div class="section">
       <div v-if="loading" class="loading-state">Carregando brindes...</div>
       <div v-else>
@@ -280,17 +459,36 @@ onMounted(() => {
           <table>
             <thead>
               <tr>
+                <th class="check-col">
+                  <input
+                    type="checkbox"
+                    :checked="allSelected"
+                    :disabled="selectableClaims.length === 0"
+                    :title="allSelected ? 'Limpar seleção' : 'Selecionar todos os liberáveis desta página'"
+                    @change="toggleAll"
+                  />
+                </th>
                 <th>Usuário</th>
                 <th>Item sorteado</th>
                 <th>Nível</th>
                 <th>Custo</th>
+                <th>Gasto</th>
                 <th>Status</th>
                 <th>Resgatado em</th>
                 <th class="center">Ação</th>
               </tr>
             </thead>
             <tbody>
-              <tr v-for="claim in claims" :key="claim.order_uuid">
+              <tr v-for="claim in claims" :key="claim.order_uuid" :class="{ 'row-selected': isSelected(claim) }">
+                <td class="check-col">
+                  <input
+                    type="checkbox"
+                    :checked="isSelected(claim)"
+                    :disabled="!isSelectable(claim)"
+                    :title="isSelectable(claim) ? 'Selecionar' : 'Só brinde em análise e com trade link entra no lote'"
+                    @change="toggleSelected(claim)"
+                  />
+                </td>
                 <td>
                   <button class="user-cell" @click="openUser(claim)">
                     <img v-if="claim.user.avatar" :src="claim.user.avatar" class="user-avatar" alt="" />
@@ -315,6 +513,7 @@ onMounted(() => {
                 </td>
                 <td class="center">{{ claim.tier ?? '—' }}</td>
                 <td class="price">{{ formatCurrency(claim.item.retail_price) }}</td>
+                <td class="price spent">{{ claim.user.spent === null ? '—' : formatCurrency(claim.user.spent) }}</td>
                 <td>
                   <span class="status-badge" :class="statusOf(claim.status).cls">
                     {{ statusOf(claim.status).label }}
@@ -340,7 +539,7 @@ onMounted(() => {
                 </td>
               </tr>
               <tr v-if="claims.length === 0">
-                <td colspan="7" class="empty-state">Nenhum brinde nesta visão.</td>
+                <td colspan="9" class="empty-state">Nenhum brinde nesta visão.</td>
               </tr>
             </tbody>
           </table>
@@ -497,6 +696,73 @@ onMounted(() => {
 
     &::-webkit-calendar-picker-indicator
         filter invert(0.6)
+
+.check-col
+    width 36px
+    text-align center
+
+    input
+        cursor pointer
+        accent-color #ec4899
+
+        &:disabled
+            cursor not-allowed
+            opacity 0.35
+
+.row-selected
+    background rgba(236,72,153,0.06)
+
+.spent
+    color #94a3b8
+
+.bulk-row
+    display flex
+    align-items flex-end
+    gap 1rem
+    flex-wrap wrap
+    margin-bottom 1.25rem
+    padding 0.9rem 1rem
+    border 1px solid rgba(255,255,255,0.06)
+    border-radius 10px
+    background rgba(236,72,153,0.04)
+
+.bulk-hint
+    flex 1
+    min-width 260px
+    color #64748b
+    font-size 0.78rem
+    line-height 1.4
+
+.btn-bulk
+    display inline-flex
+    align-items center
+    gap 0.4rem
+    background rgba(236,72,153,0.14)
+    border 1px solid rgba(236,72,153,0.35)
+    border-radius 8px
+    color #f472b6
+    padding 0.5rem 0.9rem
+    font-size 0.85rem
+    font-weight 600
+    cursor pointer
+    white-space nowrap
+
+    &:hover:not(:disabled)
+        background rgba(236,72,153,0.22)
+
+    &:disabled
+        opacity 0.5
+        cursor not-allowed
+
+// Depois de `.btn-bulk`: mesma especificidade, quem vem por último pinta.
+.btn-bulk--selection
+    align-self flex-end
+    background rgba(46,220,138,0.14)
+    border-color rgba(46,220,138,0.35)
+    color #2edc8a
+
+    &:hover:not(:disabled)
+        background rgba(46,220,138,0.22)
 
 .btn-clear
     display inline-flex

@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { adminService } from '@/services/admin/admin.service'
 import { Icon } from '@iconify/vue'
 import { toast } from 'vue3-toastify'
+import { typeBadge } from './tradeOfferType'
 
 const route = useRoute()
 const router = useRouter()
@@ -140,6 +141,9 @@ onMounted(fetchOffer)
                     <div>
                         <h1 class="hero-id">
                             Trade #{{ offer.trade_offer_id || offer.id?.substring(0, 8) || '—' }}
+                            <span class="type-badge" :class="typeBadge(offer.type).className">
+                                {{ typeBadge(offer.type).label }}
+                            </span>
                         </h1>
                         <p class="hero-meta">
                             <span v-if="offer.steam_bots">Bot: <strong>{{ offer.steam_bots.name }}</strong></span>
@@ -630,6 +634,28 @@ table
     font-size 0.8rem
     margin-top 0.5rem
     padding-left 0.25rem
+
+.type-badge
+    margin-left 0.5rem
+    padding 3px 8px
+    border-radius 5px
+    font-size 0.72rem
+    font-weight 600
+    vertical-align middle
+    background rgba(148,163,184,0.12)
+    color #94a3b8
+
+.type-gift
+    background rgba(236,72,153,0.12)
+    color #ec4899
+
+.type-swap
+    background rgba(14,165,233,0.12)
+    color #0ea5e9
+
+.type-purchase
+    background rgba(99,102,241,0.12)
+    color #6366f1
 
 .status-badge
     padding 3px 8px

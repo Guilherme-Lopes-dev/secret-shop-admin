@@ -1,31 +1,29 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { adminService } from '@/services/admin/admin.service'
+import {
+    adminService,
+    type TradeOfferRow,
+    type TradeOfferType,
+} from '@/services/admin/admin.service'
+import { typeBadge, typeOptions } from './tradeOfferType'
 import { Icon } from '@iconify/vue'
 import { toast } from 'vue3-toastify'
 
 const router = useRouter()
 const route = useRoute()
 
-const offers = ref<any[]>([])
+const offers = ref<TradeOfferRow[]>([])
 const loading = ref(true)
 const currentPage = ref(1)
 const totalPages = ref(1)
 const totalItems = ref(0)
 const limit = ref(20)
 const statusFilter = ref((route.query.status as string) ?? '')
-const saleSearch = ref('')
+const typeFilter = ref((route.query.type as string) ?? '')
+const saleSearch = ref((route.query.search as string) ?? '')
 const retrySaleUuid = ref<string | null>(null)
 
-const filteredOffers = computed(() => {
-    const q = saleSearch.value.trim().toLowerCase()
-    if (!q) return offers.value
-    return offers.value.filter(o =>
-        o.sales?.order_number?.toLowerCase().includes(q) ||
-        o.trade_offer_id?.toLowerCase().includes(q)
-    )
-})
 
 const statusOptions = [
     { label: 'Todos', value: '' },
@@ -41,7 +39,13 @@ const statusOptions = [
 const fetchOffers = async (page: number) => {
     loading.value = true
     try {
-        const response = await adminService.getTradeOffers(page, limit.value, statusFilter.value || undefined)
+        const response = await adminService.getTradeOffers({
+            page,
+            limit: limit.value,
+            status: statusFilter.value || undefined,
+            type: (typeFilter.value || undefined) as TradeOfferType | undefined,
+            search: saleSearch.value.trim() || undefined,
+        })
         if (response.data) {
             offers.value = response.data.data
             totalPages.value = response.data.pages
@@ -56,9 +60,21 @@ const fetchOffers = async (page: number) => {
 }
 
 const onFilterChange = () => {
-    router.replace({ query: statusFilter.value ? { status: statusFilter.value } : {} })
+    const query: Record<string, string> = {}
+    if (statusFilter.value) query.status = statusFilter.value
+    if (typeFilter.value) query.type = typeFilter.value
+    if (saleSearch.value.trim()) query.search = saleSearch.value.trim()
+
+    router.replace({ query })
     fetchOffers(1)
 }
+
+// a busca agora roda no banco: sem debounce seria uma request por tecla
+let searchTimer: ReturnType<typeof setTimeout>
+watch(saleSearch, () => {
+    clearTimeout(searchTimer)
+    searchTimer = setTimeout(onFilterChange, 400)
+})
 const nextPage = () => { if (currentPage.value < totalPages.value) fetchOffers(currentPage.value + 1) }
 const prevPage = () => { if (currentPage.value > 1) fetchOffers(currentPage.value - 1) }
 
@@ -111,6 +127,9 @@ onMounted(() => fetchOffers(1))
                     class="filter-input"
                     placeholder="Buscar por pedido ou Trade ID..."
                 />
+                <select v-model="typeFilter" @change="onFilterChange" class="filter-select">
+                    <option v-for="opt in typeOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+                </select>
                 <select v-model="statusFilter" @change="onFilterChange" class="filter-select">
                     <option v-for="opt in statusOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
                 </select>
@@ -125,6 +144,7 @@ onMounted(() => fetchOffers(1))
                         <thead>
                             <tr>
                                 <th>Trade ID (Steam)</th>
+                                <th>Tipo</th>
                                 <th>Pedido</th>
                                 <th>Bot</th>
                                 <th>Steam User</th>
@@ -135,12 +155,17 @@ onMounted(() => fetchOffers(1))
                             </tr>
                         </thead>
                         <tbody>
-                            <tr v-for="offer in filteredOffers" :key="offer.uuid ?? offer.id" class="clickable-row" @click="router.push(`/trade-offers/${offer.uuid ?? offer.id}`)">
+                            <tr v-for="offer in offers" :key="offer.id" class="clickable-row" @click="router.push(`/trade-offers/${offer.id}`)">
                                 <td><code class="mono">{{ offer.trade_offer_id || '—' }}</code></td>
+                                <td>
+                                    <span class="type-badge" :class="typeBadge(offer.type).className">
+                                        {{ typeBadge(offer.type).label }}
+                                    </span>
+                                </td>
                                 <td>
                                     <router-link
                                         v-if="offer.sales"
-                                        :to="`/sales/${offer.sales.uuid ?? offer.sales.id}`"
+                                        :to="`/sales/${offer.sales.id}`"
                                         class="order-link"
                                     >
                                         {{ offer.sales.order_number }}
@@ -159,10 +184,10 @@ onMounted(() => fetchOffers(1))
                                 <td>
                                     <div class="action-group">
                                         <button
-                                            v-if="offer.sales?.uuid || offer.sales?.id"
+                                            v-if="offer.sales?.id"
                                             class="btn-action btn-retry"
-                                            :disabled="retrySaleUuid === (offer.sales.uuid ?? offer.sales.id)"
-                                            @click.stop="retrySale(offer.sales.uuid ?? offer.sales.id)"
+                                            :disabled="retrySaleUuid === offer.sales.id"
+                                            @click.stop="retrySale(offer.sales.id)"
                                             title="Reenviar trade"
                                         >
                                             <Icon icon="mdi:refresh" />
@@ -178,8 +203,8 @@ onMounted(() => fetchOffers(1))
                                     </div>
                                 </td>
                             </tr>
-                            <tr v-if="filteredOffers.length === 0">
-                                <td colspan="8" class="empty-state">Nenhuma trade offer encontrada.</td>
+                            <tr v-if="offers.length === 0">
+                                <td colspan="9" class="empty-state">Nenhuma trade offer encontrada.</td>
                             </tr>
                         </tbody>
                     </table>
@@ -307,6 +332,26 @@ table
 
     &:hover
         text-decoration underline
+
+.type-badge
+    padding 3px 8px
+    border-radius 5px
+    font-size 0.72rem
+    font-weight 600
+    background rgba(148,163,184,0.12)
+    color #94a3b8
+
+.type-gift
+    background rgba(236,72,153,0.12)
+    color #ec4899
+
+.type-swap
+    background rgba(14,165,233,0.12)
+    color #0ea5e9
+
+.type-purchase
+    background rgba(99,102,241,0.12)
+    color #6366f1
 
 .status-badge
     padding 3px 8px

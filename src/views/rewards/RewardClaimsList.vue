@@ -21,6 +21,8 @@ const currentPage = ref(1)
 const totalPages = ref(1)
 const totalItems = ref(0)
 const awaitingReview = ref(0)
+const prizeValueTotal = ref(0)
+const purchaseCountTotal = ref(0)
 const searchQuery = ref('')
 // Abre na fila de análise: é pra isso que a tela existe.
 const statusFilter = ref('AWAITING_REVIEW')
@@ -117,6 +119,8 @@ const fetchClaims = async (page: number) => {
     totalItems.value = data.meta.total
     currentPage.value = data.meta.page
     awaitingReview.value = data.meta.awaiting_review
+    prizeValueTotal.value = data.meta.prize_value_total ?? 0
+    purchaseCountTotal.value = data.meta.purchase_count_total ?? 0
   } catch (e: any) {
     toast.error(e?.response?.data?.message || 'Erro ao carregar os brindes.')
   } finally {
@@ -343,6 +347,16 @@ onMounted(() => {
           {{ totalItems }} resgate(s) nesta visão ·
           <b class="highlight">{{ awaitingReview }}</b> aguardando liberação
         </p>
+        <div class="reward-total">
+          <Icon icon="mdi:trophy-outline" />
+          <span>Prêmios nesta visão</span>
+          <strong>{{ formatCurrency(prizeValueTotal) }}</strong>
+        </div>
+        <div class="reward-counts">
+          <!-- A contagem de vendas só respeita data/busca; tier e preço são filtros de brinde. -->
+          <span><b>{{ purchaseCountTotal }}</b> venda(s) no período</span>
+          <span><b>{{ totalItems }}</b> presente(s) nesta visão</span>
+        </div>
       </div>
       <div class="header-actions">
         <button
@@ -580,6 +594,8 @@ onMounted(() => {
 </template>
 
 <style lang="stylus" scoped>
+@import './rewards.styl'
+
 .view-wrap
     padding 2rem
     color #fff

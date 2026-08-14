@@ -102,7 +102,7 @@ const syncOffer = async (tradeOfferId: string) => {
     }
 }
 
-const getStatusClass = (status: string) => {
+const getStatusClass = (status: string | null | undefined) => {
     if (!status) return ''
     const s = status.toUpperCase()
     if (['ACCEPTED', 'COMPLETED'].includes(s)) return 'status-completed'

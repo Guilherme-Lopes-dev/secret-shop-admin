@@ -13,6 +13,7 @@ const loading = ref(true)
 const currentPage = ref(1)
 const totalPages = ref(1)
 const totalItems = ref(0)
+const purchaseCountTotal = ref(0)
 const maxRewardTier = ref(3)
 const searchQuery = ref('')
 // Vazio = o próximo baú que cada um resgataria; fixo = "e se todos fossem no N".
@@ -42,6 +43,12 @@ const repeated = computed(() => {
 })
 
 const isRepeated = (row: RewardSimulationRow) => (repeated.value.get(row.item?.id ?? '') ?? 0) > 1
+// Os dois totais saem da mesma página de linhas — o sorteio só existe pra quem está nela.
+const simulatedGifts = computed(() => rows.value.filter((row) => row.item))
+const simulatedGiftCount = computed(() => simulatedGifts.value.length)
+const prizeValueTotal = computed(() =>
+  simulatedGifts.value.reduce((sum, row) => sum + (row.item?.price ?? 0), 0),
+)
 
 // Ordena só a página que já está na mão: gasto e nível não são coluna no banco,
 // ordenar lá obrigaria a calcular a base inteira antes de paginar.
@@ -72,6 +79,7 @@ const fetchSimulation = async (page: number) => {
     rows.value = data.data
     totalPages.value = data.meta.totalPages
     totalItems.value = data.meta.total
+    purchaseCountTotal.value = data.meta.purchase_count_total ?? 0
     maxRewardTier.value = data.meta.max_reward_tier
     currentPage.value = data.meta.page
   } catch (e: any) {
@@ -110,6 +118,16 @@ onMounted(() => fetchSimulation(1))
           {{ totalItems }} usuário(s) com compra ·
           <b class="highlight">nada é reservado nem enviado</b> — cada sorteio é só um ensaio
         </p>
+        <div class="reward-total">
+          <Icon icon="mdi:trophy-outline" />
+          <!-- O sorteio roda só nos usuários da página; somar a base inteira custa ~5 queries por usuário. -->
+          <span>Prêmios nesta página</span>
+          <strong>{{ formatCurrency(prizeValueTotal) }}</strong>
+        </div>
+        <div class="reward-counts">
+          <span><b>{{ simulatedGiftCount }}</b> presente(s) nesta página</span>
+          <span><b>{{ purchaseCountTotal }}</b> venda(s) no total</span>
+        </div>
       </div>
       <div class="header-actions">
         <select v-model="tierFilter" @change="onFilterChange" class="filter-select">
@@ -230,6 +248,8 @@ onMounted(() => fetchSimulation(1))
 </template>
 
 <style lang="stylus" scoped>
+@import './rewards.styl'
+
 .view-wrap
     padding 2rem
     color #fff

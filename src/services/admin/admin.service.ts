@@ -1206,6 +1206,11 @@ export interface RewardClaimsPage {
     limit:           number
     totalPages:      number
     awaiting_review: number
+    /** Valor de vitrine somado dos brindes nesta visão filtrada. */
+    prize_value_total: number
+    /** Vendas pagas reais, sem pedidos GIFT-, no recorte geral de data/busca —
+     *  tier e preço não entram, são filtros que só existem pra brinde. */
+    purchase_count_total: number
   }
 }
 
@@ -1296,7 +1301,16 @@ export interface RewardSimulationRow {
 export interface RewardSimulationPage {
   data: RewardSimulationRow[]
   /** `max_reward_tier` = quantos baús a escada tem hoje; a tela não chuta o número. */
-  meta: { total: number; page: number; limit: number; totalPages: number; max_reward_tier: number }
+  meta: {
+    total: number
+    page: number
+    limit: number
+    totalPages: number
+    max_reward_tier: number
+    /** Vendas pagas reais, sem pedidos GIFT-, de toda a base da simulação —
+     *  o valor dos prêmios a tela soma das linhas, que são só a página atual. */
+    purchase_count_total: number
+  }
 }
 
 export interface InventoryFilters {

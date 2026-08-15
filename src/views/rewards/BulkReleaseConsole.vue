@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { Icon } from '@iconify/vue'
-import { formatCurrency } from '@/utils/formatCurrency'
 import { buildSteamImageUrl } from '@/utils/steamImage'
 import { adminService, type BulkReleaseGift } from '@/services/admin/admin.service'
 
@@ -267,12 +266,6 @@ const stopSending = () => (aborted.value = true)
         </ul>
         <p class="summary-hint">Continuam na fila de análise para tentar de novo.</p>
       </div>
-
-      <div class="summary-released" v-if="releasedNumbers.length">
-        <span v-for="orderNumber in releasedNumbers" :key="orderNumber" class="released-chip">
-          {{ orderNumber }}
-        </span>
-      </div>
     </section>
 
     <div v-if="withoutTradeLink && phase === 'review'" class="console-warn">
@@ -293,23 +286,9 @@ const stopSending = () => (aborted.value = true)
         <div v-else class="gift-skin gift-skin--empty"><Icon icon="mdi:gift-outline" /></div>
 
         <div class="gift-info">
+          <img v-if="gift.avatar" :src="gift.avatar" class="gift-avatar" alt="" />
           <strong>{{ gift.item.name || '—' }}</strong>
-          <span class="gift-user">
-            <img v-if="gift.avatar" :src="gift.avatar" class="gift-avatar" alt="" />
-            {{ gift.username || '—' }}
-          </span>
-          <span class="gift-meta">
-            Nível {{ gift.tier ?? '—' }} ·
-            {{ formatCurrency(gift.item.retail_price) }} ·
-            gasto {{ gift.spent === null ? '—' : formatCurrency(gift.spent) }}
-          </span>
-          <small class="gift-order">{{ gift.order_number }}</small>
         </div>
-
-        <Icon
-          class="gift-state"
-          :icon="isExcluded(gift) ? 'mdi:checkbox-blank-circle-outline' : 'mdi:check-circle'"
-        />
       </button>
     </div>
 
@@ -469,22 +448,6 @@ const stopSending = () => (aborted.value = true)
     color #64748b
     font-size 0.78rem
 
-.summary-released
-    display flex
-    flex-wrap wrap
-    justify-content center
-    gap 0.35rem
-    margin-top 1rem
-    max-width min(900px, 92vw)
-
-.released-chip
-    padding 0.2rem 0.55rem
-    border-radius 6px
-    background rgba(46,220,138,0.1)
-    color #2edc8a
-    font-size 0.72rem
-    font-family monospace
-
 .console-warn
     display flex
     align-items center
@@ -545,8 +508,8 @@ const stopSending = () => (aborted.value = true)
 
 .gift-info
     display flex
-    flex-direction column
-    gap 0.15rem
+    align-items center
+    gap 0.5rem
     min-width 0
     flex 1
 
@@ -556,33 +519,11 @@ const stopSending = () => (aborted.value = true)
         overflow hidden
         text-overflow ellipsis
 
-.gift-user
-    display flex
-    align-items center
-    gap 0.35rem
-    color #cbd5e1
-    font-size 0.8rem
-
 .gift-avatar
-    width 18px
-    height 18px
+    width 28px
+    height 28px
     border-radius 50%
-
-.gift-meta
-    color #94a3b8
-    font-size 0.75rem
-
-.gift-order
-    color #64748b
-    font-size 0.7rem
-
-.gift-state
-    font-size 1.25rem
-    color #2edc8a
     flex-shrink 0
-
-.gift-card--out .gift-state
-    color #64748b
 
 .console-foot
     display flex

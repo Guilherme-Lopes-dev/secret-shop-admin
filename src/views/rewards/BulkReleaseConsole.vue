@@ -282,13 +282,12 @@ const stopSending = () => (aborted.value = true)
         type="button"
         @click="toggle(gift)"
       >
+        <img v-if="gift.avatar" :src="gift.avatar" class="gift-avatar" alt="" />
+
         <img v-if="skinImage(gift)" :src="skinImage(gift)!" class="gift-skin" alt="" />
         <div v-else class="gift-skin gift-skin--empty"><Icon icon="mdi:gift-outline" /></div>
 
-        <div class="gift-info">
-          <img v-if="gift.avatar" :src="gift.avatar" class="gift-avatar" alt="" />
-          <strong>{{ gift.item.name || '—' }}</strong>
-        </div>
+        <strong class="gift-name">{{ gift.item.name || '—' }}</strong>
       </button>
     </div>
 
@@ -506,22 +505,17 @@ const stopSending = () => (aborted.value = true)
         background rgba(255,255,255,0.05)
         color #64748b
 
-.gift-info
-    display flex
-    align-items center
-    gap 0.5rem
-    min-width 0
+.gift-name
     flex 1
-
-    strong
-        font-size 0.9rem
-        white-space nowrap
-        overflow hidden
-        text-overflow ellipsis
+    min-width 0
+    font-size 0.9rem
+    white-space nowrap
+    overflow hidden
+    text-overflow ellipsis
 
 .gift-avatar
-    width 28px
-    height 28px
+    width 40px
+    height 40px
     border-radius 50%
     flex-shrink 0
 

@@ -493,7 +493,15 @@ onMounted(fetchSale)
                         <div class="kv-stack">
                             <div class="kv">
                                 <span class="kv-label">Username</span>
-                                <span class="kv-value">{{ sale.users?.username ?? '-' }}</span>
+                                <div class="identity-row">
+                                    <img
+                                        v-if="sale.users?.avatar"
+                                        :src="sale.users.avatar"
+                                        class="avatar"
+                                        :alt="sale.users?.username ?? 'Cliente'"
+                                    />
+                                    <span class="kv-value">{{ sale.users?.username ?? '-' }}</span>
+                                </div>
                             </div>
                             <div class="kv">
                                 <span class="kv-label">E-mail</span>
@@ -526,6 +534,16 @@ onMounted(fetchSale)
                                 <span class="card-title">{{ friendshipTitle() }}</span>
                                 <p class="friendship-desc">{{ friendshipDescription() }}</p>
                             </div>
+                        </div>
+
+                        <!-- Foto do bot não depende da consulta Steam ter dado certo -->
+                        <div v-if="friendship?.bot_avatar" class="identity-row bot-identity">
+                            <img
+                                :src="friendship.bot_avatar"
+                                class="avatar"
+                                :alt="friendship.bot_name ?? 'Bot'"
+                            />
+                            <span class="kv-value">{{ friendship.bot_name ?? 'Bot vendedor' }}</span>
                         </div>
 
                         <div v-if="friendship?.available && friendship.are_friends && friendship.friend_since_iso" class="kv-grid friendship-meta">
@@ -1082,6 +1100,24 @@ onMounted(fetchSale)
 
     &:hover
         color #818cf8
+
+.identity-row
+    display flex
+    align-items center
+    gap 0.5rem
+    min-width 0
+
+.bot-identity
+    padding-top 0.6rem
+    border-top 1px dashed rgba(255,255,255,0.08)
+
+.avatar
+    width 28px
+    height 28px
+    border-radius 50%
+    object-fit cover
+    flex-shrink 0
+    border 1px solid rgba(255,255,255,0.1)
 
 .steam-link
     color #a5b4fc

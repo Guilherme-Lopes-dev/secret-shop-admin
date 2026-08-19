@@ -264,6 +264,11 @@ const routes = [
         component: () => import('@/views/uploads/UploadTest.vue'),
       },
       {
+        path: 'backup',
+        name: 'backup',
+        component: () => import('@/views/system/BackupRestore.vue'),
+      },
+      {
         path: 'physical-products',
         name: 'physical-products',
         component: () => import('@/views/physical-products/PhysicalProductsList.vue'),

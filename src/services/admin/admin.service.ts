@@ -83,6 +83,23 @@ export interface ItemSet {
   available: number
 }
 
+/**
+ * Com `responseType: 'blob'` o corpo de erro também chega como Blob, então
+ * `error.response.data.message` some. Reidrata pro toast mostrar a mensagem real.
+ */
+const unwrapBlobError = async (error: any): Promise<never> => {
+  const body = error?.response?.data
+  if (!(body instanceof Blob)) throw error
+
+  try {
+    error.response.data = JSON.parse(await body.text())
+  } catch {
+    // Corpo não-JSON: deixa como está, o fallback do toast assume.
+  }
+
+  throw error
+}
+
 export const adminService = {
   async getSalesStats() {
     return api.get('/dashboard/stats')
@@ -1157,6 +1174,35 @@ export const adminService = {
   async deleteArcanaHeroMultiplier(hero: string) {
     return api.post<ArcanaHeroMultiplier[]>('/skins/admin/pricing-config/arcana-heroes/delete', { hero })
   },
+
+  // Backup / Restauração do banco
+  async listBackups() {
+    return api.get<BackupListResponse>('/backup')
+  },
+
+  async createBackup() {
+    return api.post<{ started: string; name: string }>('/backup')
+  },
+
+  async restoreBackup(name: string) {
+    return api.post<{ started: string; name: string }>(`/backup/${name}/restore`)
+  },
+
+  async deleteBackup(name: string) {
+    return api.delete<{ removed: string }>(`/backup/${name}`)
+  },
+
+  async downloadBackup(name: string) {
+    const { data } = await api
+      .get<Blob>(`/backup/${name}/download`, { responseType: 'blob', timeout: 0 })
+      .catch(unwrapBlobError)
+    const url = URL.createObjectURL(data)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = name
+    link.click()
+    setTimeout(() => URL.revokeObjectURL(url), 0)
+  },
 }
 
 export interface RewardClaimFilters {
@@ -1496,4 +1542,17 @@ export interface SkinPriceHistoryResponse {
   }
   points: SkinPriceHistoryPoint[]
   units: SkinUnitTracking[]
+}
+
+export interface BackupFileDto {
+  name: string
+  size: number
+  createdAt: string
+}
+
+export interface BackupListResponse {
+  /** Descrição do dump/restore em andamento, ou null quando está ocioso. */
+  running: string | null
+  lastError: string | null
+  files: BackupFileDto[]
 }

@@ -131,6 +131,19 @@ const exportPdf = () => {
 
 const isPaid = computed(() => String(sale.value?.payment_status || '').toUpperCase() === 'PAID')
 
+const latestTradeOffer = computed(() => {
+    const offers = sale.value?.trade_offers
+    if (!Array.isArray(offers) || !offers.length) return null
+    return [...offers].sort(
+        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+    )[0]
+})
+
+const goToTradeOffer = () => {
+    if (!latestTradeOffer.value?.id) return
+    router.push(`/trade-offers/${latestTradeOffer.value.id}`)
+}
+
 const openAsaasReceipt = async () => {
     if (!sale.value) return
     if (!sale.value.asaas_payment_id) {
@@ -191,6 +204,15 @@ onBeforeUnmount(() => {
                     {{ formatStatusText(sale.payment_status) }}
                 </span>
                 <div class="hero-actions">
+                    <button
+                        v-if="latestTradeOffer"
+                        class="btn-action btn-secondary"
+                        @click="goToTradeOffer"
+                    >
+                        <Icon icon="mdi:swap-horizontal" />
+                        Ver trade relacionada
+                    </button>
+
                     <button class="btn-action" :disabled="exportingPdf" @click="exportPdf">
                         <Icon icon="mdi:file-pdf-box" />
                         {{ exportingPdf ? 'Gerando...' : 'Relatorio PDF' }}

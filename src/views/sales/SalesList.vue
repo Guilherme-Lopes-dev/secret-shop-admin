@@ -5,6 +5,17 @@ import { adminService } from '@/services/admin/admin.service'
 import { formatCurrency } from '@/utils/formatCurrency'
 import { useRoute, useRouter } from 'vue-router'
 
+const props = withDefaults(defineProps<{ orderType?: 'purchase' | 'gift' }>(), {
+    orderType: 'purchase',
+})
+
+const isGifts = computed(() => props.orderType === 'gift')
+const pageTitle = computed(() => (isGifts.value ? 'Presentes' : 'Vendas'))
+const subtitleNoun = computed(() => (isGifts.value ? 'presentes' : 'pedidos'))
+const loadingText = computed(() => (isGifts.value ? 'Carregando presentes...' : 'Carregando vendas...'))
+const emptyText = computed(() => (isGifts.value ? 'Nenhum presente encontrado.' : 'Nenhuma venda encontrada.'))
+const emptyColspan = computed(() => (isGifts.value ? 6 : 7))
+
 const router = useRouter()
 const route = useRoute()
 const sales = ref<any[]>([])
@@ -35,7 +46,9 @@ const filteredSales = computed(() => {
     )
 })
 
-const hasActiveFilters = computed(() => Boolean(dateFrom.value || dateTo.value || couponCode.value || fulfillment.value))
+const hasActiveFilters = computed(() =>
+    Boolean(dateFrom.value || dateTo.value || (!isGifts.value && couponCode.value) || fulfillment.value),
+)
 
 const fetchSales = async (page: number) => {
     loading.value = true
@@ -43,8 +56,9 @@ const fetchSales = async (page: number) => {
         const response = await adminService.getAllSales(page, limit.value, {
             from: dateFrom.value || undefined,
             to: dateTo.value || undefined,
-            couponCode: couponCode.value.trim() || undefined,
+            couponCode: isGifts.value ? undefined : couponCode.value.trim() || undefined,
             fulfillmentStatus: fulfillment.value || undefined,
+            orderType: props.orderType,
         })
         if (response.data) {
             sales.value = response.data.data
@@ -110,8 +124,8 @@ onMounted(() => fetchSales(1))
     <div class="view-wrap">
         <header class="page-header">
             <div>
-                <h1 class="page-title">Vendas</h1>
-                <p class="page-subtitle">{{ totalItems }} pedidos no sistema</p>
+                <h1 class="page-title">{{ pageTitle }}</h1>
+                <p class="page-subtitle">{{ totalItems }} {{ subtitleNoun }} no sistema</p>
             </div>
             <input
                 v-model="saleSearch"
@@ -131,7 +145,7 @@ onMounted(() => fetchSales(1))
                     <label>Até</label>
                     <input type="date" v-model="dateTo" @change="applyFilters" />
                 </div>
-                <div class="filter-field">
+                <div v-if="!isGifts" class="filter-field">
                     <label>Cupom</label>
                     <input
                         v-model="couponCode"
@@ -155,7 +169,7 @@ onMounted(() => fetchSales(1))
         </div>
 
         <div class="section">
-            <div v-if="loading" class="loading-state">Carregando vendas...</div>
+            <div v-if="loading" class="loading-state">{{ loadingText }}</div>
             <div v-else>
                 <div class="table-wrapper">
                     <table>
@@ -165,7 +179,7 @@ onMounted(() => fetchSales(1))
                                 <th>Cliente</th>
                                 <th>Data</th>
                                 <th>Valor Total</th>
-                                <th>Cupom</th>
+                                <th v-if="!isGifts">Cupom</th>
                                 <th>Status</th>
                                 <th>Ações</th>
                             </tr>
@@ -186,7 +200,7 @@ onMounted(() => fetchSales(1))
                                 </td>
                                 <td>{{ $dayjs(sale.created_at).format('DD/MM/YYYY HH:mm') }}</td>
                                 <td class="price">{{ formatCurrency(sale.total_amount) }}</td>
-                                <td>
+                                <td v-if="!isGifts">
                                     <span v-if="sale.coupon?.code" class="coupon-badge">{{ sale.coupon.code }}</span>
                                     <span v-else class="muted">-</span>
                                 </td>
@@ -202,7 +216,7 @@ onMounted(() => fetchSales(1))
                                 </td>
                             </tr>
                             <tr v-if="filteredSales.length === 0">
-                                <td colspan="7" class="empty-state">Nenhuma venda encontrada.</td>
+                                <td :colspan="emptyColspan" class="empty-state">{{ emptyText }}</td>
                             </tr>
                         </tbody>
                     </table>

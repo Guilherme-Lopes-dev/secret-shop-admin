@@ -131,7 +131,14 @@ export const adminService = {
   async getAllSales(
     page: number = 1,
     limit: number = 20,
-    filters: { from?: string; to?: string; paymentStatus?: string; couponCode?: string; fulfillmentStatus?: string } = {},
+    filters: {
+      from?: string
+      to?: string
+      paymentStatus?: string
+      couponCode?: string
+      fulfillmentStatus?: string
+      orderType?: 'purchase' | 'gift'
+    } = {},
   ) {
     const params = new URLSearchParams({ page: String(page), limit: String(limit) })
     if (filters.from) params.append('from', filters.from)
@@ -139,6 +146,7 @@ export const adminService = {
     if (filters.paymentStatus) params.append('payment_status', filters.paymentStatus)
     if (filters.couponCode) params.append('coupon_code', filters.couponCode)
     if (filters.fulfillmentStatus) params.append('fulfillment_status', filters.fulfillmentStatus)
+    if (filters.orderType) params.append('order_type', filters.orderType)
     return api.get(`/admin/sales?${params}`)
   },
 

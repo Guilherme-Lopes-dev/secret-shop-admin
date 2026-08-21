@@ -39,6 +39,7 @@ const navGroups: NavGroup[] = [
         key: 'vendas',
         items: [
             { label: 'Vendas', icon: 'mdi:cart-outline', to: '/sales', name: 'sales' },
+            { label: 'Presentes', icon: 'mdi:gift-outline', to: '/gifts', name: 'gifts' },
             { label: 'Resumo', icon: 'mdi:chart-bar', to: '/sales/summary', name: 'sales-summary' },
             { label: 'Pedidos Collector', icon: 'mdi:receipt-text-outline', to: '/collector-orders', name: 'collector-orders' },
             { label: 'Envios Dropship', icon: 'mdi:package-variant-closed', to: '/dropship-orders', name: 'dropship-orders' },

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import { toast } from 'vue3-toastify'
@@ -26,7 +26,16 @@ type CollectorsCacheStore = {
 }
 
 const STORAGE_KEY = 'secretshop-admin:collectors-cache:v1'
+const FILTERS_STORAGE_KEY = 'secretshop-admin:collectors-filters:v1'
 const MAX_CACHED_INVENTORIES = 2
+
+type CollectorsFilters = {
+    itemSearch: string
+    selectedRarity: Dota2Rarity | ''
+    onlyMythicalBundles: boolean
+    onlyMythicalWearables: boolean
+    onlyNotTradable: boolean
+}
 
 const router = useRouter()
 const steamIdInput = ref('')
@@ -161,6 +170,27 @@ function readCacheStore(): CollectorsCacheStore {
     } catch {
         return createEmptyCacheStore()
     }
+}
+
+function readFiltersStore(): Partial<CollectorsFilters> {
+    if (typeof window === 'undefined') {
+        return {}
+    }
+
+    try {
+        const raw = window.localStorage.getItem(FILTERS_STORAGE_KEY)
+        return raw ? JSON.parse(raw) : {}
+    } catch {
+        return {}
+    }
+}
+
+function saveFiltersStore(filters: CollectorsFilters) {
+    if (typeof window === 'undefined') {
+        return
+    }
+
+    window.localStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify(filters))
 }
 
 function saveCacheStore(nextStore: CollectorsCacheStore) {
@@ -341,6 +371,23 @@ onMounted(() => {
             applyInventory(cached, true)
         }
     }
+
+    const savedFilters = readFiltersStore()
+    if (typeof savedFilters.itemSearch === 'string') itemSearch.value = savedFilters.itemSearch
+    if (typeof savedFilters.selectedRarity === 'string') selectedRarity.value = savedFilters.selectedRarity
+    if (typeof savedFilters.onlyMythicalBundles === 'boolean') onlyMythicalBundles.value = savedFilters.onlyMythicalBundles
+    if (typeof savedFilters.onlyMythicalWearables === 'boolean') onlyMythicalWearables.value = savedFilters.onlyMythicalWearables
+    if (typeof savedFilters.onlyNotTradable === 'boolean') onlyNotTradable.value = savedFilters.onlyNotTradable
+})
+
+watch([itemSearch, selectedRarity, onlyMythicalBundles, onlyMythicalWearables, onlyNotTradable], () => {
+    saveFiltersStore({
+        itemSearch: itemSearch.value,
+        selectedRarity: selectedRarity.value,
+        onlyMythicalBundles: onlyMythicalBundles.value,
+        onlyMythicalWearables: onlyMythicalWearables.value,
+        onlyNotTradable: onlyNotTradable.value,
+    })
 })
 </script>
 

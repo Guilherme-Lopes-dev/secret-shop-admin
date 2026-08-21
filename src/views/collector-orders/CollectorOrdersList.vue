@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { adminService } from '@/services/admin/admin.service'
 import { formatCurrency } from '@/utils/formatCurrency'
@@ -23,6 +23,43 @@ let   searchTimer: ReturnType<typeof setTimeout> | null = null
 
 const PENDINGS_CLEARED_KEY = 'admin_pendings_cleared_at'
 const pendingClearedAt = ref(localStorage.getItem(PENDINGS_CLEARED_KEY) ?? '')
+
+const FILTERS_STORAGE_KEY = 'secretshop-admin:collector-orders-filters:v1'
+
+type CollectorOrdersFilters = {
+    search: string
+    filterPayment: string
+    filterDelivery: string
+}
+
+function readFiltersStore(): Partial<CollectorOrdersFilters> {
+    if (typeof window === 'undefined') {
+        return {}
+    }
+
+    try {
+        const raw = window.localStorage.getItem(FILTERS_STORAGE_KEY)
+        return raw ? JSON.parse(raw) : {}
+    } catch {
+        return {}
+    }
+}
+
+function saveFiltersStore(filters: CollectorOrdersFilters) {
+    if (typeof window === 'undefined') {
+        return
+    }
+
+    window.localStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify(filters))
+}
+
+function persistFilters() {
+    saveFiltersStore({
+        search: search.value,
+        filterPayment: filterPayment.value,
+        filterDelivery: filterDelivery.value,
+    })
+}
 
 const fetchSales = async (page: number) => {
     loading.value = true
@@ -50,10 +87,18 @@ const fetchSales = async (page: number) => {
 
 const onSearchInput = () => {
     if (searchTimer) clearTimeout(searchTimer)
-    searchTimer = setTimeout(() => fetchSales(1), 400)
+    searchTimer = setTimeout(() => {
+        fetchSales(1)
+        persistFilters()
+    }, 400)
 }
 
 const onFilterChange = () => fetchSales(1)
+
+const toggleDeliveryShortcut = (status: string) => {
+    filterDelivery.value = filterDelivery.value === status ? '' : status
+    onFilterChange()
+}
 const nextPage = () => { if (currentPage.value < totalPages.value) fetchSales(currentPage.value + 1) }
 const prevPage = () => { if (currentPage.value > 1) fetchSales(currentPage.value - 1) }
 
@@ -96,7 +141,18 @@ const deliveryLabel = (s: string | null) => ({
 const paymentMethodLabel = (m: string | null) =>
     ({ PIX: 'PIX', BOLETO: 'Boleto', CREDIT_CARD: 'Cartão' }[m ?? ''] ?? m ?? '-')
 
-onMounted(() => fetchSales(1))
+onMounted(() => {
+    const savedFilters = readFiltersStore()
+    if (typeof savedFilters.search === 'string') search.value = savedFilters.search
+    if (typeof savedFilters.filterPayment === 'string') filterPayment.value = savedFilters.filterPayment
+    if (typeof savedFilters.filterDelivery === 'string' && !route.query.delivery_status) {
+        filterDelivery.value = savedFilters.filterDelivery
+    }
+
+    fetchSales(1)
+})
+
+watch([filterPayment, filterDelivery], persistFilters)
 </script>
 
 <template>
@@ -140,6 +196,24 @@ onMounted(() => fetchSales(1))
                 <option value="SHIPPED">Enviado</option>
                 <option value="DELIVERED">Entregue</option>
             </select>
+
+            <button
+                class="shortcut-btn"
+                :class="{ 'shortcut-btn--active': filterDelivery === 'AWAITING_SHIPPING' }"
+                @click="toggleDeliveryShortcut('AWAITING_SHIPPING')"
+            >
+                <Icon icon="mdi:package-variant-closed" />
+                Aguardando Envio
+            </button>
+
+            <button
+                class="shortcut-btn"
+                :class="{ 'shortcut-btn--active': filterDelivery === 'SHIPPED' }"
+                @click="toggleDeliveryShortcut('SHIPPED')"
+            >
+                <Icon icon="mdi:truck-fast-outline" />
+                Enviados
+            </button>
         </div>
 
         <div class="section">
@@ -306,6 +380,28 @@ onMounted(() => fetchSales(1))
 
     &:focus
         border-color rgba(99,102,241,0.4)
+
+.shortcut-btn
+    display inline-flex
+    align-items center
+    gap 0.4rem
+    background #1e1e24
+    border 1px solid rgba(255,255,255,0.08)
+    color #94a3b8
+    font-size 0.875rem
+    padding 0.5rem 0.85rem
+    border-radius 8px
+    cursor pointer
+    white-space nowrap
+    transition all 0.15s
+
+    &:hover
+        border-color rgba(255,255,255,0.18)
+
+    &--active
+        color #f59e0b
+        background rgba(245,158,11,0.12)
+        border-color rgba(245,158,11,0.3)
 
 .section
     background #1a1a1e

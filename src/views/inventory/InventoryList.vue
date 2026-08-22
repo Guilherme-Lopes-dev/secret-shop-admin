@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { ref, computed, nextTick, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { adminService } from '@/services/admin/admin.service'
+import { adminService, type InventoryFilters } from '@/services/admin/admin.service'
 import { formatCurrency } from '@/utils/formatCurrency'
-import { entryVariationPct, floorPrice, floorStatus } from '@/utils/priceFloor'
+import { entryVariationPct, floorPrice, floorStatus, marginLabel, marginTone } from '@/utils/priceFloor'
 import { Icon } from '@iconify/vue'
 import { toast } from 'vue3-toastify'
 
@@ -199,7 +199,72 @@ const sortOptions = [
     { label: 'Mais recente', value: '' },
     { label: 'Maior preço', value: 'price_desc' },
     { label: 'Menor preço', value: 'price_asc' },
+    { label: 'Pior margem (prejuízo)', value: 'margin_asc' },
+    { label: 'Melhor margem (lucro)', value: 'margin_desc' },
 ]
+
+const marginFilter = ref('')
+const marginOptions = [
+    { label: 'Margem: todas', value: '' },
+    { label: 'Só prejuízo', value: 'loss' },
+    { label: 'Só lucro', value: 'profit' },
+    { label: 'Empatadas', value: 'breakeven' },
+    { label: 'Sem custo travado', value: 'unknown' },
+]
+
+// `margin_bps` é a margem da unidade no modo desagrupado e a da PIOR unidade da
+// skin no agrupado (o backend manda o _min) — é o número que decide se tem
+// dinheiro saindo, e casa com a ordenação por margin_asc.
+// Cobertura de custo dentro do grupo: o _min do SQL ignora nulos, então uma skin
+// com 1 unidade custeada entre 10 mostraria margem como se valesse pras 10.
+const costCoverage = (item: any) => ({
+    withCost: item.units_with_cost ?? 0,
+    total: item.units_total ?? item.units ?? 0,
+})
+
+const isPartialCost = (item: any) => {
+    if (!groupBySkin.value) return false
+    const { withCost, total } = costCoverage(item)
+
+    return withCost > 0 && withCost < total
+}
+
+const marginText = (item: any) => {
+    const label = marginLabel(item.margin_bps)
+
+    return isPartialCost(item) ? `${label}*` : label
+}
+
+const marginClass = (item: any) => `margin-${marginTone(item.margin_bps)}`
+
+const marginTitle = (item: any) => {
+    if (!groupBySkin.value) {
+        return item.margin_bps == null
+            ? 'Unidade sem cost_price travado — não dá pra calcular margem.'
+            : 'Margem sobre o custo de aquisição desta unidade.'
+    }
+
+    const { withCost, total } = costCoverage(item)
+    if (withCost === 0) return `Nenhuma das ${total} unidades tem custo travado — sem margem calculável.`
+
+    const cobertura = withCost < total
+        ? `\n* Margem cobre só ${withCost} de ${total} unidades — o resto não tem custo travado.`
+        : ''
+    const prejuizo = item.in_loss > 0 ? `\n${item.in_loss} unidade(s) no prejuízo.` : ''
+
+    return `Margem da pior unidade da skin sobre o custo de aquisição.${prejuizo}${cobertura}`
+}
+
+// Filtro de margem filtra unidade e o agrupamento vem depois: sem isso o card
+// diria que a skin tem 1 unidade quando ela tem 10 e só 1 casou com o filtro.
+const unitsLabel = (item: any) => {
+    const total = item.units_total ?? item.units
+    const shown = item.units
+
+    if (shown === total) return `${shown} ${shown === 1 ? 'unidade' : 'unidades'}`
+
+    return `${shown} de ${total} unidades`
+}
 
 const rewardFilter = ref('')
 const rewardOptions = [
@@ -245,6 +310,7 @@ const fetchInventory = async (page: number, append = false) => {
             marketplace: marketplaceFilter.value || undefined,
             rewardBlocked: rewardFilter.value === '' ? undefined : rewardFilter.value === 'true',
             group: groupBySkin.value ? 'skin' : undefined,
+            margin: (marginFilter.value || undefined) as InventoryFilters['margin'],
         })
         if (generation !== fetchGeneration) return
         if (response.data) {
@@ -401,6 +467,9 @@ onUnmounted(() => observer?.disconnect())
             <select v-model="rewardFilter" @change="onFilterChange" class="filter-select">
                 <option v-for="opt in rewardOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
             </select>
+            <select v-model="marginFilter" @change="onFilterChange" class="filter-select">
+                <option v-for="opt in marginOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+            </select>
             <div class="price-range">
                 <input
                     v-model="minPriceInput"
@@ -443,7 +512,7 @@ onUnmounted(() => observer?.disconnect())
                             />
                             <div v-else class="card-img-placeholder"><Icon icon="mdi:sword" /></div>
                             <span v-if="groupBySkin" class="card-status card-status--units">
-                                {{ item.units }} {{ item.units === 1 ? 'unidade' : 'unidades' }}
+                                {{ unitsLabel(item) }}
                             </span>
                             <span v-else class="card-status" :class="itemStatus(item).cls">{{ itemStatus(item).label }}</span>
                             <span v-if="!groupBySkin && !item.tradable" class="card-untradable" title="Não tradável">
@@ -465,7 +534,12 @@ onUnmounted(() => observer?.disconnect())
                             </div>
 
                             <div class="card-prices">
-                                <span class="card-price">{{ groupBySkin ? priceRange(item) : formatCurrency(item.price) }}</span>
+                                <span class="card-price-row">
+                                    <span class="card-price">{{ groupBySkin ? priceRange(item) : formatCurrency(item.price) }}</span>
+                                    <span class="margin-badge" :class="marginClass(item)" :title="marginTitle(item)">
+                                        {{ marginText(item) }}
+                                    </span>
+                                </span>
                                 <span v-if="item.entry_steam_price" class="card-entry">
                                     entrada {{ formatCurrency(item.entry_steam_price) }}
                                     <small v-if="!groupBySkin" :class="(itemVariation(item) ?? 0) < 0 ? 'is-down' : 'is-up'">
@@ -859,6 +933,35 @@ onUnmounted(() => observer?.disconnect())
     font-weight 700
     font-size 0.95rem
     color #4caf50
+
+.card-price-row
+    display flex
+    align-items baseline
+    justify-content space-between
+    gap 0.4rem
+
+.margin-badge
+    padding 2px 6px
+    border-radius 5px
+    font-size 0.68rem
+    font-weight 700
+    white-space nowrap
+
+.margin-profit
+    background rgba(76,175,80,0.14)
+    color #4caf50
+
+.margin-loss
+    background rgba(244,67,54,0.16)
+    color #f44336
+
+.margin-even
+    background rgba(255,152,0,0.14)
+    color #ff9800
+
+.margin-unknown
+    background rgba(100,116,139,0.15)
+    color #64748b
 
 .card-entry
     font-size 0.72rem

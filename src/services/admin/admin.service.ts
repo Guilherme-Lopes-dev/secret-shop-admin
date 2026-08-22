@@ -317,6 +317,7 @@ export const adminService = {
     if (filters.marketplace) params.append('marketplace', filters.marketplace)
     if (filters.rewardBlocked !== undefined) params.append('rewardBlocked', String(filters.rewardBlocked))
     if (filters.group) params.append('group', filters.group)
+    if (filters.margin) params.append('margin', filters.margin)
     return api.get(`/skins/admin/inventory?${params}`)
   },
 
@@ -1387,6 +1388,8 @@ export interface InventoryFilters {
   rewardBlocked?: boolean
   /** 'skin' = uma linha por skin (unidades agregadas) em vez de uma por unidade. */
   group?: 'skin'
+  /** Margem sobre o custo de aquisição. 'unknown' = unidade sem cost_price travado. */
+  margin?: 'loss' | 'profit' | 'breakeven' | 'unknown'
 }
 
 export interface MarketExplorerFilters {

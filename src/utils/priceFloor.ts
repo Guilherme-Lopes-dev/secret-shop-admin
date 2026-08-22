@@ -78,3 +78,23 @@ const resolveKey = (
 
   return 'ok'
 }
+
+/** Margem sobre o custo (basis points do backend) em % legível. */
+export const marginPct = (marginBps: number | null | undefined): number | null =>
+  marginBps == null ? null : marginBps / 100
+
+export const marginLabel = (marginBps: number | null | undefined): string => {
+  const pct = marginPct(marginBps)
+  if (pct === null) return 'sem custo'
+
+  return `${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%`
+}
+
+/** Classe do badge: verde no lucro, vermelho no prejuízo, neutro sem custo travado. */
+export const marginTone = (marginBps: number | null | undefined): 'profit' | 'loss' | 'even' | 'unknown' => {
+  if (marginBps == null) return 'unknown'
+  if (marginBps < 0) return 'loss'
+  if (marginBps === 0) return 'even'
+
+  return 'profit'
+}

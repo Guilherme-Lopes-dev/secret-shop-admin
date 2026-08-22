@@ -4,7 +4,11 @@ import { useRoute, useRouter } from 'vue-router'
 import dayjs from 'dayjs'
 import Chart from 'chart.js/auto'
 import { Icon } from '@iconify/vue'
-import { adminService, type SkinPriceHistoryResponse } from '@/services/admin/admin.service'
+import {
+    adminService,
+    type SkinPriceHistoryResponse,
+    type SkinUnitTracking,
+} from '@/services/admin/admin.service'
 import { formatCurrency } from '@/utils/formatCurrency'
 
 const route = useRoute()
@@ -26,7 +30,7 @@ const currentPrice = computed(() => {
     return latest?.manual_price ?? latest?.median_price ?? null
 })
 const estimatedEntryCost = computed(() =>
-    currentPrice.value == null ? null : Math.round(currentPrice.value * 0.6),
+    currentPrice.value == null ? null : Math.round(currentPrice.value * 0.55),
 )
 
 const formatCurrencyOrDash = (v: number | null) => (v == null ? '—' : formatCurrency(v))
@@ -34,56 +38,40 @@ const formatDateOrDash = (v: string | null) => (v == null ? '—' : dayjs(v).for
 const formatPctOrDash = (v: number | null) => (v == null ? '—' : `${v > 0 ? '+' : ''}${v.toFixed(1)}%`)
 const pctClass = (v: number | null) => (v == null || v === 0 ? '' : v > 0 ? 'pct-up' : 'pct-down')
 
+// Pior caso primeiro: prejuízo > abaixo do piso > sem referência (estoque legado) > protegido.
+const floorStatus = (u: SkinUnitTracking) => {
+    if (u.protected_floor == null) return { label: 'Sem referência', cls: 'status-neutral' }
+    if (u.is_below_absolute_floor) return { label: 'Prejuízo', cls: 'status-canceled' }
+    if (u.is_below_protected_floor) return { label: 'Abaixo do piso', cls: 'status-pending' }
+    return { label: 'Protegido', cls: 'status-completed' }
+}
+
 const previewImageUrl = (hash: string | null) => {
     if (!hash) return ''
-    return `https://steamcommunity-a.akamaihd.net/economy/image/${hash}/184fx184f`
+    return `https://steamcommunity-a.akamaihd.net/economy/image/${hash}/280fx280f`
 }
 
-// latest_10_sales não tem shape documentado pelo steamwebapi — as colunas saem das
-// chaves que vierem, em vez de assumir nomes que podem não bater com a resposta real.
-const SALE_LABELS: Record<string, string> = {
-    price: 'Preço',
-    pricelatest: 'Preço',
-    date: 'Data',
-    time: 'Data',
-    created_at: 'Data',
-    sold_at: 'Data',
-    name: 'Item',
-    market_hash_name: 'Item',
-    markethashname: 'Item',
-    quantity: 'Qtd',
-    amount: 'Qtd',
-    currency: 'Moeda',
-    valor: 'Valor',
-}
+// latest_10_sales vem como tupla [data, preço, quantidade] — confirmado na doc
+// oficial da steamwebapi (GET /steam/api/items), não objeto com chaves nomeadas.
+// Ex: ["2025-10-24", 1372.29, 5]
+type SteamSaleTuple = [string, number, number]
 
-const sales = computed(() =>
-    (skin.value?.latest_10_sales ?? []).map(s =>
-        s && typeof s === 'object' ? (s as Record<string, unknown>) : { valor: s },
-    ),
+const isSaleTuple = (s: unknown): s is SteamSaleTuple =>
+    Array.isArray(s) && typeof s[0] === 'string' && typeof s[1] === 'number'
+
+const sales = computed<SteamSaleTuple[]>(() =>
+    (skin.value?.latest_10_sales ?? []).filter(isSaleTuple),
 )
-const saleColumns = computed(() => [...new Set(sales.value.flatMap(Object.keys))])
+const maxSaleQty = computed(() => Math.max(1, ...sales.value.map(s => s[2] ?? 0)))
+// px fixo (não %) — largura em % dentro de inline-flex é ambígua entre navegadores
+const qtyBarWidth = (qty: number) => `${Math.max(3, Math.round((qty / maxSaleQty.value) * 48))}px`
 
-const saleLabel = (key: string) => SALE_LABELS[key.toLowerCase()] ?? key.replace(/_/g, ' ')
-const isPriceKey = (key: string) => /price|preco|valor|value|total/i.test(key)
-const isDateKey = (key: string) => /date|time|_at$/i.test(key)
-
-const parseSaleDate = (value: string | number) => {
-    if (typeof value !== 'number') return dayjs(value)
-    return dayjs.unix(value > 1e12 ? value / 1000 : value)
+const formatSaleDate = (d: string) => {
+    const parsed = dayjs(d)
+    return parsed.isValid() ? parsed.format('DD/MM/YYYY') : d
 }
-
-const formatSaleCell = (key: string, value: unknown): string => {
-    if (value == null || value === '') return '—'
-    if (typeof value === 'object') return JSON.stringify(value)
-    // preços crus do steamwebapi vêm em unidade decimal, não em centavos
-    if (isPriceKey(key) && typeof value === 'number') return formatCurrency(value * 100)
-    if (isDateKey(key) && (typeof value === 'string' || typeof value === 'number')) {
-        const parsed = parseSaleDate(value)
-        return parsed.isValid() ? parsed.format('DD/MM/YYYY HH:mm') : String(value)
-    }
-    return String(value)
-}
+// preço cru do steamwebapi vem em unidade decimal (ex: 1372.29), não em centavos
+const formatSalePrice = (p: number) => formatCurrency(Math.round(p * 100))
 
 const renderChart = () => {
     if (!chartCanvas.value) return
@@ -178,6 +166,9 @@ onUnmounted(() => chartInstance?.destroy())
                     <h1 class="page-title">{{ skin.name }}</h1>
                     <p class="item-hash">{{ skin.hero || '—' }}</p>
                 </div>
+                <span v-if="skin.price_locked" class="lock-badge" title="Sync automático e piso de proteção não se aplicam — preço só muda por edição manual.">
+                    <Icon icon="mdi:lock" /> Travado manualmente
+                </span>
             </div>
 
             <div class="history-grid">
@@ -236,12 +227,14 @@ onUnmounted(() => chartInstance?.destroy())
                                 <th>Entrada</th>
                                 <th>Saída</th>
                                 <th>Custo pago (entrada)</th>
-                                <th class="col-estimated">Custo estimado de entrada</th>
-                                <th>Preço mercado (entrada)</th>
-                                <th>Preço mercado (saída)</th>
+                                <th class="col-estimated">Custo estimado</th>
+                                <th>Mercado (entrada)</th>
+                                <th>Mercado (saída)</th>
                                 <th>Var. mercado</th>
                                 <th>Venda</th>
                                 <th>Margem</th>
+                                <th class="col-group-start">Piso protegido</th>
+                                <th>Status</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -256,6 +249,12 @@ onUnmounted(() => chartInstance?.destroy())
                                 <td :class="pctClass(u.market_variation_pct)">{{ formatPctOrDash(u.market_variation_pct) }}</td>
                                 <td class="price">{{ formatCurrencyOrDash(u.sale_price) }}</td>
                                 <td :class="pctClass(u.margin_pct)">{{ formatPctOrDash(u.margin_pct) }}</td>
+                                <td class="price col-group-start" :title="u.absolute_floor != null ? `Piso absoluto: ${formatCurrency(u.absolute_floor)}` : ''">
+                                    {{ formatCurrencyOrDash(u.protected_floor) }}
+                                </td>
+                                <td>
+                                    <span class="status-badge" :class="floorStatus(u).cls">{{ floorStatus(u).label }}</span>
+                                </td>
                             </tr>
                         </tbody>
                     </table>
@@ -269,18 +268,21 @@ onUnmounted(() => chartInstance?.destroy())
                         <thead>
                             <tr>
                                 <th class="col-index">#</th>
-                                <th v-for="key in saleColumns" :key="key">{{ saleLabel(key) }}</th>
+                                <th>Data</th>
+                                <th>Preço</th>
+                                <th>Qtd. vendida</th>
                             </tr>
                         </thead>
                         <tbody>
                             <tr v-for="(sale, i) in sales" :key="i">
                                 <td class="col-index">{{ i + 1 }}</td>
-                                <td
-                                    v-for="key in saleColumns"
-                                    :key="key"
-                                    :class="{ price: isPriceKey(key) }"
-                                >
-                                    {{ formatSaleCell(key, sale[key]) }}
+                                <td>{{ formatSaleDate(sale[0]) }}</td>
+                                <td class="price">{{ formatSalePrice(sale[1]) }}</td>
+                                <td class="col-qty">
+                                    <span class="qty-wrap">
+                                        <span class="qty-bar" :style="{ width: qtyBarWidth(sale[2]) }"></span>
+                                        <span class="qty-value">{{ sale[2] }}</span>
+                                    </span>
                                 </td>
                             </tr>
                         </tbody>
@@ -305,6 +307,7 @@ onUnmounted(() => chartInstance?.destroy())
     grid-template-columns 1fr
     gap 1.5rem
     align-items start
+    margin-bottom 1.5rem
 
     .section
         margin-bottom 0
@@ -354,23 +357,26 @@ onUnmounted(() => chartInstance?.destroy())
     border-radius 12px
     border 1px solid rgba(255,255,255,0.05)
 
+.item-hero-info
+    flex 1
+
 .item-hero-img
-    width 80px
-    height 80px
+    width 140px
+    height 140px
     object-fit contain
-    border-radius 8px
+    border-radius 12px
     background rgba(255,255,255,0.04)
 
 .item-hero-placeholder
-    width 80px
-    height 80px
-    border-radius 8px
+    width 140px
+    height 140px
+    border-radius 12px
     background rgba(255,255,255,0.05)
     display flex
     align-items center
     justify-content center
     color #64748b
-    font-size 2rem
+    font-size 3rem
 
 .page-title
     font-size 1.5rem
@@ -380,6 +386,18 @@ onUnmounted(() => chartInstance?.destroy())
 .item-hash
     font-size 0.85rem
     color #64748b
+
+.lock-badge
+    display inline-flex
+    align-items center
+    gap 0.35rem
+    padding 0.4rem 0.75rem
+    border-radius 6px
+    background rgba(255,152,0,0.1)
+    color #ff9800
+    font-size 0.8rem
+    font-weight 600
+    white-space nowrap
 
 .section
     background #1a1a1e
@@ -418,19 +436,29 @@ table
         color #94a3b8
         font-size 0.78rem
         font-weight 500
-        padding 0.75rem
+        padding 0.75rem 1rem
         border-bottom 1px solid rgba(255,255,255,0.05)
         white-space nowrap
         text-transform uppercase
 
+        &.col-group-start
+            border-left 1px solid rgba(255,255,255,0.08)
+            padding-left 1.25rem
+
     td
-        padding 0.85rem 0.75rem
+        padding 0.85rem 1rem
         font-size 0.875rem
         border-bottom 1px solid rgba(255,255,255,0.04)
 
         &.price
             font-weight 600
             color #4caf50
+
+        // Separa visualmente o veredito de piso (2 últimas colunas) do rastreio
+        // histórico — sem isso as 12 colunas viram uma parede só de números.
+        &.col-group-start
+            border-left 1px solid rgba(255,255,255,0.08)
+            padding-left 1.25rem
 
         &.col-avg
             color #22d3ee
@@ -458,8 +486,47 @@ table
             font-weight 600
             color #f87171
 
+.status-badge
+    padding 3px 8px
+    border-radius 5px
+    font-size 0.72rem
+    font-weight 600
+    text-transform uppercase
+    white-space nowrap
+
+.status-completed
+    background rgba(76,175,80,0.1)
+    color #4caf50
+
+.status-pending
+    background rgba(255,152,0,0.1)
+    color #ff9800
+
+.status-canceled
+    background rgba(244,67,54,0.1)
+    color #f44336
+
+.status-neutral
+    background rgba(148,163,184,0.1)
+    color #64748b
+
 .col-index
     width 2.5rem
     color #64748b
+    font-weight 600
+
+.qty-wrap
+    display inline-flex
+    align-items center
+    gap 0.6rem
+
+.qty-bar
+    display inline-block
+    height 5px
+    background #6366f1
+    border-radius 3px
+
+.qty-value
+    color #cbd5e1
     font-weight 600
 </style>

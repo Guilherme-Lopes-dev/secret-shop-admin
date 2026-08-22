@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, nextTick, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { adminService } from '@/services/admin/admin.service'
 import { formatCurrency } from '@/utils/formatCurrency'
+import { entryVariationPct, floorPrice, floorStatus } from '@/utils/priceFloor'
 import { Icon } from '@iconify/vue'
 import { toast } from 'vue3-toastify'
 
@@ -14,7 +15,11 @@ const syncing = ref(false)
 const currentPage = ref(1)
 const totalPages = ref(1)
 const totalItems = ref(0)
-const limit = ref(20)
+const limit = ref(24)
+const loadingMore = ref(false)
+const loadFailed = ref(false)
+const sentinel = ref<HTMLElement | null>(null)
+let observer: IntersectionObserver | null = null
 const botFilter = ref('')
 const statusFilter = ref('')
 const searchQuery = ref('')
@@ -42,6 +47,123 @@ type SkinFlag = keyof typeof SKIN_FLAGS
 
 const toggling = ref<Set<string>>(new Set())
 
+// Vem junto com a listagem; 0.7 só cobre o primeiro paint antes da resposta.
+const protectedFloorPct = ref(0.7)
+
+// Agrupado por padrão: 4276 unidades viram ~1000 skins, e estoque repetido
+// (10 Demon Eater iguais) enchia a tela sem dizer nada de novo.
+const groupBySkin = ref(true)
+
+const toggleGrouping = () => {
+    groupBySkin.value = !groupBySkin.value
+    fetchInventory(1)
+}
+
+// No agrupado, o card resume as unidades: mostra faixa de preço e quantas estão
+// sob o piso, em vez do estado de uma unidade só.
+const groupFloor = (item: any) => {
+    if (item.skins?.visibility_override === true) return { key: 'forced-visible', label: 'Forçada visível' }
+    if (item.skins?.visibility_override === false) return { key: 'forced-hidden', label: 'Forçada oculta' }
+    if (item.below_floor > 0) {
+        return {
+            key: item.below_floor === item.units ? 'below' : 'partial',
+            label: `${item.below_floor} de ${item.units} travadas`,
+        }
+    }
+    if (item.no_base === item.units) return { key: 'no-base', label: 'Sem piso' }
+
+    return { key: 'ok', label: 'Acima do piso' }
+}
+
+const priceRange = (item: any) => {
+    if (!item.price_max || item.price_max === item.price) return formatCurrency(item.price)
+
+    return `${formatCurrency(item.price)} – ${formatCurrency(item.price_max)}`
+}
+
+// A tela de detalhe é por unidade, então o card agrupado abre a unidade mais
+// nova da skin (`unit_uuid`). O `id` do grupo é o da skin e não serve pra rota.
+const openCard = (item: any) => {
+    const target = groupBySkin.value ? item.unit_uuid : item.id
+    if (!target) return
+
+    router.push(`/inventory/${target}`)
+}
+
+const itemFloor = (item: any) =>
+    floorStatus(item.price, item.entry_steam_price, item.skins?.visibility_override, protectedFloorPct.value)
+
+const itemFloorPrice = (item: any) => floorPrice(item.entry_steam_price, protectedFloorPct.value)
+
+const itemVariation = (item: any) => entryVariationPct(item.price, item.entry_steam_price)
+
+const variationLabel = (item: any) => {
+    const pct = itemVariation(item)
+    if (pct === null) return '—'
+
+    return `${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%`
+}
+
+// Os três flags são da SKIN, não da unidade. No modo desagrupado as 10 unidades
+// da mesma skin estão na tela juntas: sem espelhar em todas, nove cards seguem
+// mostrando o estado velho de algo que já mudou no banco.
+const applyToSkinCards = (skinUuid: string, field: string, value: unknown) => {
+    items.value
+        .filter((card) => card.skins?.id === skinUuid)
+        .forEach((card) => { card.skins[field] = value })
+}
+
+// Ciclo igual ao do detalhe: automático -> oculta -> visível -> automático.
+const nextOverride = (current: boolean | null | undefined) => {
+    if (current === null || current === undefined) return false
+    if (current === false) return true
+
+    return null
+}
+
+const cyclingVisibility = ref<Set<string>>(new Set())
+
+const isCycling = (item: any) => cyclingVisibility.value.has(item.skins?.id)
+
+const cycleVisibility = async (item: any, event: MouseEvent) => {
+    event.stopPropagation()
+
+    const skinUuid = item.skins?.id
+    if (!skinUuid || isCycling(item)) return
+
+    const next = nextOverride(item.skins?.visibility_override)
+    cyclingVisibility.value = new Set([...cyclingVisibility.value, skinUuid])
+    try {
+        await adminService.setSkinVisibilityOverride(skinUuid, next)
+        applyToSkinCards(skinUuid, 'visibility_override', next)
+        toast.success(
+            next === true
+                ? 'Forçada visível — ignora o piso protegido.'
+                : next === false
+                  ? 'Forçada oculta — ignora o preço.'
+                  : 'Voltou pro automático — o piso decide.',
+        )
+    } catch (e: any) {
+        toast.error(e?.response?.data?.message || 'Erro ao alterar visibilidade.')
+    } finally {
+        cyclingVisibility.value = new Set([...cyclingVisibility.value].filter(k => k !== skinUuid))
+    }
+}
+
+const visibilityIcon = (item: any) => {
+    if (isCycling(item)) return 'mdi:loading'
+    if (item.skins?.visibility_override === true) return 'mdi:eye-check'
+    if (item.skins?.visibility_override === false) return 'mdi:eye-off'
+
+    return 'mdi:eye-settings-outline'
+}
+
+const visibilityTitle = (item: any) => {
+    const status = itemFloor(item)
+
+    return `${status.label} — ${status.hint}\nClique pra alternar: automático → oculta → visível.`
+}
+
 const isToggling = (item: any, flag: SkinFlag) => toggling.value.has(`${item.skins?.id}:${flag}`)
 
 const toggleSkinFlag = async (item: any, flag: SkinFlag, event: MouseEvent) => {
@@ -57,7 +179,7 @@ const toggleSkinFlag = async (item: any, flag: SkinFlag, event: MouseEvent) => {
     toggling.value = new Set([...toggling.value, key])
     try {
         await save(skinUuid, value)
-        item.skins[flag] = value
+        applyToSkinCards(skinUuid, flag, value)
         toast.success(value ? on : off)
     } catch (e: any) {
         toast.error(e?.response?.data?.message || 'Erro ao alterar a skin.')
@@ -100,8 +222,14 @@ const marketplaceOptions = [
     { label: 'Skinbid', value: 'skinbid' },
 ]
 
-const fetchInventory = async (page: number) => {
-    loading.value = true
+// Filtro trocado no meio de um fetch antigo: a resposta atrasada chega depois e
+// sobrescreveria a lista nova. A geração descarta quem não é mais a busca atual.
+let fetchGeneration = 0
+
+const fetchInventory = async (page: number, append = false) => {
+    const generation = ++fetchGeneration
+    if (append) loadingMore.value = true
+    else loading.value = true
     try {
         const minPrice = minPriceInput.value ? Math.round(parseFloat(minPriceInput.value) * 100) : undefined
         const maxPrice = maxPriceInput.value ? Math.round(parseFloat(maxPriceInput.value) * 100) : undefined
@@ -116,18 +244,57 @@ const fetchInventory = async (page: number) => {
             maxPrice,
             marketplace: marketplaceFilter.value || undefined,
             rewardBlocked: rewardFilter.value === '' ? undefined : rewardFilter.value === 'true',
+            group: groupBySkin.value ? 'skin' : undefined,
         })
+        if (generation !== fetchGeneration) return
         if (response.data) {
-            items.value = response.data.data
+            items.value = append ? [...items.value, ...response.data.data] : response.data.data
             totalPages.value = response.data.pages
             totalItems.value = response.data.total
             currentPage.value = response.data.page
+            protectedFloorPct.value = response.data.floors?.protectedFloorPct ?? protectedFloorPct.value
         }
+        loadFailed.value = false
     } catch (error) {
         console.error('Erro ao buscar inventário:', error)
+        if (generation === fetchGeneration) loadFailed.value = true
     } finally {
-        loading.value = false
+        if (generation === fetchGeneration) {
+            // Zerar `loading` ANTES de rearmar: a sentinela mora dentro do
+            // `v-else` do loading e só existe no DOM depois disso. Rearmar antes
+            // pega `sentinel.value` null e o observer nunca chega a observar.
+            loading.value = false
+            loadingMore.value = false
+            // Não rearma depois de falha: a sentinela continua visível, e rearmar
+            // dispararia loadMore na hora — erro, rearme, erro, martelando a API
+            // em loop. O botão "Tentar de novo" devolve o controle pro usuário.
+            if (!loadFailed.value) await rearmSentinel()
+        }
     }
+}
+
+const retryLoad = () => {
+    loadFailed.value = false
+    fetchInventory(currentPage.value + (items.value.length ? 1 : 0), items.value.length > 0)
+}
+
+// O observer só dispara quando a interseção MUDA. Se a página nova não encher a
+// tela, a sentinela continua visível e nada mais acontece — desobservar e
+// observar de novo força uma nova avaliação e a próxima página entra.
+const rearmSentinel = async () => {
+    await nextTick()
+    if (!observer || !sentinel.value) return
+
+    observer.unobserve(sentinel.value)
+    observer.observe(sentinel.value)
+}
+
+const hasMore = computed(() => currentPage.value < totalPages.value)
+
+const loadMore = () => {
+    if (!hasMore.value || loading.value || loadingMore.value || loadFailed.value) return
+
+    fetchInventory(currentPage.value + 1, true)
 }
 
 const fetchBots = async () => {
@@ -155,8 +322,6 @@ const onSearchInput = () => {
     if (searchTimeout) clearTimeout(searchTimeout)
     searchTimeout = setTimeout(() => fetchInventory(1), 400)
 }
-const nextPage = () => { if (currentPage.value < totalPages.value) fetchInventory(currentPage.value + 1) }
-const prevPage = () => { if (currentPage.value > 1) fetchInventory(currentPage.value - 1) }
 
 const itemStatus = (item: any) => {
     if (item.is_sold) return { label: 'Vendido', cls: 'status-canceled' }
@@ -167,7 +332,17 @@ const itemStatus = (item: any) => {
 onMounted(() => {
     fetchBots()
     fetchInventory(1)
+
+    // Mesmo esquema da vitrine: sentinela no fim do grid, 200px de antecedência
+    // pra próxima página já estar carregando quando o usuário chega lá embaixo.
+    observer = new IntersectionObserver(
+        ([entry]) => { if (entry?.isIntersecting) loadMore() },
+        { rootMargin: '200px' },
+    )
+    if (sentinel.value) observer.observe(sentinel.value)
 })
+
+onUnmounted(() => observer?.disconnect())
 </script>
 
 <template>
@@ -175,9 +350,20 @@ onMounted(() => {
         <header class="page-header">
             <div>
                 <h1 class="page-title">Inventário dos Bots</h1>
-                <p class="page-subtitle">{{ totalItems }} itens no inventário</p>
+                <p class="page-subtitle">
+                    {{ totalItems }} {{ groupBySkin ? 'skins distintas' : 'itens' }} no inventário
+                </p>
             </div>
             <div class="header-actions">
+                <button
+                    class="group-toggle"
+                    :class="{ 'group-toggle--on': groupBySkin }"
+                    :title="groupBySkin ? 'Mostrando 1 card por skin — clique pra ver unidade por unidade' : 'Mostrando cada unidade — clique pra agrupar por skin'"
+                    @click="toggleGrouping"
+                >
+                    <Icon :icon="groupBySkin ? 'mdi:layers' : 'mdi:layers-off-outline'" />
+                    {{ groupBySkin ? 'Agrupado por skin' : 'Unidade por unidade' }}
+                </button>
                 <select v-model="botFilter" @change="onFilterChange" class="filter-select">
                     <option value="">Todos os bots</option>
                     <option v-for="bot in bots" :key="bot.id" :value="bot.id">{{ bot.name }}</option>
@@ -239,95 +425,128 @@ onMounted(() => {
         <div class="section">
             <div v-if="loading" class="loading-state">Carregando inventário...</div>
             <div v-else>
-                <div class="table-wrapper">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Item</th>
-                                <th>Qtd</th>
-                                <th>Bot</th>
-                                <th>Asset ID</th>
-                                <th>Preço</th>
-                                <th>Tradable</th>
-                                <th>Status</th>
-                                <th>Preço Lock</th>
-                                <th>Brinde</th>
-                                <th>Criado em</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr v-for="item in items" :key="item.id" class="row-clickable" @click="router.push(`/inventory/${item.id}`)">
-                                <td>
-                                    <div class="item-cell">
-                                        <img
-                                            v-if="item.skins?.icon_url_large"
-                                            :src="`https://steamcommunity-a.akamaihd.net/economy/image/${item.skins.icon_url_large}/62fx62f`"
-                                            class="item-thumb"
-                                            alt=""
-                                        />
-                                        <div v-else class="item-thumb-placeholder">
-                                            <Icon icon="mdi:sword" />
-                                        </div>
-                                        <div>
-                                            <span class="item-name">{{ item.skins?.name || '—' }}</span>
-                                            <small class="item-hero">{{ item.skins?.hero || '' }}</small>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td class="center qty">{{ item.skins?.item_count ?? '—' }}</td>
-                                <td>{{ item.steam_bots?.name || '—' }}</td>
-                                <td><code class="mono">{{ item.asset_id }}</code></td>
-                                <td class="price">{{ formatCurrency(item.price) }}</td>
-                                <td class="center">
-                                    <Icon :icon="item.tradable ? 'mdi:check-circle' : 'mdi:close-circle'" :style="{ color: item.tradable ? '#4caf50' : '#f44336' }" />
-                                </td>
-                                <td>
-                                    <span class="status-badge" :class="itemStatus(item).cls">
-                                        {{ itemStatus(item).label }}
-                                    </span>
-                                </td>
-                                <td class="center" @click.stop>
-                                    <button
-                                        class="lock-btn"
-                                        :class="{ locked: item.skins?.price_locked }"
-                                        :disabled="isToggling(item, 'price_locked')"
-                                        :title="item.skins?.price_locked ? 'Preço bloqueado — clique para desbloquear' : 'Preço livre — clique para bloquear'"
-                                        @click="toggleSkinFlag(item, 'price_locked', $event)"
-                                    >
-                                        <Icon
-                                            :icon="isToggling(item, 'price_locked') ? 'mdi:loading' : item.skins?.price_locked ? 'mdi:lock' : 'mdi:lock-open-outline'"
-                                            :class="{ spinning: isToggling(item, 'price_locked') }"
-                                        />
-                                    </button>
-                                </td>
-                                <td class="center" @click.stop>
-                                    <button
-                                        class="lock-btn"
-                                        :class="{ locked: item.skins?.reward_blocked }"
-                                        :disabled="isToggling(item, 'reward_blocked')"
-                                        :title="item.skins?.reward_blocked ? 'Vetada dos brindes — clique para liberar' : 'Pode sair como brinde — clique para vetar'"
-                                        @click="toggleSkinFlag(item, 'reward_blocked', $event)"
-                                    >
-                                        <Icon
-                                            :icon="isToggling(item, 'reward_blocked') ? 'mdi:loading' : item.skins?.reward_blocked ? 'mdi:gift-off-outline' : 'mdi:gift-outline'"
-                                            :class="{ spinning: isToggling(item, 'reward_blocked') }"
-                                        />
-                                    </button>
-                                </td>
-                                <td>{{ $dayjs(item.created_at).format('DD/MM/YY') }}</td>
-                            </tr>
-                            <tr v-if="items.length === 0">
-                                <td colspan="10" class="empty-state">Nenhum item encontrado.</td>
-                            </tr>
-                        </tbody>
-                    </table>
+                <div class="cards-grid">
+                    <article
+                        v-for="item in items"
+                        :key="groupBySkin ? item.unit_uuid : item.id"
+                        class="card"
+                        :class="{ 'card--below': (groupBySkin ? groupFloor(item).key : itemFloor(item).key) === 'below' }"
+                        @click="openCard(item)"
+                    >
+                        <div class="card-img-wrap">
+                            <img
+                                v-if="item.skins?.icon_url_large"
+                                :src="`https://steamcommunity-a.akamaihd.net/economy/image/${item.skins.icon_url_large}/184fx184f`"
+                                class="card-img"
+                                alt=""
+                                loading="lazy"
+                            />
+                            <div v-else class="card-img-placeholder"><Icon icon="mdi:sword" /></div>
+                            <span v-if="groupBySkin" class="card-status card-status--units">
+                                {{ item.units }} {{ item.units === 1 ? 'unidade' : 'unidades' }}
+                            </span>
+                            <span v-else class="card-status" :class="itemStatus(item).cls">{{ itemStatus(item).label }}</span>
+                            <span v-if="!groupBySkin && !item.tradable" class="card-untradable" title="Não tradável">
+                                <Icon icon="mdi:swap-horizontal-off" />
+                            </span>
+                        </div>
+
+                        <div class="card-body">
+                            <h3 class="card-name" :title="item.skins?.name">{{ item.skins?.name || '—' }}</h3>
+                            <div class="card-badges">
+                                <span v-if="item.skins?.hero" class="badge badge-hero">{{ item.skins.hero }}</span>
+                                <template v-if="groupBySkin">
+                                    <span v-for="bot in item.bots" :key="bot" class="badge badge-bot">{{ bot }}</span>
+                                </template>
+                                <template v-else>
+                                    <span class="badge badge-bot">{{ item.steam_bots?.name || 'sem bot' }}</span>
+                                    <span v-if="item.skins?.item_count" class="badge badge-qty">{{ item.skins.item_count }}x</span>
+                                </template>
+                            </div>
+
+                            <div class="card-prices">
+                                <span class="card-price">{{ groupBySkin ? priceRange(item) : formatCurrency(item.price) }}</span>
+                                <span v-if="item.entry_steam_price" class="card-entry">
+                                    entrada {{ formatCurrency(item.entry_steam_price) }}
+                                    <small v-if="!groupBySkin" :class="(itemVariation(item) ?? 0) < 0 ? 'is-down' : 'is-up'">
+                                        {{ variationLabel(item) }}
+                                    </small>
+                                </span>
+                            </div>
+
+                            <div v-if="groupBySkin" class="card-floor">
+                                <span class="floor-badge" :class="`floor-${groupFloor(item).key}`">
+                                    {{ groupFloor(item).label }}
+                                </span>
+                            </div>
+                            <div v-else class="card-floor" :title="itemFloor(item).hint">
+                                <span class="floor-badge" :class="`floor-${itemFloor(item).key}`">
+                                    {{ itemFloor(item).label }}
+                                </span>
+                                <small v-if="itemFloorPrice(item)" class="floor-value">
+                                    piso {{ formatCurrency(itemFloorPrice(item)!) }}
+                                </small>
+                            </div>
+
+                            <div class="card-actions" @click.stop>
+                                <button
+                                    class="lock-btn"
+                                    :class="{
+                                        locked: item.skins?.visibility_override === false,
+                                        forced: item.skins?.visibility_override === true,
+                                    }"
+                                    :disabled="isCycling(item)"
+                                    :title="visibilityTitle(item)"
+                                    @click="cycleVisibility(item, $event)"
+                                >
+                                    <Icon :icon="visibilityIcon(item)" :class="{ spinning: isCycling(item) }" />
+                                </button>
+                                <button
+                                    class="lock-btn"
+                                    :class="{ locked: item.skins?.price_locked }"
+                                    :disabled="isToggling(item, 'price_locked')"
+                                    :title="item.skins?.price_locked ? 'Preço bloqueado — clique para desbloquear' : 'Preço livre — clique para bloquear'"
+                                    @click="toggleSkinFlag(item, 'price_locked', $event)"
+                                >
+                                    <Icon
+                                        :icon="isToggling(item, 'price_locked') ? 'mdi:loading' : item.skins?.price_locked ? 'mdi:lock' : 'mdi:lock-open-outline'"
+                                        :class="{ spinning: isToggling(item, 'price_locked') }"
+                                    />
+                                </button>
+                                <button
+                                    class="lock-btn"
+                                    :class="{ locked: item.skins?.reward_blocked }"
+                                    :disabled="isToggling(item, 'reward_blocked')"
+                                    :title="item.skins?.reward_blocked ? 'Vetada dos brindes — clique para liberar' : 'Pode sair como brinde — clique para vetar'"
+                                    @click="toggleSkinFlag(item, 'reward_blocked', $event)"
+                                >
+                                    <Icon
+                                        :icon="isToggling(item, 'reward_blocked') ? 'mdi:loading' : item.skins?.reward_blocked ? 'mdi:gift-off-outline' : 'mdi:gift-outline'"
+                                        :class="{ spinning: isToggling(item, 'reward_blocked') }"
+                                    />
+                                </button>
+                                <small class="card-date">{{ $dayjs(item.created_at).format('DD/MM/YY') }}</small>
+                            </div>
+                        </div>
+                    </article>
+
+                    <div v-if="items.length === 0" class="empty-state">Nenhum item encontrado.</div>
                 </div>
 
-                <div class="pagination" v-if="totalPages > 1">
-                    <button class="page-btn" :disabled="currentPage === 1" @click="prevPage">Anterior</button>
-                    <span class="page-info">Página {{ currentPage }} de {{ totalPages }}</span>
-                    <button class="page-btn" :disabled="currentPage === totalPages" @click="nextPage">Próxima</button>
+                <div ref="sentinel" class="scroll-sentinel" />
+
+                <div v-if="loadingMore" class="loading-more">
+                    <Icon icon="mdi:loading" class="spinning" />
+                    Carregando mais...
                 </div>
+                <div v-else-if="loadFailed" class="load-failed">
+                    <Icon icon="mdi:alert-circle-outline" />
+                    Falha ao carregar.
+                    <button class="retry-btn" @click="retryLoad">Tentar de novo</button>
+                </div>
+                <p v-else-if="items.length && !hasMore" class="list-end">
+                    {{ items.length }} de {{ totalItems }} — fim da lista
+                </p>
             </div>
         </div>
     </div>
@@ -498,84 +717,181 @@ onMounted(() => {
     text-align center
     color #94a3b8
 
-.table-wrapper
-    overflow-x auto
+.cards-grid
+    display grid
+    grid-template-columns repeat(auto-fill, minmax(215px, 1fr))
+    gap 1rem
     margin-bottom 1.5rem
 
-table
-    width 100%
-    border-collapse collapse
-
-    th
-        text-align left
-        color #94a3b8
-        font-size 0.78rem
-        font-weight 500
-        padding 0.75rem
-        border-bottom 1px solid rgba(255,255,255,0.05)
-        white-space nowrap
-        text-transform uppercase
-
-    td
-        padding 0.85rem 0.75rem
-        font-size 0.875rem
-        border-bottom 1px solid rgba(255,255,255,0.04)
-        vertical-align middle
-
-        &.center
-            text-align center
-
-        &.price
-            font-weight 600
-            color #4caf50
-
-.row-clickable
+.card
+    position relative
+    background #121214
+    border 1px solid rgba(255,255,255,0.06)
+    border-radius 10px
+    overflow hidden
     cursor pointer
-    transition background 0.15s
+    transition all 0.15s
+    display flex
+    flex-direction column
 
     &:hover
-        background rgba(255,255,255,0.03)
+        border-color rgba(99,102,241,0.4)
+        transform translateY(-2px)
 
-.item-cell
-    display flex
-    align-items center
-    gap 0.625rem
+    // Travada pelo piso: some da vitrine, então precisa saltar aos olhos aqui.
+    &--below
+        border-color rgba(244,67,54,0.35)
 
-.item-thumb
-    width 40px
-    height 40px
-    object-fit contain
-    border-radius 4px
-    background rgba(255,255,255,0.04)
 
-.item-thumb-placeholder
-    width 40px
-    height 40px
-    border-radius 4px
-    background rgba(255,255,255,0.05)
+.card-img-wrap
+    position relative
+    aspect-ratio 4 / 3
+    background rgba(255,255,255,0.03)
     display flex
     align-items center
     justify-content center
-    color #64748b
 
-.item-name
-    display block
-    font-weight 500
-    font-size 0.85rem
+.card-img
+    width 100%
+    height 100%
+    object-fit contain
 
-.item-hero
-    display block
-    color #64748b
-    font-size 0.73rem
+.card-img-placeholder
+    color #3f3f46
+    font-size 2rem
 
-.qty
-    font-weight 600
-    color #e2e8f0
-
-.mono
-    font-family monospace
-    font-size 0.8rem
+.group-toggle
+    display inline-flex
+    align-items center
+    gap 0.4rem
+    background #1a1a1e
+    border 1px solid rgba(255,255,255,0.1)
+    border-radius 8px
     color #94a3b8
+    padding 0.5rem 0.75rem
+    font-size 0.82rem
+    cursor pointer
+    transition all 0.15s
+
+    &:hover
+        border-color rgba(99,102,241,0.4)
+
+    &--on
+        border-color rgba(99,102,241,0.5)
+        background rgba(99,102,241,0.1)
+        color #a5b4fc
+
+.card-status
+    position absolute
+    top 6px
+    left 6px
+    padding 3px 8px
+    border-radius 5px
+    font-size 0.65rem
+    font-weight 700
+    text-transform uppercase
+    backdrop-filter blur(4px)
+
+    &--units
+        background rgba(99,102,241,0.22)
+        color #c7d2fe
+
+.card-untradable
+    position absolute
+    top 6px
+    right 6px
+    width 24px
+    height 24px
+    border-radius 6px
+    background rgba(0,0,0,0.55)
+    color #f87171
+    display flex
+    align-items center
+    justify-content center
+    font-size 0.9rem
+
+.card-body
+    padding 0.7rem
+    display flex
+    flex-direction column
+    gap 0.45rem
+    flex 1
+
+.card-name
+    font-size 0.82rem
+    font-weight 600
+    line-height 1.25
+    display -webkit-box
+    -webkit-line-clamp 2
+    -webkit-box-orient vertical
+    overflow hidden
+    min-height 2.05rem
+
+.card-badges
+    display flex
+    flex-wrap wrap
+    gap 0.25rem
+
+.badge
+    padding 2px 7px
+    border-radius 5px
+    font-size 0.66rem
+    font-weight 600
+
+.badge-hero
+    background rgba(76,175,80,0.12)
+    color #86efac
+
+.badge-bot
+    background rgba(255,255,255,0.07)
+    color #cbd5e1
+
+.badge-qty
+    background rgba(99,102,241,0.15)
+    color #a5b4fc
+
+.card-prices
+    display flex
+    flex-direction column
+    gap 0.1rem
+
+.card-price
+    font-weight 700
+    font-size 0.95rem
+    color #4caf50
+
+.card-entry
+    font-size 0.72rem
+    color #94a3b8
+
+    small
+        font-weight 700
+        margin-left 0.25rem
+
+        &.is-down
+            color #f44336
+
+        &.is-up
+            color #4caf50
+
+.card-floor
+    display flex
+    align-items center
+    gap 0.4rem
+    flex-wrap wrap
+
+.card-actions
+    display flex
+    align-items center
+    gap 0.35rem
+    margin-top auto
+    padding-top 0.5rem
+    border-top 1px solid rgba(255,255,255,0.05)
+
+.card-date
+    margin-left auto
+    color #475569
+    font-size 0.7rem
 
 .status-badge
     padding 3px 8px
@@ -585,16 +901,53 @@ table
     text-transform uppercase
 
 .status-completed
-    background rgba(76,175,80,0.1)
+    background rgba(76,175,80,0.14)
     color #4caf50
 
 .status-pending
-    background rgba(255,152,0,0.1)
+    background rgba(255,152,0,0.16)
     color #ff9800
 
 .status-canceled
-    background rgba(244,67,54,0.1)
+    background rgba(244,67,54,0.16)
     color #f44336
+
+.floor-badge
+    display inline-block
+    padding 3px 8px
+    border-radius 5px
+    font-size 0.68rem
+    font-weight 600
+    text-transform uppercase
+
+.floor-ok
+    background rgba(76,175,80,0.1)
+    color #4caf50
+
+.floor-below
+    background rgba(244,67,54,0.12)
+    color #f44336
+
+.floor-no-base
+    background rgba(100,116,139,0.15)
+    color #94a3b8
+
+.floor-forced-visible
+    background rgba(99,102,241,0.15)
+    color #818cf8
+
+.floor-forced-hidden
+    background rgba(255,152,0,0.12)
+    color #ff9800
+
+// Agrupado: parte das unidades sob o piso — a skin ainda aparece no site.
+.floor-partial
+    background rgba(255,152,0,0.14)
+    color #fbbf24
+
+.floor-value
+    color #64748b
+    font-size 0.72rem
 
 .lock-btn
     background transparent
@@ -622,6 +975,11 @@ table
             color #4caf50
             background rgba(76,175,80,0.06)
 
+    &.forced
+        border-color rgba(99,102,241,0.4)
+        color #818cf8
+        background rgba(99,102,241,0.08)
+
     &:disabled
         opacity 0.4
         cursor not-allowed
@@ -631,32 +989,42 @@ table
     padding 3rem
     color #94a3b8
 
-.pagination
-    display flex
-    justify-content flex-end
-    align-items center
-    gap 1rem
-    padding-top 1rem
-    border-top 1px solid rgba(255,255,255,0.05)
+.scroll-sentinel
+    height 1px
 
-.page-btn
+.loading-more
+    display flex
+    align-items center
+    justify-content center
+    gap 0.5rem
+    padding 1.5rem
+    color #94a3b8
+    font-size 0.85rem
+
+.list-end
+    text-align center
+    padding 1.5rem
+    color #475569
+    font-size 0.8rem
+
+.load-failed
+    display flex
+    align-items center
+    justify-content center
+    gap 0.5rem
+    padding 1.5rem
+    color #f87171
+    font-size 0.85rem
+
+.retry-btn
     background #2a2a30
     color #fff
     border 1px solid rgba(255,255,255,0.1)
-    padding 0.45rem 1rem
+    padding 0.35rem 0.8rem
     border-radius 6px
     cursor pointer
-    font-size 0.85rem
-    transition all 0.2s
+    font-size 0.8rem
 
-    &:hover:not(:disabled)
+    &:hover
         background #3a3a42
-
-    &:disabled
-        opacity 0.4
-        cursor not-allowed
-
-.page-info
-    color #94a3b8
-    font-size 0.875rem
 </style>

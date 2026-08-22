@@ -2,7 +2,11 @@
 import { ref, onMounted, reactive, computed } from 'vue'
 import { Icon } from '@iconify/vue'
 import { toast } from 'vue3-toastify'
-import { adminService, type ArcanaHeroMultiplier } from '@/services/admin/admin.service'
+import {
+    adminService,
+    type ArcanaHeroMultiplier,
+    type EntryPriceSource,
+} from '@/services/admin/admin.service'
 
 const errorMessage = (err: unknown, fallback: string): string => {
     const e = err as { response?: { data?: { message?: string } } }
@@ -18,7 +22,33 @@ const config = reactive({
     arcanaLevel1Multiplier: 1,
     arcanaLevel2Multiplier: 1,
     arcanaLevel3Multiplier: 1,
+    protectedFloorPct: 0.7,
+    absoluteFloorPct: 0.61,
 })
+
+const asPercent = (fraction: number) =>
+    Number.isFinite(fraction) ? `${(fraction * 100).toFixed(1)}%` : '—'
+
+// Mesma regra do backend (assertFloorOrder): breakeven acima do piso protegido
+// deixaria o sistema vendendo "protegido" já no prejuízo.
+const floorsValid = computed(
+    () =>
+        config.protectedFloorPct <= 1 &&
+        config.absoluteFloorPct <= 1 &&
+        config.absoluteFloorPct <= config.protectedFloorPct,
+)
+
+// Fora do `config` de propósito: `allPositive` valida Object.values como número,
+// e uma string ali travaria o botão de salvar.
+const entryPriceSource = ref<EntryPriceSource>('lowest')
+
+const ENTRY_PRICE_SOURCE_HINTS: Record<EntryPriceSource, string> = {
+    lowest: 'Menor listado na Steam. Salta em item de baixa liquidez e pode travar um piso alto demais.',
+    median: 'Mediana das vendas recentes. Estável, imune a listagem fora da curva.',
+    least: 'O menor entre lowest e median. Piso mais conservador.',
+}
+
+const entryPriceSourceHint = computed(() => ENTRY_PRICE_SOURCE_HINTS[entryPriceSource.value])
 
 const discountPercentLabel = computed(() => {
     const delta = (1 - config.priceSyncDiscount) * 100
@@ -40,6 +70,9 @@ const loadConfig = async () => {
             config.arcanaLevel1Multiplier = res.data.arcanaLevelMultipliers[1]
             config.arcanaLevel2Multiplier = res.data.arcanaLevelMultipliers[2]
             config.arcanaLevel3Multiplier = res.data.arcanaLevelMultipliers[3]
+            config.protectedFloorPct = res.data.protectedFloorPct
+            config.absoluteFloorPct = res.data.absoluteFloorPct
+            entryPriceSource.value = res.data.entryPriceSource ?? 'lowest'
             heroRows.value = res.data.arcanaHeroes ?? []
             heroOptions.value = res.data.heroOptions ?? []
         }
@@ -57,9 +90,16 @@ const saveConfig = async () => {
         toast.error('Todos os valores devem ser maiores que zero.')
         return
     }
+    if (!floorsValid.value) {
+        toast.error('Pisos inválidos: máximo 100%, e o absoluto não pode passar do protegido.')
+        return
+    }
     saving.value = true
     try {
-        await adminService.setPricingConfig({ ...config })
+        await adminService.setPricingConfig({
+            ...config,
+            entryPriceSource: entryPriceSource.value,
+        })
         toast.success('Configuração salva. Preços do site sendo recalculados...')
     } catch (err) {
         toast.error(errorMessage(err, 'Erro ao salvar configuração.'))
@@ -213,6 +253,58 @@ const removeHeroRow = async (row: ArcanaHeroMultiplier) => {
 
             <div class="section">
                 <h2 class="section-title">
+                    <Icon icon="mdi:shield-alert-outline" />
+                    Pisos de Preço
+                </h2>
+                <p class="section-hint">
+                    Ambos são % do <strong>valor Steam travado na entrada</strong> da unidade
+                    (<code>entry_steam_price</code>), não do preço de mercado atual.
+                    Unidade sem entry gravado (estoque legado) não tem piso.
+                </p>
+                <div class="config-grid">
+                    <div class="config-field">
+                        <label class="field-label">Piso protegido</label>
+                        <input
+                            v-model.number="config.protectedFloorPct"
+                            type="number" min="0.01" max="1" step="0.01" class="field-input"
+                        />
+                        <p class="field-hint">
+                            {{ asPercent(config.protectedFloorPct) }} da entrada. Não vende abaixo disso —
+                            unidade que fura o piso some da vitrine.
+                        </p>
+                    </div>
+                    <div class="config-field">
+                        <label class="field-label">Piso absoluto (breakeven)</label>
+                        <input
+                            v-model.number="config.absoluteFloorPct"
+                            type="number" min="0.01" max="1" step="0.01" class="field-input"
+                        />
+                        <p class="field-hint">
+                            {{ asPercent(config.absoluteFloorPct) }} da entrada. Abaixo disso a venda dá
+                            prejuízo sobre o capital investido. Informativo, não bloqueia.
+                        </p>
+                    </div>
+                    <div class="config-field">
+                        <label class="field-label">Preço travado na entrada da unidade</label>
+                        <select v-model="entryPriceSource" class="field-input">
+                            <option value="lowest">Lowest (menor listado)</option>
+                            <option value="median">Median (mediana de vendas)</option>
+                            <option value="least">Least (o menor dos dois)</option>
+                        </select>
+                        <p class="field-hint">{{ entryPriceSourceHint }}</p>
+                        <p class="field-hint field-hint--warn">
+                            Vale só pra unidade nova — entry já gravado não muda.
+                        </p>
+                    </div>
+                </div>
+                <p v-if="!floorsValid" class="field-hint field-hint--warn">
+                    Piso absoluto ({{ asPercent(config.absoluteFloorPct) }}) não pode passar do protegido
+                    ({{ asPercent(config.protectedFloorPct) }}), e nenhum dos dois passa de 100%.
+                </p>
+            </div>
+
+            <div class="section">
+                <h2 class="section-title">
                     <Icon icon="mdi:auto-fix" />
                     Arcana por Level
                 </h2>
@@ -330,7 +422,7 @@ const removeHeroRow = async (row: ArcanaHeroMultiplier) => {
             </div>
 
             <div class="actions">
-                <button class="btn-save" :disabled="saving || !allPositive" @click="saveConfig">
+                <button class="btn-save" :disabled="saving || !allPositive || !floorsValid" @click="saveConfig">
                     <Icon v-if="saving" icon="mdi:loading" class="spin" />
                     <Icon v-else icon="mdi:content-save-outline" />
                     {{ saving ? 'Salvando...' : 'Salvar' }}
@@ -399,6 +491,12 @@ const removeHeroRow = async (row: ArcanaHeroMultiplier) => {
     font-size 0.85rem
     margin -0.5rem 0 1rem
 
+    code
+        background #1a1a1f
+        border-radius 4px
+        padding 0.1rem 0.3rem
+        font-size 0.8rem
+
 .config-grid
     display grid
     grid-template-columns repeat(auto-fit, minmax(220px, 1fr))
@@ -429,6 +527,9 @@ const removeHeroRow = async (row: ArcanaHeroMultiplier) => {
 .field-hint
     color #64748b
     font-size 0.78rem
+
+    &--warn
+        color #f59e0b
 
 .actions
     display flex

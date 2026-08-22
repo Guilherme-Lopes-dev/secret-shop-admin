@@ -316,6 +316,7 @@ export const adminService = {
     if (filters.maxPrice !== undefined) params.append('maxPrice', String(filters.maxPrice))
     if (filters.marketplace) params.append('marketplace', filters.marketplace)
     if (filters.rewardBlocked !== undefined) params.append('rewardBlocked', String(filters.rewardBlocked))
+    if (filters.group) params.append('group', filters.group)
     return api.get(`/skins/admin/inventory?${params}`)
   },
 
@@ -549,6 +550,11 @@ export const adminService = {
   /** Veta (ou libera) a skin no sorteio de brindes de nível. */
   async toggleSkinRewardBlock(skinUuid: string, blocked: boolean) {
     return api.patch(`/skins/admin/skin/${skinUuid}/reward-block`, { blocked })
+  },
+
+  /** Override manual de visibilidade na vitrine. null = automático (piso decide). */
+  async setSkinVisibilityOverride(skinUuid: string, override: boolean | null) {
+    return api.patch(`/skins/admin/skin/${skinUuid}/visibility-override`, { override })
   },
 
   // Brindes — fila de liberação
@@ -1379,6 +1385,8 @@ export interface InventoryFilters {
   marketplace?: string
   /** true = só as vetadas como brinde, false = só as liberadas, undefined = todas. */
   rewardBlocked?: boolean
+  /** 'skin' = uma linha por skin (unidades agregadas) em vez de uma por unidade. */
+  group?: 'skin'
 }
 
 export interface MarketExplorerFilters {
@@ -1467,10 +1475,18 @@ export interface ArcanaHeroMultiplierInput {
   active?: boolean
 }
 
+/** Preço Steam travado em entry_steam_price quando a unidade entra no bot. */
+export type EntryPriceSource = 'lowest' | 'median' | 'least'
+
 export interface PricingConfigBase {
   priceSyncDiscount: number
   dropshipPriceMultiplier: number
   arcanaLevelMultipliers: Record<1 | 2 | 3, number>
+  entryPriceSource: EntryPriceSource
+  /** Ex: 0.7 = some da vitrine abaixo de 70% do valor Steam de entrada. */
+  protectedFloorPct: number
+  /** Ex: 0.61 = abaixo disso a venda dá prejuízo sobre o capital investido. */
+  absoluteFloorPct: number
 }
 
 export interface PricingConfig extends PricingConfigBase {
@@ -1484,6 +1500,9 @@ export interface PricingConfigInput {
   arcanaLevel1Multiplier?: number
   arcanaLevel2Multiplier?: number
   arcanaLevel3Multiplier?: number
+  entryPriceSource?: EntryPriceSource
+  protectedFloorPct?: number
+  absoluteFloorPct?: number
 }
 
 export interface SkinPriceCatalogItem {
@@ -1537,6 +1556,11 @@ export interface SkinUnitTracking {
   sale_price: number | null
   market_variation_pct: number | null
   margin_pct: number | null
+  // null = sem valor Steam de referência na entrada (estoque legado sem backfill) — sem piso pra checar.
+  protected_floor: number | null
+  absolute_floor: number | null
+  is_below_protected_floor: boolean
+  is_below_absolute_floor: boolean
 }
 
 export interface SkinPriceHistoryResponse {
@@ -1547,6 +1571,7 @@ export interface SkinPriceHistoryResponse {
     icon_url_large: string | null
     // Shape interno não documentado pelo steamwebapi — renderizado de forma genérica.
     latest_10_sales: unknown[] | null
+    price_locked: boolean
   }
   points: SkinPriceHistoryPoint[]
   units: SkinUnitTracking[]

@@ -3,6 +3,7 @@ import { ref, onMounted, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { adminService } from '@/services/admin/admin.service'
 import { formatCurrency } from '@/utils/formatCurrency'
+import { entryVariationPct, floorPrice, floorStatus } from '@/utils/priceFloor'
 import { Icon } from '@iconify/vue'
 import { toast } from 'vue3-toastify'
 
@@ -15,6 +16,58 @@ const loading = ref(true)
 const saving = ref(false)
 const priceLocked = ref(false)
 const lockingPrice = ref(false)
+const visibilityOverride = ref<boolean | null>(null)
+const togglingVisibility = ref(false)
+
+// Vem no GET do item; o default cobre o intervalo antes da resposta chegar.
+const floors = ref({ protectedFloorPct: 0.7, absoluteFloorPct: 0.61, costRatio: 0.55 })
+
+// cost_price é travado na entrada da unidade. Estoque antigo pode não ter — aí
+// estima pelo valor Steam da entrada, e a tela diz que é estimativa.
+const costPrice = computed<number | null>(() => {
+    if (item.value?.cost_price != null) return item.value.cost_price
+    if (!entrySteamPrice.value) return null
+
+    return Math.round(entrySteamPrice.value * floors.value.costRatio)
+})
+
+const costIsEstimated = computed(() => item.value?.cost_price == null && costPrice.value !== null)
+
+// Margem sobre o capital investido, não sobre o preço de venda.
+const marginOverCost = computed(() => {
+    const cost = costPrice.value
+    if (!cost || !item.value?.price) return null
+
+    return (item.value.price / cost - 1) * 100
+})
+
+const entrySteamPrice = computed<number | null>(() => item.value?.entry_steam_price ?? null)
+const protectedFloor = computed(() => floorPrice(entrySteamPrice.value, floors.value.protectedFloorPct))
+const breakevenFloor = computed(() => floorPrice(entrySteamPrice.value, floors.value.absoluteFloorPct))
+const entryVariation = computed(() => entryVariationPct(item.value?.price ?? null, entrySteamPrice.value))
+const floorState = computed(() =>
+    floorStatus(
+        item.value?.price ?? null,
+        entrySteamPrice.value,
+        visibilityOverride.value,
+        floors.value.protectedFloorPct,
+    ),
+)
+
+const pctLabel = (fraction: number) => `${(fraction * 100).toFixed(0)}%`
+
+const variationLabel = computed(() => {
+    if (entryVariation.value === null) return '—'
+
+    return `${entryVariation.value >= 0 ? '+' : ''}${entryVariation.value.toFixed(1)}%`
+})
+
+// Quanto falta o preço subir pra sair do piso — só faz sentido quando está travada.
+const gapToFloor = computed(() => {
+    if (floorState.value.key !== 'below' || !protectedFloor.value) return null
+
+    return protectedFloor.value - (item.value?.price ?? 0)
+})
 
 const rarityOptions = [
     'Common', 'Uncommon', 'Rare', 'Mythical', 'Legendary', 'Immortal',
@@ -88,9 +141,47 @@ const handleToggleLock = async () => {
     }
 }
 
+const visibilityLabel = computed(() => {
+    if (visibilityOverride.value === true) return 'Forçado visível'
+    if (visibilityOverride.value === false) return 'Forçado oculto'
+    return 'Automático (piso decide)'
+})
+const visibilityIcon = computed(() => {
+    if (togglingVisibility.value) return 'mdi:loading'
+    if (visibilityOverride.value === true) return 'mdi:eye-check'
+    if (visibilityOverride.value === false) return 'mdi:eye-off'
+    return 'mdi:eye-settings-outline'
+})
+
+// Ciclo: automático -> forçar oculto -> forçar visível -> automático de novo
+const handleCycleVisibility = async () => {
+    const skinUuid = item.value?.skins?.id
+    if (!skinUuid) return
+    togglingVisibility.value = true
+    try {
+        const next =
+            visibilityOverride.value === null ? false : visibilityOverride.value === false ? true : null
+        await adminService.setSkinVisibilityOverride(skinUuid, next)
+        visibilityOverride.value = next
+        if (item.value?.skins) item.value.skins.visibility_override = next
+        const msg =
+            next === true
+                ? 'Forçado visível na vitrine — ignora o piso protegido.'
+                : next === false
+                  ? 'Forçado oculto na vitrine — ignora o preço.'
+                  : 'Voltou pro automático — piso protegido decide sozinho.'
+        toast.success(msg)
+    } catch (e: any) {
+        toast.error(e?.response?.data?.message || 'Erro ao alterar visibilidade.')
+    } finally {
+        togglingVisibility.value = false
+    }
+}
+
 const populateForm = (data: any) => {
     const s = data.skins ?? {}
     priceLocked.value = s.price_locked ?? false
+    visibilityOverride.value = s.visibility_override ?? null
     form.value = {
         name: s.name ?? '',
         hero: s.hero ?? '',
@@ -117,6 +208,7 @@ const fetchItem = async () => {
     try {
         const response = await adminService.getInventoryItem(uuid)
         item.value = response.data
+        if (response.data?.floors) floors.value = response.data.floors
         populateForm(response.data)
     } catch {
         toast.error('Erro ao carregar item.')
@@ -272,7 +364,82 @@ onMounted(fetchItem)
                             />
                             {{ priceLocked ? 'Bloqueado' : 'Livre para sync' }}
                         </button>
+                        <button
+                            type="button"
+                            class="visibility-toggle"
+                            :class="{
+                                'visibility-toggle--forced-visible': visibilityOverride === true,
+                                'visibility-toggle--forced-hidden': visibilityOverride === false,
+                            }"
+                            :disabled="togglingVisibility"
+                            @click="handleCycleVisibility"
+                            title="Visibilidade na vitrine — clique pra alternar entre automático (piso decide), forçar oculto e forçar visível"
+                        >
+                            <Icon :icon="visibilityIcon" :class="{ spinning: togglingVisibility }" />
+                            {{ visibilityLabel }}
+                        </button>
                     </h2>
+
+                    <div class="floor-panel" :class="`floor-panel--${floorState.key}`">
+                        <div class="floor-panel-head">
+                            <span class="floor-panel-badge">{{ floorState.label }}</span>
+                            <span class="floor-panel-hint">{{ floorState.hint }}</span>
+                        </div>
+                        <div class="floor-panel-grid">
+                            <div class="floor-stat">
+                                <span class="floor-stat-label">Entrada Steam (base)</span>
+                                <strong class="floor-stat-value">
+                                    {{ entrySteamPrice ? formatCurrency(entrySteamPrice) : 'sem base' }}
+                                </strong>
+                                <small class="floor-stat-hint">travado quando a unidade entrou no bot</small>
+                            </div>
+                            <div class="floor-stat">
+                                <span class="floor-stat-label">Preço de venda atual</span>
+                                <strong class="floor-stat-value">{{ formatCurrency(item?.price ?? 0) }}</strong>
+                                <small
+                                    class="floor-stat-hint floor-variation"
+                                    :class="(entryVariation ?? 0) < 0 ? 'is-down' : 'is-up'"
+                                >{{ variationLabel }} vs entrada</small>
+                            </div>
+                            <div class="floor-stat">
+                                <span class="floor-stat-label">
+                                    Custo estimado ({{ pctLabel(floors.costRatio) }})
+                                </span>
+                                <strong class="floor-stat-value">
+                                    {{ costPrice ? formatCurrency(costPrice) : '—' }}
+                                </strong>
+                                <small class="floor-stat-hint">
+                                    <template v-if="costIsEstimated">estimado: entrada × {{ floors.costRatio }}</template>
+                                    <template v-else>travado na entrada da unidade</template>
+                                    <span
+                                        v-if="marginOverCost !== null"
+                                        class="floor-variation"
+                                        :class="marginOverCost < 0 ? 'is-down' : 'is-up'"
+                                    >
+                                        · margem {{ marginOverCost >= 0 ? '+' : '' }}{{ marginOverCost.toFixed(1) }}%
+                                    </span>
+                                </small>
+                            </div>
+                            <div class="floor-stat">
+                                <span class="floor-stat-label">Piso protegido ({{ pctLabel(floors.protectedFloorPct) }})</span>
+                                <strong class="floor-stat-value">
+                                    {{ protectedFloor ? formatCurrency(protectedFloor) : '—' }}
+                                </strong>
+                                <small class="floor-stat-hint">abaixo disso some da vitrine</small>
+                            </div>
+                            <div class="floor-stat">
+                                <span class="floor-stat-label">Breakeven ({{ pctLabel(floors.absoluteFloorPct) }})</span>
+                                <strong class="floor-stat-value">
+                                    {{ breakevenFloor ? formatCurrency(breakevenFloor) : '—' }}
+                                </strong>
+                                <small class="floor-stat-hint">abaixo disso a venda dá prejuízo</small>
+                            </div>
+                        </div>
+                        <p v-if="gapToFloor" class="floor-panel-gap">
+                            Faltam <strong>{{ formatCurrency(gapToFloor) }}</strong> no preço de venda pra ela
+                            voltar sozinha pra vitrine — ou use o botão de visibilidade pra forçar.
+                        </p>
+                    </div>
 
                     <div class="form-row form-row--4">
                         <div class="field">
@@ -577,6 +744,87 @@ onMounted(fetchItem)
     color #64748b
     margin-left auto
 
+.floor-panel
+    border 1px solid rgba(255,255,255,0.08)
+    border-left 3px solid #475569
+    border-radius 10px
+    background rgba(255,255,255,0.02)
+    padding 1rem
+    margin-bottom 1.25rem
+
+    &--below
+        border-left-color #f44336
+        background rgba(244,67,54,0.05)
+
+    &--ok
+        border-left-color #4caf50
+
+    &--forced-visible
+        border-left-color #818cf8
+        background rgba(99,102,241,0.05)
+
+    &--forced-hidden
+        border-left-color #ff9800
+        background rgba(255,152,0,0.05)
+
+.floor-panel-head
+    display flex
+    align-items center
+    flex-wrap wrap
+    gap 0.5rem
+    margin-bottom 0.9rem
+
+.floor-panel-badge
+    padding 3px 8px
+    border-radius 5px
+    font-size 0.68rem
+    font-weight 700
+    text-transform uppercase
+    background rgba(255,255,255,0.07)
+    color #cbd5e1
+
+.floor-panel-hint
+    font-size 0.78rem
+    color #94a3b8
+
+.floor-panel-grid
+    display grid
+    grid-template-columns repeat(auto-fit, minmax(150px, 1fr))
+    gap 1rem
+
+.floor-stat
+    display flex
+    flex-direction column
+    gap 0.15rem
+
+.floor-stat-label
+    font-size 0.72rem
+    color #64748b
+    text-transform uppercase
+    letter-spacing 0.02em
+
+.floor-stat-value
+    font-size 1rem
+    color #fff
+
+.floor-stat-hint
+    font-size 0.72rem
+    color #64748b
+
+.floor-variation
+    font-weight 600
+
+    &.is-down
+        color #f44336
+
+    &.is-up
+        color #4caf50
+
+.floor-panel-gap
+    margin 0.9rem 0 0
+    font-size 0.8rem
+    color #fbbf24
+
 .form-row
     display grid
     grid-template-columns 1fr 1fr
@@ -734,6 +982,40 @@ onMounted(fetchItem)
             border-color rgba(76,175,80,0.35)
             color #4caf50
             background rgba(76,175,80,0.06)
+
+    &:disabled
+        opacity 0.4
+        cursor not-allowed
+
+.visibility-toggle
+    display inline-flex
+    align-items center
+    gap 0.35rem
+    margin-left 0.5rem
+    background rgba(255,255,255,0.04)
+    border 1px solid rgba(255,255,255,0.1)
+    border-radius 6px
+    color #94a3b8
+    padding 0.3rem 0.75rem
+    font-size 0.78rem
+    font-weight 500
+    cursor pointer
+    transition all 0.2s
+
+    &:hover:not(:disabled)
+        border-color rgba(99,102,241,0.35)
+        color #6366f1
+        background rgba(99,102,241,0.06)
+
+    &--forced-visible
+        border-color rgba(76,175,80,0.35)
+        color #4caf50
+        background rgba(76,175,80,0.06)
+
+    &--forced-hidden
+        border-color rgba(244,67,54,0.35)
+        color #f44336
+        background rgba(244,67,54,0.06)
 
     &:disabled
         opacity 0.4

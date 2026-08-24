@@ -9,6 +9,7 @@ import {
 import { typeBadge, typeOptions } from './tradeOfferType'
 import { Icon } from '@iconify/vue'
 import { toast } from 'vue3-toastify'
+import { persistedRef } from '@/utils/persistedRef'
 
 const router = useRouter()
 const route = useRoute()
@@ -19,9 +20,14 @@ const currentPage = ref(1)
 const totalPages = ref(1)
 const totalItems = ref(0)
 const limit = ref(20)
-const statusFilter = ref((route.query.status as string) ?? '')
-const typeFilter = ref((route.query.type as string) ?? '')
-const saleSearch = ref((route.query.search as string) ?? '')
+const statusFilter = persistedRef('trade-offers:status', '')
+const typeFilter = persistedRef('trade-offers:type', '')
+const saleSearch = persistedRef('trade-offers:search', '')
+
+// Link com ?status=... manda mais que o filtro guardado.
+if (route.query.status !== undefined) statusFilter.value = String(route.query.status)
+if (route.query.type !== undefined) typeFilter.value = String(route.query.type)
+if (route.query.search !== undefined) saleSearch.value = String(route.query.search)
 const retrySaleUuid = ref<string | null>(null)
 
 

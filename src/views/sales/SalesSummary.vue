@@ -5,6 +5,7 @@ import { Icon } from '@iconify/vue'
 import Chart from 'chart.js/auto'
 import { adminService } from '@/services/admin/admin.service'
 import { formatCurrency } from '@/utils/formatCurrency'
+import { persistedRef } from '@/utils/persistedRef'
 
 type Preset = 'today' | '7d' | 'month' | 'lastMonth'
 
@@ -18,7 +19,7 @@ const PRESETS: { key: Preset; label: string }[] = [
 const activePreset = ref<Preset>('today')
 const dateFrom = ref('')
 const dateTo = ref('')
-const paymentStatus = ref('PAID')
+const paymentStatus = persistedRef('sales-summary:payment-status', 'PAID')
 const loading = ref(false)
 const sales = ref<any[]>([])
 const chartCanvas = ref<HTMLCanvasElement | null>(null)

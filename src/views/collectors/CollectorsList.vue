@@ -19,6 +19,7 @@ import {
     isMythicalWearable,
     type Dota2Rarity,
 } from '@/utils/collectorsAllowlist'
+import { persistedRef } from '@/utils/persistedRef'
 
 type CollectorsCacheStore = {
     lastSteamId: string | null
@@ -39,7 +40,7 @@ type CollectorsFilters = {
 
 const router = useRouter()
 const steamIdInput = ref('')
-const itemSearch = ref('')
+const itemSearch = persistedRef('collectors:item-search', '')
 const loading = ref(false)
 const inventory = ref<CollectorInventoryPayload | null>(null)
 const loadedFromCache = ref(false)
@@ -47,9 +48,9 @@ const lastError = ref('')
 const selectedItemKeys = ref<string[]>([])
 const cacheStore = ref<CollectorsCacheStore>(createEmptyCacheStore())
 const selectedRarity = ref<Dota2Rarity | ''>('')
-const onlyMythicalBundles = ref(false)
-const onlyMythicalWearables = ref(false)
-const onlyNotTradable = ref(false)
+const onlyMythicalBundles = persistedRef('collectors:only-mythical-bundles', false)
+const onlyMythicalWearables = persistedRef('collectors:only-mythical-wearables', false)
+const onlyNotTradable = persistedRef('collectors:only-not-tradable', false)
 const autoImporting = ref(false)
 const autoImportResult = ref<{
     scanned: number

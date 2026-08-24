@@ -12,6 +12,7 @@ import {
 } from '@/services/affiliates/affiliates.service'
 import { adminService } from '@/services/admin/admin.service'
 import { formatCurrency } from '@/utils/formatCurrency'
+import { persistedRef } from '@/utils/persistedRef'
 
 // `id` aqui é o uuid do usuário — o backend serializa `uuid` como `id`.
 interface FoundUser {
@@ -25,7 +26,7 @@ const route = useRoute()
 const router = useRouter()
 const affiliates = ref<AffiliateRow[]>([])
 const loading = ref(true)
-const search = ref('')
+const search = persistedRef('affiliates:search', '')
 
 const creating = ref(false)
 const saving = ref(false)

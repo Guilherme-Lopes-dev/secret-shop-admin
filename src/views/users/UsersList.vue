@@ -5,6 +5,7 @@ import { adminService } from '@/services/admin/admin.service'
 import { formatCurrency } from '@/utils/formatCurrency'
 import { Icon } from '@iconify/vue'
 import { toast } from 'vue3-toastify'
+import { persistedRef } from '@/utils/persistedRef'
 
 const router = useRouter()
 const users = ref<any[]>([])
@@ -13,13 +14,13 @@ const currentPage = ref(1)
 const totalPages = ref(1)
 const totalItems = ref(0)
 const limit = ref(20)
-const search = ref('')
-const sortFilter = ref('')
+const search = persistedRef('users:search', '')
+const sortFilter = persistedRef('users:sort', '')
 const tierRankFilter = ref<number | ''>('')
-const minOrdersInput = ref('')
-const maxOrdersInput = ref('')
-const minSpentInput = ref('')
-const maxSpentInput = ref('')
+const minOrdersInput = persistedRef('users:min-orders', '')
+const maxOrdersInput = persistedRef('users:max-orders', '')
+const minSpentInput = persistedRef('users:min-spent', '')
+const maxSpentInput = persistedRef('users:max-spent', '')
 let searchTimeout: ReturnType<typeof setTimeout> | null = null
 
 const TIERS = [

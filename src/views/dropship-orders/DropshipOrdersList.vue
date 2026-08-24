@@ -10,6 +10,7 @@ import type {
 } from '@/services/admin/types'
 import { formatCurrency } from '@/utils/formatCurrency'
 import ConfirmActionModal from '@/components/common/ConfirmActionModal.vue'
+import { persistedRef } from '@/utils/persistedRef'
 
 interface ShippingRow {
     key: string
@@ -26,7 +27,7 @@ const totalPages = ref(1)
 const totalOrders = ref(0)
 const pendingCount = ref(0)
 const limit = 20
-const search = ref('')
+const search = persistedRef('dropship-orders:search', '')
 const queueFilter = ref<'pending' | 'all'>('pending')
 
 const rows = computed<ShippingRow[]>(() => {

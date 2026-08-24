@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, nextTick, onMounted, onUnmounted } from 'vue'
+import { persistedRef } from '@/utils/persistedRef'
 import { useRouter } from 'vue-router'
 import { adminService, type InventoryFilters } from '@/services/admin/admin.service'
 import { formatCurrency } from '@/utils/formatCurrency'
@@ -20,12 +21,12 @@ const loadingMore = ref(false)
 const loadFailed = ref(false)
 const sentinel = ref<HTMLElement | null>(null)
 let observer: IntersectionObserver | null = null
-const botFilter = ref('')
-const statusFilter = ref('')
-const searchQuery = ref('')
-const sortFilter = ref('')
-const minPriceInput = ref('')
-const maxPriceInput = ref('')
+const botFilter = persistedRef('inventory:bot', '')
+const statusFilter = persistedRef('inventory:status', '')
+const searchQuery = persistedRef('inventory:search', '')
+const sortFilter = persistedRef('inventory:sort', '')
+const minPriceInput = persistedRef('inventory:min-price', '')
+const maxPriceInput = persistedRef('inventory:max-price', '')
 let searchTimeout: ReturnType<typeof setTimeout> | null = null
 
 // Os dois toggles da linha são a mesma dança (chama a API, espelha o campo,
@@ -52,7 +53,7 @@ const protectedFloorPct = ref(0.7)
 
 // Agrupado por padrão: 4276 unidades viram ~1000 skins, e estoque repetido
 // (10 Demon Eater iguais) enchia a tela sem dizer nada de novo.
-const groupBySkin = ref(true)
+const groupBySkin = persistedRef('inventory:group-by-skin', true)
 
 const toggleGrouping = () => {
     groupBySkin.value = !groupBySkin.value
@@ -203,7 +204,7 @@ const sortOptions = [
     { label: 'Melhor margem (lucro)', value: 'margin_desc' },
 ]
 
-const marginFilter = ref('')
+const marginFilter = persistedRef('inventory:margin', '')
 const marginOptions = [
     { label: 'Margem: todas', value: '' },
     { label: 'Só prejuízo', value: 'loss' },
@@ -266,14 +267,14 @@ const unitsLabel = (item: any) => {
     return `${shown} de ${total} unidades`
 }
 
-const rewardFilter = ref('')
+const rewardFilter = persistedRef('inventory:reward', '')
 const rewardOptions = [
     { label: 'Brinde: todas', value: '' },
     { label: 'Brinde: liberadas', value: 'false' },
     { label: 'Brinde: vetadas', value: 'true' },
 ]
 
-const marketplaceFilter = ref('')
+const marketplaceFilter = persistedRef('inventory:marketplace', '')
 const marketplaceOptions = [
     { label: 'Todos os marketplaces', value: '' },
     { label: 'Buff163', value: 'buff' },

@@ -5,6 +5,7 @@ import { adminService, type SkinPriceCatalogItem, type MarketExplorerFacets } fr
 import { formatCurrency } from '@/utils/formatCurrency'
 import { toCents } from '@/utils/toCents'
 import { Icon } from '@iconify/vue'
+import { persistedRef } from '@/utils/persistedRef'
 
 const router = useRouter()
 const items = ref<SkinPriceCatalogItem[]>([])
@@ -17,16 +18,16 @@ const limit = ref(40)
 const sentinel = ref<HTMLElement | null>(null)
 let observer: IntersectionObserver | null = null
 
-const searchQuery = ref('')
-const heroFilter = ref('')
-const typeFilter = ref('')
-const slotFilter = ref('')
-const rarityFilter = ref('')
+const searchQuery = persistedRef('skins:search', '')
+const heroFilter = persistedRef('skins:hero', '')
+const typeFilter = persistedRef('skins:type', '')
+const slotFilter = persistedRef('skins:slot', '')
+const rarityFilter = persistedRef('skins:rarity', '')
 const qualityFilter = ref<string[]>([])
 const priceFilter = ref<'all' | 'with' | 'without'>('all')
-const priceMin = ref('')
-const priceMax = ref('')
-const sortValue = ref('update:desc')
+const priceMin = persistedRef('skins:price-min', '')
+const priceMax = persistedRef('skins:price-max', '')
+const sortValue = persistedRef('skins:sort', 'update:desc')
 
 const facets = ref<MarketExplorerFacets>({ heroes: [], types: [], slots: [], rarities: [], qualities: [] })
 let searchTimeout: ReturnType<typeof setTimeout> | null = null

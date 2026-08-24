@@ -130,12 +130,13 @@ import { useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import { adminService } from '@/services/admin/admin.service'
 import { formatCurrency } from '@/utils/formatCurrency'
+import { persistedRef } from '@/utils/persistedRef'
 
 const router = useRouter()
 const coupons = ref<any[]>([])
 const loading = ref(true)
-const search = ref('')
-const filterStatus = ref('')
+const search = persistedRef('coupons:search', '')
+const filterStatus = persistedRef('coupons:status', '')
 const deleteTarget = ref<any>(null)
 const deleting = ref(false)
 

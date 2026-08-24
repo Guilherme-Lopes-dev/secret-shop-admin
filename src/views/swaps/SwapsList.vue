@@ -357,6 +357,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue3-toastify'
 import { adminService, type SwapCompensationConfig, type RarityMultiplier } from '@/services/admin/admin.service'
 import { formatCurrency } from '@/utils/formatCurrency'
+import { persistedRef } from '@/utils/persistedRef'
 
 const swaps = ref<any[]>([])
 const loading = ref(true)
@@ -368,7 +369,10 @@ const storeMultiplier = ref(1)
 const savingMultiplier = ref(false)
 const route = useRoute()
 const router = useRouter()
-const activeStatus = ref((route.query.status as string) ?? '')
+const activeStatus = persistedRef('swaps:status', '')
+
+// Link com ?status=... manda mais que o filtro guardado.
+if (route.query.status !== undefined) activeStatus.value = String(route.query.status)
 
 const KNOWN_RARITIES = ['Common', 'Uncommon', 'Rare', 'Mythical', 'Legendary', 'Ancient', 'Immortal', 'Arcana']
 const rarityMultipliers = ref<RarityMultiplier[]>([])

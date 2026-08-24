@@ -95,10 +95,11 @@
 import { ref, onMounted } from 'vue'
 import { Icon } from '@iconify/vue'
 import { adminService } from '@/services/admin/admin.service'
+import { persistedRef } from '@/utils/persistedRef'
 
 const rows = ref<any[]>([])
 const loading = ref(true)
-const search = ref('')
+const search = persistedRef('recommendations:search', '')
 const page = ref(1)
 const limit = 20
 const meta = ref({ total: 0, totalPages: 1 })

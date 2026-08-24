@@ -5,6 +5,7 @@ import { Icon } from '@iconify/vue'
 import { toast } from 'vue3-toastify'
 import { adminService } from '@/services/admin/admin.service'
 import { formatCurrency } from '@/utils/formatCurrency'
+import { persistedRef } from '@/utils/persistedRef'
 
 const router = useRouter()
 const goToDetail = (uuid: string) => router.push(`/physical-orders/${uuid}`)
@@ -18,9 +19,9 @@ const totalPages = ref(1)
 const totalItems = ref(0)
 const limit = ref(20)
 
-const search = ref('')
-const filterPayment = ref('')
-const filterDelivery = ref('')
+const search = persistedRef('physical-orders:search', '')
+const filterPayment = persistedRef('physical-orders:payment', '')
+const filterDelivery = persistedRef('physical-orders:delivery', '')
 let searchTimer: ReturnType<typeof setTimeout> | null = null
 
 const mediaUrl = (path: string) => `${API_URL}${path}`

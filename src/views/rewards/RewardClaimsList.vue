@@ -12,6 +12,7 @@ import {
 } from '@/services/admin/admin.service'
 import BulkReleaseConsole from './BulkReleaseConsole.vue'
 import { formatCurrency } from '@/utils/formatCurrency'
+import { persistedRef } from '@/utils/persistedRef'
 
 const router = useRouter()
 
@@ -23,19 +24,19 @@ const totalItems = ref(0)
 const awaitingReview = ref(0)
 const prizeValueTotal = ref(0)
 const purchaseCountTotal = ref(0)
-const searchQuery = ref('')
+const searchQuery = persistedRef('reward-claims:search', '')
 // Abre na fila de análise: é pra isso que a tela existe.
-const statusFilter = ref('AWAITING_REVIEW')
-const tierFilter = ref('')
+const statusFilter = persistedRef('reward-claims:status', 'AWAITING_REVIEW')
+const tierFilter = persistedRef('reward-claims:tier', '')
 // Valor digitado em reais; a API filtra em centavos.
-const minPrice = ref('')
-const maxPrice = ref('')
+const minPrice = persistedRef('reward-claims:min-price', '')
+const maxPrice = persistedRef('reward-claims:max-price', '')
 // Gasto do usuário: só a liberação em lote filtra por ele — não é coluna, é
 // soma de skins + collector + físico, cara demais pra paginar a fila inteira.
-const minSpent = ref('')
-const maxSpent = ref('')
-const dateFrom = ref('')
-const dateTo = ref('')
+const minSpent = persistedRef('reward-claims:min-spent', '')
+const maxSpent = persistedRef('reward-claims:max-spent', '')
+const dateFrom = persistedRef('reward-claims:date-from', '')
+const dateTo = persistedRef('reward-claims:date-to', '')
 const bulkLimit = ref(20)
 const pageSize = ref(50)
 const pageSizes = [20, 50, 100]

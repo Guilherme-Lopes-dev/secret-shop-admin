@@ -5,6 +5,7 @@ import { Icon } from '@iconify/vue'
 import { toast } from 'vue3-toastify'
 import { adminService } from '@/services/admin/admin.service'
 import { formatCurrency } from '@/utils/formatCurrency'
+import { persistedRef } from '@/utils/persistedRef'
 
 type DotaHero = { id: string; slug: string; name: string; image: string | null }
 
@@ -35,12 +36,12 @@ const page = ref(1)
 const limit = ref(20)
 const loading = ref(false)
 
-const search = ref('')
-const steamIdFilter = ref('')
-const minPriceInput = ref('')
-const maxPriceInput = ref('')
-const noPriceOnly = ref(false)
-const noHeroOnly = ref(false)
+const search = persistedRef('collectors-catalog:search', '')
+const steamIdFilter = persistedRef('collectors-catalog:steam-id', '')
+const minPriceInput = persistedRef('collectors-catalog:min-price', '')
+const maxPriceInput = persistedRef('collectors-catalog:max-price', '')
+const noPriceOnly = persistedRef('collectors-catalog:no-price-only', false)
+const noHeroOnly = persistedRef('collectors-catalog:no-hero-only', false)
 
 const deletingUuid = ref<string | null>(null)
 const confirmDeleteUuid = ref<string | null>(null)

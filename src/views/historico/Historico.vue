@@ -3,6 +3,7 @@ import { ref, computed, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 import { adminService } from '@/services/admin/admin.service'
 import { toast } from 'vue3-toastify'
+import { persistedRef } from '@/utils/persistedRef'
 
 type TradeItem = {
     assetId: string
@@ -42,10 +43,10 @@ const hasMore = ref(false)
 const lastTradeId = ref<string | null>(null)
 const cacheTimestamp = ref<number | null>(null)
 
-const searchItem = ref('')
-const searchTradeId = ref('')
+const searchItem = persistedRef('historico:item', '')
+const searchTradeId = persistedRef('historico:trade-id', '')
 const directionFilter = ref<'all' | 'received' | 'given'>('all')
-const statusFilter = ref('')
+const statusFilter = persistedRef('historico:status', '')
 const currentPage = ref(1)
 
 function keyLabel(key: string) {

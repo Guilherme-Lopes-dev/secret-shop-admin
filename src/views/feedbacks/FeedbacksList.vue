@@ -169,6 +169,7 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { toast } from 'vue3-toastify'
 import { adminService } from '@/services/admin/admin.service'
+import { persistedRef } from '@/utils/persistedRef'
 
 const ORDER_TYPE_LABELS: Record<string, string> = {
   sale: 'Skins',
@@ -212,7 +213,7 @@ const replyTarget = ref<any>(null)
 const replyText = ref('')
 const replying = ref(false)
 const handledFilter = ref<'pending' | 'handled' | 'all'>('pending')
-const ratingFilter = ref('')
+const ratingFilter = persistedRef('feedbacks:rating', '')
 
 const totalPages = computed(() => Math.max(Math.ceil(total.value / LIMIT), 1))
 

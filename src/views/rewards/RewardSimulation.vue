@@ -5,6 +5,7 @@ import { Icon } from '@iconify/vue'
 import { toast } from 'vue3-toastify'
 import { adminService, type RewardSimulationRow } from '@/services/admin/admin.service'
 import { formatCurrency } from '@/utils/formatCurrency'
+import { persistedRef } from '@/utils/persistedRef'
 
 const router = useRouter()
 
@@ -15,9 +16,9 @@ const totalPages = ref(1)
 const totalItems = ref(0)
 const purchaseCountTotal = ref(0)
 const maxRewardTier = ref(3)
-const searchQuery = ref('')
+const searchQuery = persistedRef('reward-simulation:search', '')
 // Vazio = o próximo baú que cada um resgataria; fixo = "e se todos fossem no N".
-const tierFilter = ref('')
+const tierFilter = persistedRef('reward-simulation:tier', '')
 const tierOptions = computed(() => Array.from({ length: maxRewardTier.value }, (_, i) => i + 1))
 let searchTimeout: ReturnType<typeof setTimeout> | null = null
 
@@ -59,7 +60,7 @@ const SORTERS: Record<string, (a: RewardSimulationRow, b: RewardSimulationRow) =
   stock: (a, b) => a.stock - b.stock,
 }
 
-const sortBy = ref('')
+const sortBy = persistedRef('reward-simulation:sort', '')
 
 const sortedRows = computed(() => {
   const sorter = SORTERS[sortBy.value]

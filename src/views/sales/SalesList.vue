@@ -4,6 +4,7 @@ import dayjs from 'dayjs'
 import { adminService } from '@/services/admin/admin.service'
 import { formatCurrency } from '@/utils/formatCurrency'
 import { useRoute, useRouter } from 'vue-router'
+import { persistedRef } from '@/utils/persistedRef'
 
 const props = withDefaults(defineProps<{ orderType?: 'purchase' | 'gift' }>(), {
     orderType: 'purchase',
@@ -24,11 +25,14 @@ const currentPage = ref(1)
 const totalPages = ref(1)
 const totalItems = ref(0)
 const limit = ref(20)
-const saleSearch = ref('')
-const dateFrom = ref('')
-const dateTo = ref('')
-const couponCode = ref('')
-const fulfillment = ref((route.query.fulfillment as string) ?? '')
+const saleSearch = persistedRef('sales:search', '')
+const dateFrom = persistedRef('sales:date-from', '')
+const dateTo = persistedRef('sales:date-to', '')
+const couponCode = persistedRef('sales:coupon', '')
+const fulfillment = persistedRef('sales:fulfillment', '')
+
+// Link com ?fulfillment=... manda mais que o filtro guardado.
+if (route.query.fulfillment !== undefined) fulfillment.value = String(route.query.fulfillment)
 
 const fulfillmentOptions = [
     { value: '', label: 'Todas' },

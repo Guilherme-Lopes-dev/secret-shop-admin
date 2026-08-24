@@ -5,6 +5,7 @@ import { adminService } from '@/services/admin/admin.service'
 import { formatCurrency } from '@/utils/formatCurrency'
 import { toast } from 'vue3-toastify'
 import { Icon } from '@iconify/vue'
+import { persistedRef } from '@/utils/persistedRef'
 
 const router = useRouter()
 const route = useRoute()
@@ -16,9 +17,12 @@ const totalPages  = ref(1)
 const totalItems  = ref(0)
 const limit       = ref(20)
 
-const search         = ref('')
-const filterPayment  = ref('')
-const filterDelivery = ref((route.query.delivery_status as string) ?? '')
+const search         = persistedRef('collector-orders:search', '')
+const filterPayment  = persistedRef('collector-orders:payment', '')
+const filterDelivery = persistedRef('collector-orders:delivery', '')
+
+// Link com ?delivery_status=... manda mais que o filtro guardado.
+if (route.query.delivery_status !== undefined) filterDelivery.value = String(route.query.delivery_status)
 let   searchTimer: ReturnType<typeof setTimeout> | null = null
 
 const PENDINGS_CLEARED_KEY = 'admin_pendings_cleared_at'

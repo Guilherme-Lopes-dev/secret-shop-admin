@@ -6,18 +6,19 @@ import { adminService } from '@/services/admin/admin.service'
 import { formatCurrency } from '@/utils/formatCurrency'
 import { buildSteamImageUrl } from '@/utils/steamImage'
 import type { ItemSet } from '@/services/admin/admin.service'
+import { persistedRef } from '@/utils/persistedRef'
 
 const sets = ref<ItemSet[]>([])
 const loading = ref(false)
 const saving = ref(false)
 
-const search = ref('')
-const cacheFilter = ref('')
-const heroFilter = ref('')
-const rarityFilter = ref('')
-const typeFilter = ref('')
-const onlyInStock = ref(false)
-const onlyWithoutPrice = ref(false)
+const search = persistedRef('item-sets:search', '')
+const cacheFilter = persistedRef('item-sets:cache', '')
+const heroFilter = persistedRef('item-sets:hero', '')
+const rarityFilter = persistedRef('item-sets:rarity', '')
+const typeFilter = persistedRef('item-sets:type', '')
+const onlyInStock = persistedRef('item-sets:only-in-stock', false)
+const onlyWithoutPrice = persistedRef('item-sets:only-without-price', false)
 
 /** Ordem de raridade da Valve — alfabético aqui não diz nada. */
 const RARITY_ORDER = ['Regular', 'Rare', 'Very Rare', 'Ultra Rare']

@@ -104,6 +104,13 @@ const stats = ref([
 
 const recentSales = ref<any[]>([])
 
+const orderBasePaths: Record<string, string> = {
+    sale: '/sales',
+    collector: '/collector-orders',
+}
+
+const orderLink = (sale: any) => `${orderBasePaths[sale.type] ?? orderBasePaths.sale}/${sale.id}`
+
 const fetchDashboardData = async () => {
     loading.value = true
     try {
@@ -291,7 +298,11 @@ onMounted(fetchDashboardData)
                         </thead>
                         <tbody>
                             <tr v-for="sale in recentSales" :key="sale.orderNumber">
-                                <td class="fw">{{ sale.orderNumber }}</td>
+                                <td class="fw">
+                                    <router-link :to="orderLink(sale)" class="order-link">
+                                        {{ sale.orderNumber }}
+                                    </router-link>
+                                </td>
                                 <td>{{ formatCurrency(sale.price) }}</td>
                                 <td>{{ $dayjs(sale.date).format('DD/MM/YY HH:mm') }}</td>
                                 <td>
@@ -509,6 +520,14 @@ table
 
 .fw
     font-weight 600
+
+.order-link
+    color inherit
+    text-decoration none
+
+    &:hover
+        color #6366f1
+        text-decoration underline
 
 .empty
     text-align center

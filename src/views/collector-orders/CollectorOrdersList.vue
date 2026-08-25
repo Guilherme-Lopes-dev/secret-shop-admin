@@ -6,6 +6,15 @@ import { formatCurrency } from '@/utils/formatCurrency'
 import { toast } from 'vue3-toastify'
 import { Icon } from '@iconify/vue'
 import { persistedRef } from '@/utils/persistedRef'
+import RefreshFriendshipButton from '@/components/common/RefreshFriendshipButton.vue'
+import {
+    FRIENDSHIP_DURATION_PRESETS,
+    friendshipDurationRange,
+    FRIENDSHIP_FILTER_OPTIONS,
+    friendshipIcon,
+    friendshipLabel,
+    friendshipTone,
+} from '@/utils/friendship'
 
 const router = useRouter()
 const route = useRoute()
@@ -20,6 +29,8 @@ const limit       = ref(20)
 const search         = persistedRef('collector-orders:search', '')
 const filterPayment  = persistedRef('collector-orders:payment', '')
 const filterDelivery = persistedRef('collector-orders:delivery', '')
+const filterFriendship = persistedRef('collector-orders:friendship', '')
+const friendDurationIndex = persistedRef('collector-orders:friend-duration', '0')
 
 // Link com ?delivery_status=... manda mais que o filtro guardado.
 if (route.query.delivery_status !== undefined) filterDelivery.value = String(route.query.delivery_status)
@@ -68,6 +79,8 @@ function persistFilters() {
 const fetchSales = async (page: number) => {
     loading.value = true
     try {
+        const duration = friendshipDurationRange(friendDurationIndex.value)
+
         const res = await adminService.getCollectorSales({
             page,
             limit:           limit.value,
@@ -75,6 +88,9 @@ const fetchSales = async (page: number) => {
             delivery_status: filterDelivery.value || undefined,
             search:          search.value         || undefined,
             from:            filterDelivery.value === 'PENDING' ? (pendingClearedAt.value || undefined) : undefined,
+            friendship:      filterFriendship.value || undefined,
+            minFriendDays:   duration.min,
+            maxFriendDays:   duration.max,
         })
         if (res.data) {
             sales.value       = res.data.data
@@ -171,6 +187,7 @@ watch([filterPayment, filterDelivery], persistFilters)
                     {{ totalItems }} pedido{{ totalItems !== 1 ? 's' : '' }} encontrado{{ totalItems !== 1 ? 's' : '' }}
                 </p>
             </div>
+            <RefreshFriendshipButton @done="fetchSales(currentPage)" />
         </header>
 
         <div class="filters-bar">
@@ -199,6 +216,14 @@ watch([filterPayment, filterDelivery], persistFilters)
                 <option value="AWAITING_SHIPPING">Aguard. Envio</option>
                 <option value="SHIPPED">Enviado</option>
                 <option value="DELIVERED">Entregue</option>
+            </select>
+            <select v-model="filterFriendship" class="filter-select" @change="onFilterChange">
+                <option v-for="opt in FRIENDSHIP_FILTER_OPTIONS" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+            </select>
+            <select v-model="friendDurationIndex" class="filter-select" @change="onFilterChange">
+                <option v-for="(preset, index) in FRIENDSHIP_DURATION_PRESETS" :key="preset.label" :value="String(index)">
+                    {{ preset.label }}
+                </option>
             </select>
 
             <button
@@ -234,6 +259,7 @@ watch([filterPayment, filterDelivery], persistFilters)
                                 <th>Pedido</th>
                                 <th>Item</th>
                                 <th>Cliente</th>
+                                <th>Amizade c/ conta do pedido</th>
                                 <th>Qtd × Preço</th>
                                 <th>Total</th>
                                 <th>Pagamento</th>
@@ -272,6 +298,16 @@ watch([filterPayment, filterDelivery], persistFilters)
                                         <span class="customer-email">{{ sale.users?.email ?? '-' }}</span>
                                     </div>
                                 </td>
+                                <td>
+                                    <span
+                                        class="friend-badge"
+                                        :class="`friend-badge--${friendshipTone(sale.friendship)}`"
+                                        :title="`Amigo de ${sale.friendship?.friends_count ?? 0} de ${sale.friendship?.accounts_count ?? 0} conta(s) collector deste pedido`"
+                                    >
+                                        <Icon :icon="friendshipIcon(sale.friendship)" />
+                                        {{ friendshipLabel(sale.friendship) }}
+                                    </span>
+                                </td>
                                 <td class="qty-cell">{{ line(sale)?.quantity ?? '-' }} × {{ line(sale) ? formatCurrency(line(sale).unit_price) : '-' }}</td>
                                 <td class="price-col">{{ line(sale) ? formatCurrency(line(sale).total_price) : '-' }}</td>
                                 <td>
@@ -290,7 +326,7 @@ watch([filterPayment, filterDelivery], persistFilters)
                             </tr>
 
                             <tr v-if="sales.length === 0">
-                                <td colspan="9" class="empty-state">
+                                <td colspan="10" class="empty-state">
                                     <Icon icon="mdi:trophy-outline" class="empty-icon" />
                                     <p>Nenhum pedido collector encontrado.</p>
                                 </td>
@@ -317,6 +353,11 @@ watch([filterPayment, filterDelivery], persistFilters)
     min-height 100vh
 
 .page-header
+    display flex
+    align-items flex-start
+    justify-content space-between
+    gap 1rem
+    flex-wrap wrap
     margin-bottom 1.5rem
 
 .page-title
@@ -497,6 +538,28 @@ table
     max-width 180px
     font-size 0.85rem
     color #e2e8f0
+
+.friend-badge
+    display inline-flex
+    align-items center
+    gap 0.3rem
+    padding 2px 8px
+    border-radius 5px
+    font-size 0.75rem
+    font-weight 600
+    white-space nowrap
+
+.friend-badge--friends
+    background rgba(76,175,80,0.14)
+    color #4caf50
+
+.friend-badge--not_friends
+    background rgba(244,67,54,0.12)
+    color #f87171
+
+.friend-badge--unknown
+    background rgba(148,163,184,0.1)
+    color #94a3b8
 
 .customer-cell
     display flex

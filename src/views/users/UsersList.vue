@@ -6,6 +6,15 @@ import { formatCurrency } from '@/utils/formatCurrency'
 import { Icon } from '@iconify/vue'
 import { toast } from 'vue3-toastify'
 import { persistedRef } from '@/utils/persistedRef'
+import RefreshFriendshipButton from '@/components/common/RefreshFriendshipButton.vue'
+import {
+    FRIENDSHIP_DURATION_PRESETS,
+    friendshipDurationRange,
+    FRIENDSHIP_FILTER_OPTIONS,
+    friendshipIcon,
+    friendshipLabel,
+    friendshipTone,
+} from '@/utils/friendship'
 
 const router = useRouter()
 const users = ref<any[]>([])
@@ -21,6 +30,8 @@ const minOrdersInput = persistedRef('users:min-orders', '')
 const maxOrdersInput = persistedRef('users:max-orders', '')
 const minSpentInput = persistedRef('users:min-spent', '')
 const maxSpentInput = persistedRef('users:max-spent', '')
+const friendshipFilter = persistedRef('users:friendship', '')
+const friendDurationIndex = persistedRef('users:friend-duration', '0')
 let searchTimeout: ReturnType<typeof setTimeout> | null = null
 
 const TIERS = [
@@ -47,6 +58,8 @@ const fetchUsers = async (page: number) => {
         const minSpent = minSpentInput.value ? Math.round(parseFloat(minSpentInput.value) * 100) : undefined
         const maxSpent = maxSpentInput.value ? Math.round(parseFloat(maxSpentInput.value) * 100) : undefined
 
+        const duration = friendshipDurationRange(friendDurationIndex.value)
+
         const response = await adminService.getAllUsers(
             page,
             limit.value,
@@ -57,6 +70,11 @@ const fetchUsers = async (page: number) => {
             minSpent,
             maxSpent,
             tierRankFilter.value === '' ? undefined : tierRankFilter.value,
+            {
+                friendship: friendshipFilter.value || undefined,
+                minFriendDays: duration.min,
+                maxFriendDays: duration.max,
+            },
         )
         if (response.data) {
             users.value = response.data.data
@@ -112,6 +130,7 @@ onMounted(() => fetchUsers(1))
                 <h1 class="page-title">Usuários</h1>
                 <p class="page-subtitle">{{ totalItems }} usuários cadastrados</p>
             </div>
+            <RefreshFriendshipButton @done="fetchUsers(currentPage)" />
         </header>
 
         <div class="filters-row">
@@ -131,6 +150,14 @@ onMounted(() => fetchUsers(1))
             <select v-model="tierRankFilter" @change="onFilterChange" class="filter-select">
                 <option value="">Todos os tiers</option>
                 <option v-for="t in TIERS" :key="t.rank" :value="t.rank">{{ t.name }}</option>
+            </select>
+            <select v-model="friendshipFilter" @change="onFilterChange" class="filter-select">
+                <option v-for="opt in FRIENDSHIP_FILTER_OPTIONS" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+            </select>
+            <select v-model="friendDurationIndex" @change="onFilterChange" class="filter-select">
+                <option v-for="(preset, index) in FRIENDSHIP_DURATION_PRESETS" :key="preset.label" :value="String(index)">
+                    {{ preset.label }}
+                </option>
             </select>
             <div class="range-group">
                 <span class="range-label">Pedidos</span>
@@ -183,6 +210,7 @@ onMounted(() => fetchUsers(1))
                             <th>Steam ID</th>
                             <th>E-mail</th>
                             <th>Tier</th>
+                            <th>Amizade Collector</th>
                             <th>Pedidos</th>
                             <th>Valor Gasto</th>
                             <th>Role</th>
@@ -206,6 +234,7 @@ onMounted(() => fetchUsers(1))
                                 <td><div class="skeleton skeleton-line" style="width: 120px" /></td>
                                 <td><div class="skeleton skeleton-line" style="width: 140px" /></td>
                                 <td><div class="skeleton skeleton-line" style="width: 40px" /></td>
+                                <td><div class="skeleton skeleton-line" style="width: 90px" /></td>
                                 <td><div class="skeleton skeleton-line" style="width: 70px" /></td>
                                 <td><div class="skeleton skeleton-line" style="width: 50px" /></td>
                                 <td><div class="skeleton skeleton-line" style="width: 80px" /></td>
@@ -234,6 +263,16 @@ onMounted(() => fetchUsers(1))
                                         class="tier-badge"
                                         :style="{ color: TIERS[user.tier_rank ?? 0]?.color, borderColor: TIERS[user.tier_rank ?? 0]?.color }"
                                     >{{ user.tier_name ?? 'Common' }}</span>
+                                </td>
+                                <td>
+                                    <span
+                                        class="friend-badge"
+                                        :class="`friend-badge--${friendshipTone(user.friendship)}`"
+                                        :title="`${user.friendship?.friends_count ?? 0} de ${user.friendship?.accounts_count ?? 0} conta(s) collector`"
+                                    >
+                                        <Icon :icon="friendshipIcon(user.friendship)" />
+                                        {{ friendshipLabel(user.friendship) }}
+                                    </span>
                                 </td>
                                 <td><span class="count-badge">{{ user._count?.sales ?? 0 }}</span></td>
                                 <td class="spent-cell">{{ formatCurrency(user.total_spent ?? 0) }}</td>
@@ -264,7 +303,7 @@ onMounted(() => fetchUsers(1))
                                 </td>
                             </tr>
                             <tr v-if="users.length === 0">
-                                <td colspan="10" class="empty-state">Nenhum usuário encontrado.</td>
+                                <td colspan="11" class="empty-state">Nenhum usuário encontrado.</td>
                             </tr>
                         </template>
                     </tbody>
@@ -467,6 +506,28 @@ table
     border 1px solid
     background rgba(255,255,255,0.04)
     white-space nowrap
+
+.friend-badge
+    display inline-flex
+    align-items center
+    gap 0.3rem
+    padding 2px 8px
+    border-radius 5px
+    font-size 0.75rem
+    font-weight 600
+    white-space nowrap
+
+.friend-badge--friends
+    background rgba(76,175,80,0.14)
+    color #4caf50
+
+.friend-badge--not_friends
+    background rgba(244,67,54,0.12)
+    color #f87171
+
+.friend-badge--unknown
+    background rgba(148,163,184,0.1)
+    color #94a3b8
 
 .count-badge
     background rgba(99,102,241,0.12)

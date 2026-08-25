@@ -8,6 +8,12 @@ import { toast } from 'vue3-toastify'
 import UserPassCard from '@/components/passes/UserPassCard.vue'
 import UserProgressCard from '@/components/profile-progress/UserProgressCard.vue'
 import { countryName } from '@/utils/countries'
+import {
+    friendshipDuration,
+    friendshipIcon,
+    friendshipLabel,
+    friendshipTone,
+} from '@/utils/friendship'
 
 const route = useRoute()
 const router = useRouter()
@@ -318,6 +324,58 @@ onMounted(fetchUser)
                 </details>
 
                 <details class="section" open>
+                    <summary class="section-title">
+                        Amizade Steam com as contas collector
+                        <span class="friend-badge" :class="`friend-badge--${friendshipTone(user.friendship)}`">
+                            <Icon :icon="friendshipIcon(user.friendship)" />
+                            {{ friendshipLabel(user.friendship) }}
+                        </span>
+                    </summary>
+
+                    <p class="friend-hint">
+                        {{ user.friendship?.friends_count ?? 0 }} de {{ user.friendship?.accounts_count ?? 0 }} conta(s)
+                        cadastrada(s) como collector.
+                        <template v-if="user.friendship?.checked_at">
+                            Consultado em {{ $dayjs(user.friendship.checked_at).format('DD/MM/YYYY HH:mm') }}.
+                        </template>
+                        <template v-else>Ainda não consultado na Steam.</template>
+                    </p>
+
+                    <div v-if="!user.friendship?.accounts?.length" class="empty-state">
+                        Nenhuma conta collector cadastrada.
+                    </div>
+                    <div v-else class="friend-accounts">
+                        <div v-for="account in user.friendship.accounts" :key="account.steam_id" class="friend-account">
+                            <img v-if="account.avatar" :src="account.avatar" class="friend-avatar" alt="" />
+                            <div v-else class="friend-avatar friend-avatar--empty">
+                                <Icon icon="mdi:robot-outline" />
+                            </div>
+                            <div class="friend-account-info">
+                                <span class="friend-account-name">{{ account.name ?? 'Conta collector' }}</span>
+                                <a
+                                    class="info-value mono steam-link"
+                                    :href="`https://steamcommunity.com/profiles/${encodeURIComponent(account.steam_id)}`"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                >{{ account.steam_id }}</a>
+                            </div>
+                            <div class="friend-account-status">
+                                <span v-if="account.unknown" class="friend-badge friend-badge--unknown">Sem dados</span>
+                                <span v-else-if="!account.are_friends" class="friend-badge friend-badge--not_friends">Não amigos</span>
+                                <template v-else>
+                                    <span class="friend-badge friend-badge--friends">
+                                        {{ friendshipDuration(account.friendship_age_days) ?? 'Amigos' }}
+                                    </span>
+                                    <small v-if="account.friend_since" class="friend-since">
+                                        desde {{ $dayjs(account.friend_since).format('DD/MM/YYYY') }}
+                                    </small>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
+                </details>
+
+                <details class="section" open>
                     <summary class="section-title">Últimos Pedidos ({{ user.recent_orders?.length ?? 0 }})</summary>
                     <div v-if="!user.recent_orders?.length" class="empty-state">Nenhum pedido.</div>
                     <div v-else class="table-wrapper">
@@ -614,6 +672,81 @@ onMounted(fetchUser)
     padding 1.5rem
     border-radius 12px
     border 1px solid rgba(255,255,255,0.05)
+
+.friend-badge
+    display inline-flex
+    align-items center
+    gap 0.3rem
+    padding 2px 8px
+    border-radius 5px
+    font-size 0.75rem
+    font-weight 600
+    white-space nowrap
+
+.friend-badge--friends
+    background rgba(76,175,80,0.14)
+    color #4caf50
+
+.friend-badge--not_friends
+    background rgba(244,67,54,0.12)
+    color #f87171
+
+.friend-badge--unknown
+    background rgba(148,163,184,0.1)
+    color #94a3b8
+
+.friend-hint
+    color #64748b
+    font-size 0.78rem
+    margin 0 0 0.75rem
+
+.friend-accounts
+    display flex
+    flex-direction column
+    gap 0.5rem
+
+.friend-account
+    display flex
+    align-items center
+    gap 0.65rem
+    padding 0.55rem 0.65rem
+    border-radius 8px
+    background rgba(255,255,255,0.03)
+
+.friend-avatar
+    width 32px
+    height 32px
+    border-radius 50%
+    object-fit cover
+    flex-shrink 0
+
+.friend-avatar--empty
+    display flex
+    align-items center
+    justify-content center
+    background rgba(255,255,255,0.06)
+    color #64748b
+
+.friend-account-info
+    display flex
+    flex-direction column
+    gap 0.15rem
+    min-width 0
+    flex 1
+
+.friend-account-name
+    font-size 0.85rem
+    font-weight 500
+
+.friend-account-status
+    display flex
+    flex-direction column
+    align-items flex-end
+    gap 0.2rem
+
+.friend-since
+    color #64748b
+    font-size 0.7rem
 
 .section-title
     font-size 1rem

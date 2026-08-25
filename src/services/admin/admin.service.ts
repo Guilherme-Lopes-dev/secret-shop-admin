@@ -225,6 +225,7 @@ export const adminService = {
     minSpent?: number,
     maxSpent?: number,
     tierRank?: number,
+    friendship?: { friendship?: string; minFriendDays?: number; maxFriendDays?: number },
   ) {
     const params = new URLSearchParams({ page: String(page), limit: String(limit) })
     if (search) params.append('search', search)
@@ -234,7 +235,22 @@ export const adminService = {
     if (minSpent !== undefined) params.append('minSpent', String(minSpent))
     if (maxSpent !== undefined) params.append('maxSpent', String(maxSpent))
     if (tierRank !== undefined) params.append('tierRank', String(tierRank))
+    if (friendship?.friendship) params.append('friendship', friendship.friendship)
+    if (friendship?.minFriendDays !== undefined) params.append('minFriendDays', String(friendship.minFriendDays))
+    if (friendship?.maxFriendDays !== undefined) params.append('maxFriendDays', String(friendship.maxFriendDays))
     return api.get(`/admin/users?${params}`)
+  },
+
+  async getCollectorFriendshipStatus() {
+    return api.get<{ running: boolean; pending: number; checked: number }>(
+      '/admin/users/collector-friendship/status',
+    )
+  },
+
+  async refreshCollectorFriendship() {
+    return api.post<{ started: boolean; running: boolean; pending: number; checked: number }>(
+      '/admin/users/collector-friendship/refresh',
+    )
   },
 
   async getUserById(uuid: string) {
@@ -717,6 +733,9 @@ export const adminService = {
     from?: string
     paid_from?: string
     paid_to?: string
+    friendship?: string
+    minFriendDays?: number
+    maxFriendDays?: number
   } = {}) {
     const p = new URLSearchParams({ page: String(params.page ?? 1), limit: String(params.limit ?? 20) })
     if (params.payment_status) p.append('payment_status', params.payment_status)
@@ -725,6 +744,9 @@ export const adminService = {
     if (params.from) p.append('from', params.from)
     if (params.paid_from) p.append('paid_from', params.paid_from)
     if (params.paid_to) p.append('paid_to', params.paid_to)
+    if (params.friendship) p.append('friendship', params.friendship)
+    if (params.minFriendDays !== undefined) p.append('minFriendDays', String(params.minFriendDays))
+    if (params.maxFriendDays !== undefined) p.append('maxFriendDays', String(params.maxFriendDays))
     return api.get(`/collector-sales/admin/list?${p}`)
   },
 

@@ -83,7 +83,7 @@ const cancelLoading = ref(false)
 const fetchingReceipt = ref(false)
 
 // ── Friendship Steam ──────────────────────────────────────────────────────────
-const friendship        = ref<any>(null)
+const friendshipBots    = ref<any[]>([])
 const friendshipLoading = ref(false)
 
 // ── Fetch ─────────────────────────────────────────────────────────────────────
@@ -105,30 +105,29 @@ const fetchFriendship = async () => {
     friendshipLoading.value = true
     try {
         const res = await adminService.getCollectorSaleFriendship(route.params.uuid as string)
-        friendship.value = res.data?.bots?.[0] ?? null
+        friendshipBots.value = res.data?.bots ?? []
     } catch {
-        friendship.value = null
+        friendshipBots.value = []
     } finally {
         friendshipLoading.value = false
     }
 }
 
-const friendshipTitle = () => {
+const friendshipTitle = (f: any) => {
     if (friendshipLoading.value) return 'Consultando Steam...'
-    if (!friendship.value) return 'Amizade Steam'
-    if (!friendship.value.available) return 'Steam ID indisponível'
-    if (friendship.value.privacy_blocked) return 'Lista de amigos privada'
-    return friendship.value.are_friends ? 'São amigos na Steam' : 'Ainda não são amigos'
+    if (!f) return 'Amizade Steam'
+    if (!f.available) return 'Steam ID indisponível'
+    if (f.privacy_blocked) return 'Lista de amigos privada'
+    return f.are_friends ? 'São amigos na Steam' : 'Ainda não são amigos'
 }
 
-const friendshipTone = () => {
-    if (friendshipLoading.value || !friendship.value) return 'neutral'
-    if (!friendship.value.available || friendship.value.privacy_blocked) return 'warning'
-    return friendship.value.are_friends ? 'success' : 'warning'
+const friendshipTone = (f: any) => {
+    if (friendshipLoading.value || !f) return 'neutral'
+    if (!f.available || f.privacy_blocked) return 'warning'
+    return f.are_friends ? 'success' : 'warning'
 }
 
-const friendshipDescription = () => {
-    const f = friendship.value
+const friendshipDescription = (f: any) => {
     if (friendshipLoading.value) return 'Aguarde — consultando a Steam Web API.'
     if (!f) return ''
     if (!f.available) {
@@ -518,63 +517,68 @@ onMounted(fetchSale)
                     </div>
 
                     <!-- Amizade Steam -->
-                    <div class="card friendship-card" :class="`friendship-card--${friendshipTone()}`">
+                    <div
+                        v-for="bot in (friendshipBots.length ? friendshipBots : [null])"
+                        :key="bot?.bot_steamid ?? 'friendship'"
+                        class="card friendship-card"
+                        :class="`friendship-card--${friendshipTone(bot)}`"
+                    >
                         <div class="friendship-header">
                             <Icon
                                 :icon="friendshipLoading
                                     ? 'mdi:loading'
-                                    : (!friendship || !friendship.available || friendship.privacy_blocked)
+                                    : (!bot || !bot.available || bot.privacy_blocked)
                                         ? 'mdi:account-question-outline'
-                                        : friendship.are_friends
+                                        : bot.are_friends
                                             ? 'mdi:account-heart-outline'
                                             : 'mdi:account-off-outline'"
                                 :class="{ spin: friendshipLoading }"
                             />
                             <div>
-                                <span class="card-title">{{ friendshipTitle() }}</span>
-                                <p class="friendship-desc">{{ friendshipDescription() }}</p>
+                                <span class="card-title">{{ friendshipTitle(bot) }}</span>
+                                <p class="friendship-desc">{{ friendshipDescription(bot) }}</p>
                             </div>
                         </div>
 
                         <!-- Foto do bot não depende da consulta Steam ter dado certo -->
-                        <div v-if="friendship?.bot_avatar" class="identity-row bot-identity">
+                        <div v-if="bot?.bot_avatar" class="identity-row bot-identity">
                             <img
-                                :src="friendship.bot_avatar"
+                                :src="bot.bot_avatar"
                                 class="avatar"
-                                :alt="friendship.bot_name ?? 'Bot'"
+                                :alt="bot.bot_name ?? 'Bot'"
                             />
-                            <span class="kv-value">{{ friendship.bot_name ?? 'Bot vendedor' }}</span>
+                            <span class="kv-value">{{ bot.bot_name ?? 'Bot vendedor' }}</span>
                         </div>
 
-                        <div v-if="friendship?.available && friendship.are_friends && friendship.friend_since_iso" class="kv-grid friendship-meta">
+                        <div v-if="bot?.available && bot.are_friends && bot.friend_since_iso" class="kv-grid friendship-meta">
                             <div class="kv">
                                 <span class="kv-label">Amigos desde</span>
-                                <span class="kv-value">{{ $dayjs(friendship.friend_since_iso).format('DD/MM/YYYY') }}</span>
+                                <span class="kv-value">{{ $dayjs(bot.friend_since_iso).format('DD/MM/YYYY') }}</span>
                             </div>
-                            <div class="kv" v-if="friendship.friendship_age_days !== null">
+                            <div class="kv" v-if="bot.friendship_age_days !== null">
                                 <span class="kv-label">Tempo de amizade</span>
-                                <span class="kv-value">{{ friendshipDuration(friendship.friendship_age_days) }}</span>
+                                <span class="kv-value">{{ friendshipDuration(bot.friendship_age_days) }}</span>
                             </div>
                         </div>
 
-                        <div v-if="friendship?.available" class="kv-grid friendship-meta">
+                        <div v-if="bot?.available" class="kv-grid friendship-meta">
                             <div class="kv">
                                 <span class="kv-label">Steam ID Bot</span>
                                 <a
-                                    :href="`https://steamcommunity.com/profiles/${friendship.bot_steamid}`"
+                                    :href="`https://steamcommunity.com/profiles/${bot.bot_steamid}`"
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     class="kv-value mono small steam-link"
-                                >{{ friendship.bot_steamid }}</a>
+                                >{{ bot.bot_steamid }}</a>
                             </div>
                             <div class="kv">
                                 <span class="kv-label">Steam ID Comprador</span>
                                 <a
-                                    :href="`https://steamcommunity.com/profiles/${friendship.buyer_steamid}`"
+                                    :href="`https://steamcommunity.com/profiles/${bot.buyer_steamid}`"
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     class="kv-value mono small steam-link"
-                                >{{ friendship.buyer_steamid }}</a>
+                                >{{ bot.buyer_steamid }}</a>
                             </div>
                         </div>
                     </div>

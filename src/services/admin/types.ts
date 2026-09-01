@@ -46,6 +46,30 @@ export interface DropshipNotificationsResponse {
   limit: number
 }
 
+export type SwapNotificationType =
+  | 'swap_approve_conflict'
+  | 'swap_review'
+  | 'swap_countered'
+  | 'swap_compensation_refund'
+
+export interface SwapNotificationDto {
+  id: string
+  type: SwapNotificationType
+  title: string
+  body: string
+  metadata: { swap_uuid?: string; detail?: string } | null
+  is_read: boolean
+  read_at: string | null
+  created_at: string
+}
+
+export interface SwapNotificationsResponse {
+  data: SwapNotificationDto[]
+  total: number
+  page: number
+  limit: number
+}
+
 export interface PassProgressDto {
   pass_active:         boolean
   season_start:        string | null

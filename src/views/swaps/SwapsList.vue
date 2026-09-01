@@ -129,6 +129,36 @@
       </div>
     </section>
 
+    <section v-if="pendings.length" class="pendings">
+      <header class="pendings-head">
+        <h3>Pendências ({{ pendings.length }})</h3>
+      </header>
+      <ul>
+        <li v-for="pending in pendings" :key="pending.id">
+          <div class="pending-text">
+            <strong>{{ pending.title }}</strong>
+            <span>{{ pending.body }}</span>
+          </div>
+          <div class="pending-actions">
+            <button
+              v-if="pending.metadata?.swap_uuid"
+              class="btn-view"
+              @click="openPendingSwap(pending)"
+            >
+              Ver troca
+            </button>
+            <button
+              class="btn-ghost"
+              :disabled="resolvingPending === pending.id"
+              @click="resolvePending(pending)"
+            >
+              Resolver
+            </button>
+          </div>
+        </li>
+      </ul>
+    </section>
+
     <div class="filters">
       <button
         v-for="opt in statusFilters"
@@ -356,6 +386,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue3-toastify'
 import { adminService, type SwapCompensationConfig, type RarityMultiplier } from '@/services/admin/admin.service'
+import type { SwapNotificationDto } from '@/services/admin/types'
 import { formatCurrency } from '@/utils/formatCurrency'
 import { persistedRef } from '@/utils/persistedRef'
 
@@ -413,6 +444,7 @@ const statusFilters = [
   { value: 'store_sent', label: 'Loja enviada' },
   { value: 'completed', label: 'Concluídas' },
   { value: 'rejected', label: 'Rejeitadas' },
+  { value: 'expired', label: 'Expiradas' },
   { value: 'cancelled', label: 'Canceladas' },
 ]
 
@@ -455,6 +487,41 @@ const mapOfferStatus = (status: string) => {
   if (status === 'cancelled') return 'cancelled'
   if (status === 'trade_sent') return 'trade_sent'
   return 'pending_admin'
+}
+
+const pendings = ref<SwapNotificationDto[]>([])
+const resolvingPending = ref('')
+
+const fetchPendings = async () => {
+  try {
+    const res = await adminService.getSwapNotifications()
+    pendings.value = res.data.data
+  } catch {
+    // Fila de pendências é acessório: falha nela não pode derrubar a lista de trocas.
+    pendings.value = []
+  }
+}
+
+const resolvePending = async (pending: SwapNotificationDto) => {
+  resolvingPending.value = pending.id
+  try {
+    await adminService.markSwapNotificationRead(pending.id)
+    pendings.value = pendings.value.filter((item) => item.id !== pending.id)
+  } catch {
+    toast.error('Falha ao resolver a pendência.')
+  } finally {
+    resolvingPending.value = ''
+  }
+}
+
+const openPendingSwap = (pending: SwapNotificationDto) => {
+  const swap = swaps.value.find((item) => item.id === pending.metadata?.swap_uuid)
+  if (!swap) {
+    toast.info('Troca fora do filtro atual. Use "Todos" para encontrá-la.')
+    return
+  }
+
+  openDetail(swap)
 }
 
 const fetchSwaps = async () => {
@@ -644,6 +711,7 @@ const removeRarity = async (rarity: string) => {
 
 onMounted(() => {
   fetchSwaps()
+  fetchPendings()
   fetchMultiplier()
   fetchComp()
   fetchRarityMultipliers()
@@ -896,6 +964,52 @@ onMounted(() => {
     padding 0.5rem
     max-height 90px
     overflow-y auto
+
+.pendings
+  margin-bottom 1rem
+  padding 14px 16px
+  border 1px solid rgba(251,191,36,0.25)
+  border-radius 10px
+  background rgba(251,191,36,0.06)
+
+  ul
+    list-style none
+    margin 0
+    padding 0
+    display flex
+    flex-direction column
+    gap 8px
+
+  li
+    display flex
+    align-items center
+    justify-content space-between
+    gap 12px
+    flex-wrap wrap
+
+.pendings-head h3
+  margin 0 0 10px
+  font-size 0.9rem
+  color #fbbf24
+
+.pending-text
+  display flex
+  flex-direction column
+  gap 2px
+  min-width 0
+
+  strong
+    font-size 0.85rem
+    color rgba(255,255,255,0.9)
+
+  span
+    font-size 0.78rem
+    color rgba(255,255,255,0.55)
+
+.pending-actions
+  display flex
+  gap 8px
+  flex-shrink 0
 
 .filters
   display flex

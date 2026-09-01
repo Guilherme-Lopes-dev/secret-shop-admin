@@ -21,6 +21,7 @@ import type {
   DiscordUpdateRolePayload,
   DiscordWebhookCreatedDto,
   DropshipNotificationsResponse,
+  SwapNotificationsResponse,
   PassProgressDto,
   ProfileProgressDto,
 } from './types'
@@ -60,6 +61,8 @@ export interface TradeOffersPage {
 
 const collectorNotificationTypes = 'COLLECTOR_PURCHASE,COLLECTOR_SHIPPING_REMINDER'
 const dropshipNotificationTypes = 'DROPSHIP_PURCHASE'
+const swapNotificationTypes =
+  'swap_approve_conflict,swap_review,swap_countered,swap_compensation_refund'
 
 /** Set de Collector's Cache / Heroes' Hoard + estoque atual desse set. */
 export interface ItemSet {
@@ -444,6 +447,21 @@ export const adminService = {
 
   async markAllCollectorNotificationsRead() {
     return api.patch(`/admin/notifications/read-all?types=${collectorNotificationTypes}`)
+  },
+
+  // Swap pendings queue
+  async getSwapNotifications(limit: number = 20) {
+    const params = new URLSearchParams({
+      page: '1',
+      limit: String(limit),
+      types: swapNotificationTypes,
+      onlyUnread: 'true',
+    })
+    return api.get<SwapNotificationsResponse>(`/admin/notifications?${params}`)
+  },
+
+  async markSwapNotificationRead(id: string) {
+    return api.patch(`/admin/notifications/${id}/read`)
   },
 
   // Dropship shipping queue

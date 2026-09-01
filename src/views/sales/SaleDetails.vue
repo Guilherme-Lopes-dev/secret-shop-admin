@@ -150,7 +150,7 @@ const openAsaasReceipt = async () => {
         toast.warning('Venda nao possui cobranca Asaas vinculada.')
         return
     }
-    const saleUuid = sale.value.id || sale.value.uuid || (route.params.id as string)
+    const saleUuid = sale.value.id ?? (route.params.id as string)
     if (!saleUuid) {
         toast.error('UUID da venda nao disponivel.')
         return
@@ -314,15 +314,15 @@ onBeforeUnmount(() => {
                         <div class="info-row">
                             <span class="label">Usuario</span>
                             <a
-                                v-if="sale.users?.id || sale.users?.uuid"
+                                v-if="sale.users?.id"
                                 class="value user-link"
-                                @click="router.push(`/users/${sale.users.id || sale.users.uuid}`)"
+                                @click="router.push(`/users/${sale.users.id}`)"
                             >{{ sale.users?.username || 'N/A' }}</a>
                             <span v-else class="value">{{ sale.users?.username || 'N/A' }}</span>
                         </div>
                         <div class="info-row">
                             <span class="label">UUID</span>
-                            <code class="value mono">{{ sale.users?.id || sale.users?.uuid || 'N/A' }}</code>
+                            <code class="value mono">{{ sale.users?.id ?? 'N/A' }}</code>
                         </div>
                         <div class="info-row">
                             <span class="label">IP</span>

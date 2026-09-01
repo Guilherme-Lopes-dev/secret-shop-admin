@@ -936,7 +936,7 @@ onMounted(() => {
                         </tr>
                     </thead>
                     <tbody>
-                        <tr v-for="guild in guilds" :key="guild.uuid">
+                        <tr v-for="guild in guilds" :key="guild.id">
                             <td><strong>{{ guild.name }}</strong></td>
                             <td><code>{{ guild.discord_id }}</code></td>
                             <td>{{ guild.member_count ?? guild._count?.members ?? '-' }}</td>
@@ -1088,7 +1088,7 @@ onMounted(() => {
                         </tr>
                     </thead>
                     <tbody>
-                        <tr v-for="member in members" :key="member.uuid">
+                        <tr v-for="member in members" :key="member.id">
                             <td>{{ member.global_name || member.username || '-' }}</td>
                             <td><code>{{ member.discord_user_id }}</code></td>
                             <td>{{ member.nickname || '-' }}</td>
@@ -1171,7 +1171,7 @@ onMounted(() => {
                             </tr>
                         </thead>
                         <tbody>
-                            <tr v-for="log in auditLogs" :key="log.uuid">
+                            <tr v-for="log in auditLogs" :key="log.id">
                                 <td>{{ formatDate(log.created_at) }}</td>
                                 <td><code>{{ log.action }}</code></td>
                                 <td>{{ log.target_type || '-' }} / {{ log.target_id || '-' }}</td>

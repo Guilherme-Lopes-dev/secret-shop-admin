@@ -104,7 +104,7 @@
               <option v-if="orphanCouponCode" :value="orphanCouponCode">
                 {{ orphanCouponCode }} — removido
               </option>
-              <option v-for="coupon in activeCoupons" :key="coupon.uuid" :value="coupon.code">
+              <option v-for="coupon in activeCoupons" :key="coupon.id" :value="coupon.code">
                 {{ coupon.code }} — {{ couponDiscount(coupon) }}
               </option>
             </select>
@@ -252,7 +252,8 @@ const form = reactive({
 })
 
 interface Coupon {
-  uuid: string
+  /** `uuid` chega como `id`: interceptor do backend renomeia. */
+  id: string
   code: string
   description: string | null
   is_active: boolean

@@ -40,7 +40,7 @@ const fetchOffer = async () => {
 }
 
 const retrySale = async () => {
-    const saleIdentifier = offer.value?.sales?.uuid ?? offer.value?.sales?.id
+    const saleIdentifier = offer.value?.sales?.id
     if (!saleIdentifier) return
     retrying.value = true
     try {
@@ -108,7 +108,7 @@ onMounted(fetchOffer)
             </button>
             <div class="header-actions" v-if="offer">
                 <button
-                    v-if="offer.sales?.uuid || offer.sales?.id"
+                    v-if="offer.sales?.id"
                     class="btn-action btn-retry"
                     :disabled="retrying"
                     @click="retrySale"
@@ -149,7 +149,7 @@ onMounted(fetchOffer)
                             <span v-if="offer.steam_bots">Bot: <strong>{{ offer.steam_bots.name }}</strong></span>
                             <span v-if="offer.sales">
                                 &nbsp;· Pedido:
-                                <router-link :to="`/sales/${offer.sales.uuid ?? offer.sales.id}`" class="link" @click.stop>
+                                <router-link :to="`/sales/${offer.sales.id}`" class="link" @click.stop>
                                     {{ offer.sales.order_number }}
                                 </router-link>
                             </span>
@@ -179,7 +179,7 @@ onMounted(fetchOffer)
                     <div class="info-list">
                         <div class="info-row">
                             <span class="info-label">UUID</span>
-                            <code class="info-value mono small">{{ offer.uuid ?? offer.id }}</code>
+                            <code class="info-value mono small">{{ offer.id }}</code>
                         </div>
                         <div class="info-row" v-if="offer.steam_trade_id">
                             <span class="info-label">Steam Trade ID</span>

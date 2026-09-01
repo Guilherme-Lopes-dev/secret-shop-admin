@@ -12,7 +12,7 @@ import {
 } from '@/utils/collectorsSelection'
 import { adminService } from '@/services/admin/admin.service'
 
-type DotaHero = { uuid: string; slug: string; name: string; image: string | null }
+type DotaHero = { /** `uuid` chega como `id`: interceptor do backend renomeia. */ id: string; slug: string; name: string; image: string | null }
 
 const router = useRouter()
 const steamId = ref('')
@@ -173,7 +173,7 @@ function goBack() {
 onMounted(async () => {
     const [selection, fetchedHeroes, fetchedSets] = await Promise.all([
         Promise.resolve(readCollectorReviewSelection()),
-        adminService.getDotaHeroes().then((r) => (r as any).data ?? r).catch(() => [] as DotaHero[]),
+        adminService.getDotaHeroes().then((r) => r.data).catch(() => [] as DotaHero[]),
         adminService.getItemSets().then((r) => r.data).catch(() => []),
     ])
 
@@ -330,7 +330,7 @@ onMounted(async () => {
                                     </option>
                                     <option
                                         v-for="hero in heroes"
-                                        :key="hero.uuid"
+                                        :key="hero.id"
                                         :value="hero.slug"
                                     >{{ hero.name }}</option>
                                 </select>

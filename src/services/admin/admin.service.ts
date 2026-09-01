@@ -138,6 +138,8 @@ export const adminService = {
       couponCode?: string
       fulfillmentStatus?: string
       orderType?: 'purchase' | 'gift'
+      /** Número do pedido, username, e-mail ou steam id do comprador. */
+      search?: string
     } = {},
   ) {
     const params = new URLSearchParams({ page: String(page), limit: String(limit) })
@@ -147,6 +149,7 @@ export const adminService = {
     if (filters.couponCode) params.append('coupon_code', filters.couponCode)
     if (filters.fulfillmentStatus) params.append('fulfillment_status', filters.fulfillmentStatus)
     if (filters.orderType) params.append('order_type', filters.orderType)
+    if (filters.search) params.append('search', filters.search)
     return api.get(`/admin/sales?${params}`)
   },
 
@@ -557,7 +560,10 @@ export const adminService = {
 
   // Dota Heroes
   async getDotaHeroes() {
-    return api.get<Array<{ uuid: string; slug: string; name: string; image: string | null }>>('/dota-heroes')
+    // `uuid` chega como `id`: o interceptor do backend renomeia na resposta.
+    return api.get<Array<{ id: string; slug: string; name: string; image: string | null }>>(
+      '/dota-heroes',
+    )
   },
 
   async toggleSkinPriceLock(skinUuid: string, locked: boolean) {
@@ -1048,6 +1054,41 @@ export const adminService = {
 
   async deleteCoupon(uuid: string) {
     return api.delete(`/coupons/${uuid}`)
+  },
+
+  // ── Sorteios ────────────────────────────────────────────────────────────────
+
+  /** Preview ao vivo da tela 2. Não grava nada — o snapshot só nasce no save. */
+  async previewRaffle(params: RaffleParams, page = 1, limit = 50) {
+    return api.post<RafflePreview>(
+      `/admin/raffles/preview?page=${page}&limit=${limit}`,
+      params,
+    )
+  },
+
+  async createRaffle(
+    params: RaffleParams & {
+      name: string
+      /** O que a tela 2 mostrou. Divergiu no recálculo do save? 409. */
+      expected_eligible_count: number
+      expected_total_tickets: number
+    },
+  ) {
+    return api.post<{ id: string }>('/admin/raffles', params)
+  },
+
+  async getRaffles(page = 1, limit = 50) {
+    return api.get<{ data: RaffleSummary[]; total: number }>(
+      `/admin/raffles?page=${page}&limit=${limit}`,
+    )
+  },
+
+  async getRaffle(uuid: string, page = 1, limit = 50) {
+    return api.get<RaffleDetail>(`/admin/raffles/${uuid}?page=${page}&limit=${limit}`)
+  },
+
+  async deleteRaffle(uuid: string) {
+    return api.delete(`/admin/raffles/${uuid}`)
   },
 
   // ── Steam Bots ──────────────────────────────────────────────────────────────
@@ -1570,7 +1611,8 @@ export interface SkinPriceHistoryPoint {
 }
 
 export interface SkinUnitTracking {
-  uuid: string
+  /** `uuid` chega como `id`: o interceptor do backend renomeia na resposta. */
+  id: string
   bot_name: string | null
   entered_at: string | null
   exited_at: string | null
@@ -1613,4 +1655,64 @@ export interface BackupListResponse {
   running: string | null
   lastError: string | null
   files: BackupFileDto[]
+}
+
+// ── Sorteios ──────────────────────────────────────────────────────────────────
+
+/** Lojas que podem contar para o gasto elegível. */
+export type RaffleStore = 'skins' | 'collector' | 'physical'
+
+/** Parâmetros da tela 1. `*_uuids` são os `.id` que o front já recebe da API. */
+export interface RaffleParams {
+  /** Vazio nas duas pontas = conta todo pedido pago, sem recorte de data. */
+  period_from?: string
+  period_to?: string
+  /** Centavos de gasto que valem 1 ticket. 5000 = R$ 50,00. */
+  cents_per_ticket: number
+  stores: RaffleStore[]
+  coupon_uuids?: string[]
+  excluded_user_uuids?: string[]
+}
+
+export interface RaffleEligibleRow {
+  spent: number
+  tickets: number
+  users: {
+    id: string
+    username: string | null
+    email: string | null
+    avatar: string | null
+    steam_id: string | null
+  } | null
+}
+
+export interface RafflePreview {
+  eligible_count: number
+  total_tickets: number
+  data: RaffleEligibleRow[]
+  total: number
+  page: number
+  limit: number
+}
+
+export interface RaffleSummary {
+  id: string
+  name: string
+  cents_per_ticket: number
+  period_from: string | null
+  period_to: string | null
+  stores: RaffleStore[]
+  eligible_count: number
+  total_tickets: number
+  created_at: string
+}
+
+export interface RaffleDetail extends RaffleSummary {
+  coupons: Array<{ id: string; code: string }>
+  eligible: {
+    data: RaffleEligibleRow[]
+    total: number
+    page: number
+    limit: number
+  }
 }

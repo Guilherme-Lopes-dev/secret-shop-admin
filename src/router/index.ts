@@ -175,6 +175,28 @@ const routes = [
         component: () => import('@/views/coupons/CouponsList.vue'),
       },
       {
+        path: 'raffles',
+        name: 'raffles',
+        component: () => import('@/views/raffles/RafflesList.vue'),
+      },
+      {
+        path: 'raffles/new',
+        name: 'raffle-new',
+        component: () => import('@/views/raffles/RaffleForm.vue'),
+      },
+      {
+        // Preview ao vivo: os parâmetros vêm na query string, nada foi salvo ainda.
+        path: 'raffles/eligible',
+        name: 'raffle-eligible',
+        component: () => import('@/views/raffles/RaffleEligible.vue'),
+      },
+      {
+        // Mesma tela, lendo o snapshot congelado em vez de recalcular.
+        path: 'raffles/:uuid',
+        name: 'raffle-details',
+        component: () => import('@/views/raffles/RaffleEligible.vue'),
+      },
+      {
         path: 'affiliates',
         name: 'affiliates',
         component: () => import('@/views/affiliates/AffiliatesList.vue'),

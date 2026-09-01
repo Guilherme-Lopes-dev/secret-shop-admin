@@ -40,8 +40,9 @@ const ORDER_ORIGINS: Record<string, { label: string; path: string }> = {
 
 const originOf = (kind: string) => ORDER_ORIGINS[kind] ?? { label: kind, path: '/sales' }
 
-const openOrder = (order: { kind: string; uuid: string }) =>
-    router.push(`${originOf(order.kind).path}/${order.uuid}`)
+// `uuid` chega como `id`: o interceptor do backend renomeia na resposta.
+const openOrder = (order: { kind: string; id: string }) =>
+    router.push(`${originOf(order.kind).path}/${order.id}`)
 
 // Brinde é uma venda de skin — abre na mesma tela de pedido.
 const openGift = (claim: { order_uuid: string }) => router.push(`/sales/${claim.order_uuid}`)
@@ -392,7 +393,7 @@ onMounted(fetchUser)
                             <tbody>
                                 <tr
                                     v-for="order in user.recent_orders"
-                                    :key="`${order.kind}:${order.uuid}`"
+                                    :key="`${order.kind}:${order.id}`"
                                     class="clickable-row"
                                     @click="openOrder(order)"
                                 >

@@ -41,20 +41,26 @@ const fulfillmentOptions = [
     { value: 'COMPLETED', label: 'Entregues' },
 ]
 
-const filteredSales = computed(() => {
-    const q = saleSearch.value.trim().toLowerCase()
-    if (!q) return sales.value
-    return sales.value.filter(s =>
-        s.order_number?.toLowerCase().includes(q) ||
-        s.users?.username?.toLowerCase().includes(q)
-    )
-})
-
 const hasActiveFilters = computed(() =>
-    Boolean(dateFrom.value || dateTo.value || (!isGifts.value && couponCode.value) || fulfillment.value),
+    Boolean(
+        dateFrom.value ||
+        dateTo.value ||
+        saleSearch.value ||
+        (!isGifts.value && couponCode.value) ||
+        fulfillment.value,
+    ),
 )
 
+// Busca é digitada: duas requests ficam em voo e a mais lenta pode chegar por
+// último. Só a resposta do último pedido feito tem direito de escrever na tela.
+let requestToken = 0
+
+// O que já foi pro servidor. Guarda o watcher de refazer busca que não mudou.
+let searchedTerm = saleSearch.value.trim()
+
 const fetchSales = async (page: number) => {
+    const token = ++requestToken
+    searchedTerm = saleSearch.value.trim()
     loading.value = true
     try {
         const response = await adminService.getAllSales(page, limit.value, {
@@ -63,7 +69,9 @@ const fetchSales = async (page: number) => {
             couponCode: isGifts.value ? undefined : couponCode.value.trim() || undefined,
             fulfillmentStatus: fulfillment.value || undefined,
             orderType: props.orderType,
+            search: searchedTerm || undefined,
         })
+        if (token !== requestToken) return
         if (response.data) {
             sales.value = response.data.data
             totalPages.value = response.data.pages
@@ -73,7 +81,7 @@ const fetchSales = async (page: number) => {
     } catch (error) {
         console.error('Erro ao buscar vendas:', error)
     } finally {
-        loading.value = false
+        if (token === requestToken) loading.value = false
     }
 }
 
@@ -83,6 +91,16 @@ watch(couponCode, (value, previous) => {
     if (value !== '' || previous === '') return
     if (loading.value) return
     applyFilters()
+})
+
+// A busca agora vai pro SQL, então cada tecla seria um request. Espera parar de digitar.
+let searchTimer: ReturnType<typeof setTimeout>
+watch(saleSearch, (value) => {
+    clearTimeout(searchTimer)
+    // `clearFilters` já zerou e buscou: o watcher roda depois dele e faria de novo.
+    if (value.trim() === searchedTerm) return
+
+    searchTimer = setTimeout(applyFilters, 350)
 })
 
 const setToday = () => {
@@ -97,6 +115,8 @@ const clearFilters = () => {
     dateTo.value = ''
     couponCode.value = ''
     fulfillment.value = ''
+    saleSearch.value = ''
+    clearTimeout(searchTimer)
     router.replace({ query: {} })
     applyFilters()
 }
@@ -135,7 +155,7 @@ onMounted(() => fetchSales(1))
                 v-model="saleSearch"
                 type="search"
                 class="filter-input"
-                placeholder="Buscar por pedido ou cliente..."
+                placeholder="Buscar por pedido, nome, e-mail ou steam id..."
             />
         </header>
 
@@ -190,16 +210,16 @@ onMounted(() => fetchSales(1))
                         </thead>
                         <tbody>
                             <tr
-                                v-for="sale in filteredSales"
+                                v-for="sale in sales"
                                 :key="sale.id"
                                 class="row-clickable"
-                                @click="router.push(`/sales/${sale.id ?? sale.uuid}`)"
+                                @click="router.push(`/sales/${sale.id}`)"
                             >
                                 <td><strong>{{ sale.order_number }}</strong></td>
                                 <td>
                                     <div class="user-cell">
                                         <span>{{ sale.users?.username || 'Desconhecido' }}</span>
-                                        <small v-if="sale.users?.id || sale.users?.uuid" class="muted">{{ (sale.users?.id ?? sale.users?.uuid).substring(0, 8) }}...</small>
+                                        <small v-if="sale.users?.id" class="muted">{{ sale.users.id.substring(0, 8) }}...</small>
                                     </div>
                                 </td>
                                 <td>{{ $dayjs(sale.created_at).format('DD/MM/YYYY HH:mm') }}</td>
@@ -214,12 +234,12 @@ onMounted(() => fetchSales(1))
                                     </span>
                                 </td>
                                 <td>
-                                    <button class="btn-view" @click.stop="router.push(`/sales/${sale.id ?? sale.uuid}`)">
+                                    <button class="btn-view" @click.stop="router.push(`/sales/${sale.id}`)">
                                         Ver Detalhes
                                     </button>
                                 </td>
                             </tr>
-                            <tr v-if="filteredSales.length === 0">
+                            <tr v-if="sales.length === 0">
                                 <td :colspan="emptyColspan" class="empty-state">{{ emptyText }}</td>
                             </tr>
                         </tbody>

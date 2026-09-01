@@ -271,7 +271,7 @@ watch([filterPayment, filterDelivery], persistFilters)
                         <tbody>
                             <tr
                                 v-for="sale in sales"
-                                :key="sale.uuid"
+                                :key="sale.id"
                                 class="row-main"
                                 @click="goToDetail(sale.id)"
                             >

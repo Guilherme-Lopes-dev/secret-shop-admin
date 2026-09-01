@@ -63,7 +63,7 @@ function renderSale(doc: jsPDF, sale: Sale, index: number, total: number) {
   doc.setFontSize(9)
   doc.setFont('helvetica', 'normal')
   doc.setTextColor(120)
-  doc.text(`UUID: ${String(sale.id || sale.uuid || '-')}`, 14, y)
+  doc.text(`UUID: ${String(sale.id ?? '-')}`, 14, y)
   doc.setTextColor(0)
   y += 6
 
@@ -92,7 +92,7 @@ function renderSale(doc: jsPDF, sale: Sale, index: number, total: number) {
       ['CPF/CNPJ', formatCpfCnpj(sale.customer_cpf_cnpj)],
       ['Email', sale.users?.email || '-'],
       ['Contato', sale.users?.contact || '-'],
-      ['UUID', sale.users?.id || sale.users?.uuid || '-'],
+      ['UUID', sale.users?.id ?? '-'],
       ['Trade Link', sale.users?.trade_link || '-'],
       ['IP', sale.ip_address || '-'],
       ['Pais IP', sale.ip_country || '-'],

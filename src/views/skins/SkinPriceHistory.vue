@@ -238,7 +238,7 @@ onUnmounted(() => chartInstance?.destroy())
                             </tr>
                         </thead>
                         <tbody>
-                            <tr v-for="u in units" :key="u.uuid">
+                            <tr v-for="u in units" :key="u.id">
                                 <td>{{ u.bot_name || '—' }}</td>
                                 <td>{{ formatDateOrDash(u.entered_at) }}</td>
                                 <td>{{ u.exited_at ? formatDateOrDash(u.exited_at) : (u.is_sold ? 'Vendida' : 'Ativa') }}</td>

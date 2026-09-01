@@ -59,7 +59,7 @@ export function generateSaleReportPdf(sale: Sale) {
     head: [['Dados Gerais', '']],
     body: [
       ['Order Number', sale.order_number || '-'],
-      ['UUID', String(sale.id || sale.uuid || '-')],
+      ['UUID', String(sale.id ?? '-')],
       ['Status Pagamento', sale.payment_status || '-'],
       ['Status Entrega', sale.fulfillment_status || '-'],
       ['Criado em', formatDate(sale.created_at)],
@@ -79,7 +79,7 @@ export function generateSaleReportPdf(sale: Sale) {
       ['Usuario', sale.users?.username || '-'],
       ['Email', sale.users?.email || '-'],
       ['Contato', sale.users?.contact || '-'],
-      ['UUID', sale.users?.id || sale.users?.uuid || '-'],
+      ['UUID', sale.users?.id ?? '-'],
       ['Trade Link', sale.users?.trade_link || '-'],
       ['IP', sale.ip_address || '-'],
       ['Pais IP', sale.ip_country || '-'],
@@ -137,5 +137,5 @@ export function generateSaleReportPdf(sale: Sale) {
     })
   }
 
-  doc.save(`venda-${sale.order_number || sale.uuid || 'relatorio'}.pdf`)
+  doc.save(`venda-${sale.order_number ?? sale.id ?? 'relatorio'}.pdf`)
 }

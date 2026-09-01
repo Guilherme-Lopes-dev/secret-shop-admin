@@ -43,7 +43,7 @@
               </tr>
             </template>
             <template v-else>
-              <tr v-for="row in rows" :key="`${row.users?.uuid}-${row.hero_name}`">
+              <tr v-for="row in rows" :key="`${row.users?.id}-${row.hero_name}`">
                 <td>
                   <div class="user-cell">
                     <img v-if="row.users?.avatar" :src="row.users.avatar" class="user-avatar" />

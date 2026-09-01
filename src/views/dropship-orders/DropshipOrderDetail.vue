@@ -372,7 +372,7 @@ onUnmounted(() => {
                                         </span>
                                         <span>
                                             <small>ID da linha</small>
-                                            <code>{{ item.saleItem?.uuid ?? '-' }}</code>
+                                            <code>{{ item.saleItem?.id ?? '-' }}</code>
                                         </span>
                                         <span>
                                             <small>Inventário</small>
@@ -576,7 +576,7 @@ onUnmounted(() => {
                             </div>
                             <div>
                                 <span>UUID do cliente</span>
-                                <code>{{ sale.users?.uuid ?? '-' }}</code>
+                                <code>{{ sale.users?.id ?? '-' }}</code>
                             </div>
                             <div>
                                 <span>IP</span>
@@ -612,7 +612,7 @@ onUnmounted(() => {
                             </div>
                             <div>
                                 <span>UUID da venda</span>
-                                <code>{{ sale.uuid }}</code>
+                                <code>{{ sale.id ?? '-' }}</code>
                             </div>
                             <div>
                                 <span>ID interno</span>

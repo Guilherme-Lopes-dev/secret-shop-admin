@@ -104,9 +104,9 @@
         <div v-else class="bot-list">
           <div
             v-for="bot in bots"
-            :key="bot.uuid"
+            :key="bot.id"
             class="bot-card"
-            :class="{ 'bot-card--editing': bot.uuid === editingUuid }"
+            :class="{ 'bot-card--editing': bot.id === editingUuid }"
           >
             <div class="bot-card__main">
               <span class="bot-card__name">{{ bot.name }}</span>
@@ -137,7 +137,8 @@ import { Icon } from '@iconify/vue'
 import { adminService } from '@/services/admin/admin.service'
 
 interface SteamBot {
-  uuid: string
+  /** `uuid` chega como `id`: o interceptor do backend renomeia na resposta. */
+  id: string
   name: string
   steam_id: string
   is_active: boolean | null
@@ -204,7 +205,7 @@ const resetForm = () => {
 
 const startEdit = (bot: SteamBot) => {
   resetForm()
-  editingUuid.value = bot.uuid
+  editingUuid.value = bot.id
   form.name = bot.name
   form.steam_id = bot.steam_id
   form.webhook_url = bot.webhook_url ?? ''
@@ -234,8 +235,8 @@ const submit = async () => {
 const removeBot = async (bot: SteamBot) => {
   if (!confirm(`Deletar o bot "${bot.name}" (${bot.steam_id})?`)) return
   try {
-    await adminService.deleteSteamBot(bot.uuid)
-    if (editingUuid.value === bot.uuid) resetForm()
+    await adminService.deleteSteamBot(bot.id)
+    if (editingUuid.value === bot.id) resetForm()
     await loadBots()
   } catch (err: any) {
     errorMsg.value = err?.response?.data?.message ?? 'Erro ao deletar bot.'

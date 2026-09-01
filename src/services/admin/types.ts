@@ -93,7 +93,8 @@ export interface DiscordHealthDto {
 }
 
 export interface DiscordAccountDto {
-  uuid: string
+  /** `uuid` chega como `id`: o interceptor do backend renomeia na resposta. */
+  id: string
   discord_user_id: string
   username: string | null
   global_name: string | null
@@ -112,7 +113,6 @@ export interface DiscordMeDto {
 
 export interface DiscordGuildDto {
   id: string | number
-  uuid: string
   discord_id: string
   name: string
   icon: string | null
@@ -146,7 +146,6 @@ export interface DiscordBotGuildDto {
 
 export interface DiscordChannelDto {
   id: string | number
-  uuid: string
   guild_id: string | number
   discord_id: string
   parent_discord_id: string | null
@@ -176,7 +175,6 @@ export interface DiscordBotChannelDto {
 
 export interface DiscordRoleDto {
   id: string | number
-  uuid: string
   guild_id: string | number
   discord_id: string
   name: string
@@ -190,7 +188,6 @@ export interface DiscordRoleDto {
 
 export interface DiscordMemberDto {
   id: string | number
-  uuid: string
   guild_id: string | number
   account_id: string | number | null
   discord_user_id: string
@@ -206,7 +203,6 @@ export interface DiscordMemberDto {
 
 export interface DiscordAuditLogDto {
   id: string | number
-  uuid: string
   actor_user_id: string | number | null
   actor_discord_id: string | null
   guild_id: string | number | null

@@ -351,7 +351,9 @@ const markHandled = async (item: any) => {
 
 const visibilityLabel = (item: any) => {
   if (visibilityUuid.value === item.id) return 'Salvando...'
-  return item.is_visible ? 'Esconder da home' : 'Mostrar na home'
+  if (!item.is_visible) return 'Mostrar na home'
+
+  return 'Esconder da home'
 }
 
 const toggleVisibility = async (item: any) => {

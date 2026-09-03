@@ -32,6 +32,11 @@
         <option value="handled">Tratados</option>
         <option value="all">Todos</option>
       </select>
+      <select v-model="visibleFilter" class="filter-input" @change="reload">
+        <option value="all">Visíveis e escondidos</option>
+        <option value="visible">Só visíveis na home</option>
+        <option value="hidden">Só escondidos</option>
+      </select>
       <select v-model="ratingFilter" class="filter-input" @change="reload">
         <option value="">Todas as notas</option>
         <option v-for="n in 5" :key="n" :value="String(n)">{{ n }} estrela{{ n > 1 ? 's' : '' }}</option>
@@ -104,6 +109,17 @@
                     <button class="btn-view" @click="openReply(item)">
                       {{ item.reply ? 'Editar resposta' : 'Responder' }}
                     </button>
+                    <button
+                      class="btn-ghost"
+                      :disabled="!item.comment || visibilityUuid === item.id"
+                      :title="item.comment ? '' : 'Sem comentário — nunca aparece na home.'"
+                      @click="toggleVisibility(item)"
+                    >
+                      {{ visibilityLabel(item) }}
+                    </button>
+                    <span v-if="!item.is_visible" class="status-badge status-inactive">
+                      Escondido
+                    </span>
                     <span v-if="item.handled_at" class="status-badge status-active">Tratado</span>
                     <button
                       v-else
@@ -209,10 +225,12 @@ const average = ref<number | null>(null)
 const page = ref(1)
 const loading = ref(true)
 const handlingUuid = ref<string | null>(null)
+const visibilityUuid = ref<string | null>(null)
 const replyTarget = ref<any>(null)
 const replyText = ref('')
 const replying = ref(false)
 const handledFilter = ref<'pending' | 'handled' | 'all'>('pending')
+const visibleFilter = persistedRef<'all' | 'visible' | 'hidden'>('feedbacks:visible', 'all')
 const ratingFilter = persistedRef('feedbacks:rating', '')
 
 const totalPages = computed(() => Math.max(Math.ceil(total.value / LIMIT), 1))
@@ -233,6 +251,12 @@ const handledParam = () => {
   return undefined
 }
 
+const visibleParam = () => {
+  if (visibleFilter.value === 'visible') return true
+  if (visibleFilter.value === 'hidden') return false
+  return undefined
+}
+
 const fetchFeedbacks = async () => {
   loading.value = true
   try {
@@ -241,6 +265,7 @@ const fetchFeedbacks = async () => {
       limit: LIMIT,
       ...(ratingFilter.value ? { rating: Number(ratingFilter.value) } : {}),
       ...(handledParam() === undefined ? {} : { handled: handledParam() }),
+      ...(visibleParam() === undefined ? {} : { visible: visibleParam() }),
     })
     feedbacks.value = res.data.data
     total.value = res.data.total
@@ -321,6 +346,27 @@ const markHandled = async (item: any) => {
     toast.error(errorMessage(err, 'Não foi possível marcar como tratado.'))
   } finally {
     handlingUuid.value = null
+  }
+}
+
+const visibilityLabel = (item: any) => {
+  if (visibilityUuid.value === item.id) return 'Salvando...'
+  return item.is_visible ? 'Esconder da home' : 'Mostrar na home'
+}
+
+const toggleVisibility = async (item: any) => {
+  visibilityUuid.value = item.id
+  try {
+    await adminService.setFeedbackVisibility(item.id, !item.is_visible)
+
+    // Sai da lista quando o filtro de visibilidade está ligado — recua da página vazia.
+    if (visibleParam() !== undefined && feedbacks.value.length === 1 && page.value > 1) page.value--
+
+    await fetchFeedbacks()
+  } catch (err: any) {
+    toast.error(errorMessage(err, 'Não foi possível mudar a visibilidade.'))
+  } finally {
+    visibilityUuid.value = null
   }
 }
 
@@ -482,6 +528,10 @@ tbody tr:hover td
 .status-active
   background rgba(46,220,138,0.12)
   color #4ade80
+
+.status-inactive
+  background rgba(255,255,255,0.06)
+  color rgba(255,255,255,0.45)
 
 .btn-view
   padding 4px 12px

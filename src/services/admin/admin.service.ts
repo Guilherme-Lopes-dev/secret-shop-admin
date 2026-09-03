@@ -1177,13 +1177,22 @@ export const adminService = {
     return api.delete(`/news/${uuid}`)
   },
 
-  async getFeedbacks(params: { page?: number; limit?: number; rating?: number; handled?: boolean } = {}) {
+  async getFeedbacks(
+    params: {
+      page?: number
+      limit?: number
+      rating?: number
+      handled?: boolean
+      visible?: boolean
+    } = {},
+  ) {
     const query = new URLSearchParams({
       page: String(params.page ?? 1),
       limit: String(params.limit ?? 20),
     })
     if (params.rating) query.append('rating', String(params.rating))
     if (params.handled !== undefined) query.append('handled', String(params.handled))
+    if (params.visible !== undefined) query.append('visible', String(params.visible))
     return api.get(`/admin/feedbacks?${query}`)
   },
 
@@ -1193,6 +1202,10 @@ export const adminService = {
 
   async replyFeedback(uuid: string, reply: string) {
     return api.patch(`/admin/feedbacks/${uuid}/reply`, { reply })
+  },
+
+  async setFeedbackVisibility(uuid: string, isVisible: boolean) {
+    return api.patch(`/admin/feedbacks/${uuid}/visibility`, { is_visible: isVisible })
   },
 
   async getSwaps(status?: string) {

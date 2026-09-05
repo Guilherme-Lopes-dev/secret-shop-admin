@@ -50,6 +50,31 @@ const openGift = (claim: { order_uuid: string }) => router.push(`/sales/${claim.
 const skinThumb = (icon?: string | null): string | null =>
     icon ? `https://steamcommunity-a.akamaihd.net/economy/image/${icon}/62fx62f` : null
 
+const API_URL = import.meta.env.VITE_API_URL?.trim() || ''
+
+const FAVORITE_LABELS = { skin: 'Skin', collector: 'Collector', physical: 'Físico' } as const
+const FAVORITE_ICONS = {
+    skin: 'mdi:sword-cross',
+    collector: 'mdi:trophy-outline',
+    physical: 'mdi:package-variant-closed',
+} as const
+
+type FavoriteKind = keyof typeof FAVORITE_LABELS
+
+type Favorite = { kind: FavoriteKind; image: string | null }
+
+// Skin e collector guardam o hash da Steam; produto físico guarda o path do nosso
+// servidor. Por isso a URL sai do `kind`, não do formato do campo.
+const favoriteThumb = (favorite: Favorite): string | null => {
+    if (!favorite.image) return null
+    if (favorite.kind === 'physical') return `${API_URL}${favorite.image}`
+
+    return skinThumb(favorite.image)
+}
+
+const favoriteLabel = (favorite: Favorite) => FAVORITE_LABELS[favorite.kind] ?? favorite.kind
+const favoriteIcon = (favorite: Favorite) => FAVORITE_ICONS[favorite.kind] ?? 'mdi:heart-outline'
+
 // Quanto o estoque saiu de graça: o pedido do brinde vale zero.
 const giftCost = (claims: any[] = []) =>
     claims.reduce((total, claim) => total + (claim.item?.retail_price ?? 0), 0)
@@ -470,6 +495,39 @@ onMounted(fetchUser)
                         </table>
                     </div>
                 </details>
+
+                <details class="section" open>
+                    <summary class="section-title">
+                        Favoritos ({{ user.favorites?.length ?? 0 }})
+                    </summary>
+                    <div v-if="!user.favorites?.length" class="empty-state">Nenhum item favoritado.</div>
+                    <div v-else class="favorites-grid">
+                        <article
+                            v-for="favorite in user.favorites"
+                            :key="`${favorite.kind}-${favorite.id}`"
+                            class="favorite-card"
+                        >
+                            <img
+                                v-if="favoriteThumb(favorite)"
+                                :src="favoriteThumb(favorite)!"
+                                class="favorite-thumb"
+                                :alt="favorite.name"
+                            />
+                            <div v-else class="favorite-thumb favorite-thumb--empty">
+                                <Icon :icon="favoriteIcon(favorite)" />
+                            </div>
+
+                            <div class="favorite-info">
+                                <span class="favorite-name">{{ favorite.name }}</span>
+                                <small class="favorite-meta">
+                                    <span class="favorite-kind">{{ favoriteLabel(favorite) }}</span>
+                                    · {{ favorite.hero || 'sem herói' }}
+                                    · {{ $dayjs(favorite.favorited_at).format('DD/MM/YY') }}
+                                </small>
+                            </div>
+                        </article>
+                    </div>
+                </details>
             </div>
         </template>
     </div>
@@ -821,6 +879,56 @@ details.section:not([open]) > summary.section-title
     display block
     color #64748b
     font-size 0.73rem
+
+.favorites-grid
+    display grid
+    grid-template-columns repeat(auto-fill, minmax(230px, 1fr))
+    gap 0.75rem
+    padding 0.75rem
+
+.favorite-card
+    display flex
+    align-items center
+    gap 0.625rem
+    padding 0.625rem
+    border 1px solid rgba(255,255,255,0.06)
+    border-radius 8px
+    background rgba(255,255,255,0.02)
+    min-width 0
+
+.favorite-thumb
+    width 48px
+    height 48px
+    flex-shrink 0
+    object-fit contain
+    border-radius 4px
+    background rgba(255,255,255,0.04)
+
+    &--empty
+        display flex
+        align-items center
+        justify-content center
+        color #f472b6
+
+.favorite-info
+    min-width 0
+
+.favorite-name
+    display block
+    font-weight 500
+    font-size 0.85rem
+    overflow hidden
+    text-overflow ellipsis
+    white-space nowrap
+
+.favorite-meta
+    display block
+    color #64748b
+    font-size 0.73rem
+
+.favorite-kind
+    color #94a3b8
+    font-weight 600
 
 .info-list
     display flex

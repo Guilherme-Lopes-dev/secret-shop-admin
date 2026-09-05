@@ -52,28 +52,54 @@ const skinThumb = (icon?: string | null): string | null =>
 
 const API_URL = import.meta.env.VITE_API_URL?.trim() || ''
 
-const FAVORITE_LABELS = { skin: 'Skin', collector: 'Collector', physical: 'Físico' } as const
-const FAVORITE_ICONS = {
+// Favoritos e carrinho listam os mesmos três catálogos — os helpers servem os dois.
+const CATALOG_LABELS = { skin: 'Skin', collector: 'Collector', physical: 'Físico' } as const
+const CATALOG_ICONS = {
     skin: 'mdi:sword-cross',
     collector: 'mdi:trophy-outline',
     physical: 'mdi:package-variant-closed',
 } as const
 
-type FavoriteKind = keyof typeof FAVORITE_LABELS
+type CatalogKind = keyof typeof CATALOG_LABELS
 
-type Favorite = { kind: FavoriteKind; image: string | null }
+type CatalogItem = { kind: CatalogKind; image: string | null }
 
 // Skin e collector guardam o hash da Steam; produto físico guarda o path do nosso
 // servidor. Por isso a URL sai do `kind`, não do formato do campo.
-const favoriteThumb = (favorite: Favorite): string | null => {
-    if (!favorite.image) return null
-    if (favorite.kind === 'physical') return `${API_URL}${favorite.image}`
+const catalogThumb = (item: CatalogItem): string | null => {
+    if (!item.image) return null
+    if (item.kind === 'physical') return `${API_URL}${item.image}`
 
-    return skinThumb(favorite.image)
+    return skinThumb(item.image)
 }
 
-const favoriteLabel = (favorite: Favorite) => FAVORITE_LABELS[favorite.kind] ?? favorite.kind
-const favoriteIcon = (favorite: Favorite) => FAVORITE_ICONS[favorite.kind] ?? 'mdi:heart-outline'
+const catalogLabel = (item: CatalogItem) => CATALOG_LABELS[item.kind] ?? item.kind
+const catalogIcon = (item: CatalogItem) => CATALOG_ICONS[item.kind] ?? 'mdi:heart-outline'
+
+// Quanto o usuário tem parado no carrinho, a preço de vitrine de hoje.
+const cartTotal = (items: any[] = []) =>
+    items.reduce((total, item) => total + (item.unit_price ?? 0) * (item.quantity ?? 1), 0)
+
+const daysSince = (date?: string | null): number | null => {
+    if (!date) return null
+
+    return Math.floor((Date.now() - new Date(date).getTime()) / 86_400_000)
+}
+
+const ageLabel = (days: number | null): string => {
+    if (days == null) return 'sem data'
+    if (days < 1) return 'hoje'
+    if (days === 1) return 'ontem'
+
+    return `há ${days} dias`
+}
+
+// Idade do carrinho é a do item mais velho parado nele.
+const cartAge = (items: any[] = []): number | null => {
+    const ages = items.map((item) => daysSince(item.added_at)).filter((days) => days != null)
+
+    return ages.length ? Math.max(...(ages as number[])) : null
+}
 
 // Quanto o estoque saiu de graça: o pedido do brinde vale zero.
 const giftCost = (claims: any[] = []) =>
@@ -501,28 +527,68 @@ onMounted(fetchUser)
                         Favoritos ({{ user.favorites?.length ?? 0 }})
                     </summary>
                     <div v-if="!user.favorites?.length" class="empty-state">Nenhum item favoritado.</div>
-                    <div v-else class="favorites-grid">
+                    <div v-else class="catalog-grid">
                         <article
                             v-for="favorite in user.favorites"
                             :key="`${favorite.kind}-${favorite.id}`"
-                            class="favorite-card"
+                            class="catalog-card"
                         >
                             <img
-                                v-if="favoriteThumb(favorite)"
-                                :src="favoriteThumb(favorite)!"
-                                class="favorite-thumb"
+                                v-if="catalogThumb(favorite)"
+                                :src="catalogThumb(favorite)!"
+                                class="catalog-thumb"
                                 :alt="favorite.name"
                             />
-                            <div v-else class="favorite-thumb favorite-thumb--empty">
-                                <Icon :icon="favoriteIcon(favorite)" />
+                            <div v-else class="catalog-thumb catalog-thumb--empty">
+                                <Icon :icon="catalogIcon(favorite)" />
                             </div>
 
-                            <div class="favorite-info">
-                                <span class="favorite-name">{{ favorite.name }}</span>
-                                <small class="favorite-meta">
-                                    <span class="favorite-kind">{{ favoriteLabel(favorite) }}</span>
+                            <div class="catalog-info">
+                                <span class="catalog-name">{{ favorite.name }}</span>
+                                <small class="catalog-meta">
+                                    <span class="catalog-kind">{{ catalogLabel(favorite) }}</span>
                                     · {{ favorite.hero || 'sem herói' }}
                                     · {{ $dayjs(favorite.favorited_at).format('DD/MM/YY') }}
+                                </small>
+                            </div>
+                        </article>
+                    </div>
+                </details>
+
+                <details class="section" open>
+                    <summary class="section-title">
+                        Carrinho ({{ user.cart?.length ?? 0 }})
+                        <span v-if="user.cart?.length" class="section-note">
+                            {{ formatCurrency(cartTotal(user.cart)) }}
+                            · mais antigo {{ ageLabel(cartAge(user.cart)) }}
+                        </span>
+                    </summary>
+                    <div v-if="!user.cart?.length" class="empty-state">Carrinho vazio.</div>
+                    <div v-else class="catalog-grid">
+                        <article
+                            v-for="item in user.cart"
+                            :key="`${item.kind}-${item.id}`"
+                            class="catalog-card"
+                        >
+                            <img
+                                v-if="catalogThumb(item)"
+                                :src="catalogThumb(item)!"
+                                class="catalog-thumb"
+                                :alt="item.name"
+                            />
+                            <div v-else class="catalog-thumb catalog-thumb--empty">
+                                <Icon :icon="catalogIcon(item)" />
+                            </div>
+
+                            <div class="catalog-info">
+                                <span class="catalog-name">{{ item.name }}</span>
+                                <small class="catalog-meta">
+                                    <span class="catalog-kind">{{ catalogLabel(item) }}</span>
+                                    · {{ item.quantity }}× {{ formatCurrency(item.unit_price) }}
+                                    ·
+                                    <span :title="item.added_at ? $dayjs(item.added_at).format('DD/MM/YY HH:mm') : ''">
+                                        {{ ageLabel(daysSince(item.added_at)) }}
+                                    </span>
                                 </small>
                             </div>
                         </article>
@@ -880,13 +946,13 @@ details.section:not([open]) > summary.section-title
     color #64748b
     font-size 0.73rem
 
-.favorites-grid
+.catalog-grid
     display grid
     grid-template-columns repeat(auto-fill, minmax(230px, 1fr))
     gap 0.75rem
     padding 0.75rem
 
-.favorite-card
+.catalog-card
     display flex
     align-items center
     gap 0.625rem
@@ -896,7 +962,7 @@ details.section:not([open]) > summary.section-title
     background rgba(255,255,255,0.02)
     min-width 0
 
-.favorite-thumb
+.catalog-thumb
     width 48px
     height 48px
     flex-shrink 0
@@ -910,10 +976,10 @@ details.section:not([open]) > summary.section-title
         justify-content center
         color #f472b6
 
-.favorite-info
+.catalog-info
     min-width 0
 
-.favorite-name
+.catalog-name
     display block
     font-weight 500
     font-size 0.85rem
@@ -921,12 +987,12 @@ details.section:not([open]) > summary.section-title
     text-overflow ellipsis
     white-space nowrap
 
-.favorite-meta
+.catalog-meta
     display block
     color #64748b
     font-size 0.73rem
 
-.favorite-kind
+.catalog-kind
     color #94a3b8
     font-weight 600
 

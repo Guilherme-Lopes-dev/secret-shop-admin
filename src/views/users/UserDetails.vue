@@ -524,9 +524,9 @@ onMounted(fetchUser)
 
                 <details class="section" open>
                     <summary class="section-title">
-                        Favoritos ({{ user.favorites?.length ?? 0 }})
+                        Lista de Desejos ({{ user.favorites?.length ?? 0 }})
                     </summary>
-                    <div v-if="!user.favorites?.length" class="empty-state">Nenhum item favoritado.</div>
+                    <div v-if="!user.favorites?.length" class="empty-state">Lista de desejos vazia.</div>
                     <div v-else class="catalog-grid">
                         <article
                             v-for="favorite in user.favorites"

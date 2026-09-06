@@ -80,6 +80,12 @@ const routes = [
         component: () => import('@/views/skins/SkinPriceHistory.vue'),
       },
       {
+        // Item do market que não é do catálogo: sem uuid, a chave é o market_hash_name.
+        path: 'skins/market-prices/:name',
+        name: 'market-price-history',
+        component: () => import('@/views/skins/SkinPriceHistory.vue'),
+      },
+      {
         path: 'pricing-config',
         name: 'pricing-config',
         component: () => import('@/views/pricing/PricingConfig.vue'),

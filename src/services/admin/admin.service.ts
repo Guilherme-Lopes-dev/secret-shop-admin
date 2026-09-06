@@ -658,7 +658,7 @@ export const adminService = {
   },
 
   // Preços — catálogo + evolução por skin
-  async getSkinsPriceCatalog(page: number = 1, limit: number = 20, filters: MarketExplorerFilters = {}) {
+  async getSkinsPriceCatalog(page: number = 1, limit: number = 20, filters: PriceCatalogFilters = {}) {
     const params = new URLSearchParams({ page: String(page), limit: String(limit) })
     if (filters.search) params.append('search', filters.search)
     if (filters.hero) params.append('hero', filters.hero)
@@ -671,11 +671,18 @@ export const adminService = {
     if (filters.priceMax != null) params.append('priceMax', String(filters.priceMax))
     if (filters.sortBy) params.append('sortBy', filters.sortBy)
     if (filters.sortDir) params.append('sortDir', filters.sortDir)
+    if (filters.stock && filters.stock !== 'all') params.append('stock', filters.stock)
     return api.get<SkinPriceCatalogResponse>(`/skins/admin/price-catalog?${params}`)
   },
 
   async getSkinPriceHistory(uuid: string) {
     return api.get<SkinPriceHistoryResponse>(`/skins/admin/${uuid}/price-history`)
+  },
+
+  /** Histórico de item que não é do catálogo — chave é o market_hash_name, não uuid. */
+  async getMarketPriceHistory(marketHashName: string) {
+    const params = new URLSearchParams({ name: marketHashName })
+    return api.get<MarketPriceHistoryResponse>(`/skins/admin/market-price-history?${params}`)
   },
 
   // Pass config
@@ -1602,11 +1609,26 @@ export interface PricingConfigInput {
   absoluteFloorPct?: number
 }
 
+/** `stock`: 'in' = temos unidade viva no bot; 'out' = tudo que não temos. */
+export interface PriceCatalogFilters extends MarketExplorerFilters {
+  stock?: 'all' | 'in' | 'out'
+}
+
 export interface SkinPriceCatalogItem {
-  id: string
-  name: string
+  /** null quando o item nunca virou skin do catálogo — aí a rota é por market_hash_name. */
+  id: string | null
+  market_hash_name: string
+  /** Já temos unidade no bot. */
+  in_stock: boolean
+  /** Existe como skin no catálogo (pode estar sem estoque). */
+  in_catalog: boolean
+  /** Cai pro market_hash_name quando o market não mandou nome. */
+  name: string | null
   hero: string | null
+  /** Hash da Steam (precisa de prefixo). Só item do catálogo tem. */
   icon_url_large: string | null
+  /** URL pronta vinda do market — fallback pra quem não está no catálogo. */
+  image_url: string | null
   lowest_price: number | null
   median_price: number | null
   manual_price: number | null
@@ -1673,6 +1695,28 @@ export interface SkinPriceHistoryResponse {
   }
   points: SkinPriceHistoryPoint[]
   units: SkinUnitTracking[]
+}
+
+/** Item fora do catálogo: sem unidades, sem preço de venda — só a série do market. */
+export interface MarketPriceHistoryResponse {
+  marketHashName: string
+  item: {
+    /** null = nunca virou skin do catálogo. */
+    id: string | null
+    name: string
+    hero: string | null
+    /** Hash da Steam, só pra item do catálogo. */
+    icon_url_large: string | null
+    /** URL pronta do market — fallback pro resto. */
+    image_url: string | null
+    price_locked: boolean
+  }
+  points: MarketPriceHistoryPoint[]
+}
+
+/** Item fora do catálogo não tem preço de venda nosso — `manual_price` nunca vem. */
+export type MarketPriceHistoryPoint = Omit<SkinPriceHistoryPoint, 'manual_price'> & {
+  manual_price?: null
 }
 
 export interface BackupFileDto {

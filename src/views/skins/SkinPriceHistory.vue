@@ -6,6 +6,7 @@ import Chart from 'chart.js/auto'
 import { Icon } from '@iconify/vue'
 import {
     adminService,
+    type MarketPriceHistoryResponse,
     type SkinPriceHistoryResponse,
     type SkinUnitTracking,
 } from '@/services/admin/admin.service'
@@ -16,13 +17,25 @@ const router = useRouter()
 
 const loading = ref(true)
 const result = ref<SkinPriceHistoryResponse | null>(null)
+const marketResult = ref<MarketPriceHistoryResponse | null>(null)
 const chartCanvas = ref<HTMLCanvasElement | null>(null)
 let chartInstance: Chart | null = null
 
-const skin = computed(() => result.value?.skin ?? null)
-const points = computed(() => result.value?.points ?? [])
+// Duas fontes pro mesmo gráfico: item do catálogo (com unidades, preço de venda e
+// vendas recentes) e item que só existe no market (só a série de preço).
+const skin = computed(() => {
+    const catalog = result.value?.skin
+    if (catalog) return { ...catalog, image_url: null as string | null }
+
+    const item = marketResult.value?.item
+    if (!item) return null
+
+    return { ...item, latest_10_sales: null as unknown[] | null }
+})
+const points = computed(() => result.value?.points ?? marketResult.value?.points ?? [])
 const recentFirst = computed(() => [...points.value].reverse())
 const units = computed(() => result.value?.units ?? [])
+const hasManualPrice = computed(() => points.value.some(p => typeof p.manual_price === 'number'))
 
 // preço atual = último ponto registrado (catálogo, com fallback pro mediano)
 const currentPrice = computed(() => {
@@ -90,7 +103,11 @@ const renderChart = () => {
         data: {
             labels,
             datasets: [
-                { label: 'Catálogo', data: series('manual_price'), borderColor: '#6366f1', backgroundColor: 'rgba(99,102,241,0.12)', tension: 0.25, spanGaps: true },
+                // Preço de venda só existe pra item do catálogo — fora dele a linha
+                // seria vazia com legenda enganosa.
+                ...(hasManualPrice.value
+                    ? [{ label: 'Catálogo', data: series('manual_price'), borderColor: '#6366f1', backgroundColor: 'rgba(99,102,241,0.12)', tension: 0.25, spanGaps: true }]
+                    : []),
                 { label: 'Mediano', data: series('median_price'), borderColor: '#4caf50', backgroundColor: 'rgba(76,175,80,0.12)', tension: 0.25, spanGaps: true },
                 { label: 'Menor Preço', data: series('lowest_price'), borderColor: '#ff9800', backgroundColor: 'rgba(255,152,0,0.12)', tension: 0.25, spanGaps: true },
                 { label: 'Média', data: series('price_avg'), borderColor: '#22d3ee', backgroundColor: 'rgba(34,211,238,0.1)', tension: 0.25, spanGaps: true, hidden: true },
@@ -122,11 +139,15 @@ const renderChart = () => {
     })
 }
 
-const fetchHistory = async (uuid: string) => {
+const fetchHistory = async () => {
     loading.value = true
+    result.value = null
+    marketResult.value = null
+    const uuid = route.params.uuid as string | undefined
+    const marketHashName = route.params.name as string | undefined
     try {
-        const response = await adminService.getSkinPriceHistory(uuid)
-        result.value = response.data
+        if (uuid) result.value = (await adminService.getSkinPriceHistory(uuid)).data
+        else if (marketHashName) marketResult.value = (await adminService.getMarketPriceHistory(marketHashName)).data
     } catch (error) {
         console.error('Erro ao buscar histórico de preço:', error)
     } finally {
@@ -138,8 +159,8 @@ const fetchHistory = async (uuid: string) => {
 }
 
 watch(
-    () => route.params.uuid as string,
-    (uuid) => fetchHistory(uuid),
+    () => [route.params.uuid, route.params.name],
+    () => fetchHistory(),
     { immediate: true },
 )
 
@@ -160,6 +181,7 @@ onUnmounted(() => chartInstance?.destroy())
             <div class="item-hero-row">
                 <div class="item-thumb-wrap">
                     <img v-if="skin.icon_url_large" :src="previewImageUrl(skin.icon_url_large)" class="item-hero-img" alt="" />
+                    <img v-else-if="skin.image_url" :src="skin.image_url" class="item-hero-img" alt="" />
                     <div v-else class="item-hero-placeholder"><Icon icon="mdi:sword" /></div>
                 </div>
                 <div class="item-hero-info">
@@ -290,6 +312,10 @@ onUnmounted(() => chartInstance?.destroy())
                 </div>
             </div>
         </template>
+
+        <div v-else class="empty-state">
+            Item não encontrado. Ele pode ter saído do market — o espelho é atualizado a cada sync de preços.
+        </div>
     </div>
 </template>
 

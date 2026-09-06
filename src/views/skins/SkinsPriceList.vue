@@ -25,6 +25,7 @@ const slotFilter = persistedRef('skins:slot', '')
 const rarityFilter = persistedRef('skins:rarity', '')
 const qualityFilter = ref<string[]>([])
 const priceFilter = ref<'all' | 'with' | 'without'>('all')
+const stockFilter = persistedRef<'all' | 'in' | 'out'>('skins:stock', 'all')
 const priceMin = persistedRef('skins:price-min', '')
 const priceMax = persistedRef('skins:price-max', '')
 const sortValue = persistedRef('skins:sort', 'update:desc')
@@ -48,6 +49,7 @@ const fetchCatalog = async (page: number, append = false) => {
             rarity: rarityFilter.value || undefined,
             qualities: qualityFilter.value.length ? qualityFilter.value : undefined,
             priceFilter: priceFilter.value !== 'all' ? priceFilter.value : undefined,
+            stock: stockFilter.value,
             priceMin: priceMin.value ? toCents(priceMin.value) : undefined,
             priceMax: priceMax.value ? toCents(priceMax.value) : undefined,
             sortBy: sortBy === 'update' ? undefined : (sortBy as 'price' | 'name' | 'rarity' | 'variation'),
@@ -57,11 +59,17 @@ const fetchCatalog = async (page: number, append = false) => {
         if (myGeneration !== fetchGeneration) return
         if (response.data) {
             items.value = append ? [...items.value, ...response.data.data] : response.data.data
-            totalPages.value = response.data.pages
-            totalItems.value = response.data.total
             currentPage.value = response.data.page
-            facets.value = response.data.facets
             applied = true
+            // Página vazia (dados mudaram entre requests) traz total 0 — aplicar
+            // zeraria o contador com a grid cheia.
+            if (response.data.data.length) {
+                totalPages.value = response.data.pages
+                totalItems.value = response.data.total
+            }
+            // Faceta só vem na 1ª página; nas outras o backend manda vazio pra não
+            // varrer o catálogo inteiro a cada scroll.
+            if (!append) facets.value = response.data.facets
         }
     } catch (error) {
         console.error('Erro ao buscar catálogo de preços:', error)
@@ -111,6 +119,7 @@ const clearAllFilters = () => {
     rarityFilter.value = ''
     qualityFilter.value = []
     priceFilter.value = 'all'
+    stockFilter.value = 'all'
     priceMin.value = ''
     priceMax.value = ''
     searchQuery.value = ''
@@ -122,6 +131,11 @@ const priceOptions = [
     { label: 'Todos', value: 'all' },
     { label: 'Com preço', value: 'with' },
     { label: 'Sem preço', value: 'without' },
+]
+const stockOptions = [
+    { label: 'Temos e não temos', value: 'all' },
+    { label: 'Só as que temos', value: 'in' },
+    { label: 'Só as que não temos', value: 'out' },
 ]
 const sortOptions = [
     { label: 'Última atualização', value: 'update:desc' },
@@ -143,6 +157,28 @@ const trendClass = (pct: number | null) => {
     return pct > 0 ? 'trend-up' : pct < 0 ? 'trend-down' : ''
 }
 
+// Três estados de verdade: unidade viva no bot, skin do catálogo sem estoque, e o
+// item do market que nunca tivemos. O filtro é binário (temos / não temos) — quem
+// está no catálogo mas zerado conta como "não temos".
+const stockBadge = (item: SkinPriceCatalogItem) => {
+    if (item.in_stock) return { label: 'Temos', cls: 'badge-have' }
+    if (item.in_catalog) return { label: 'Sem estoque', cls: 'badge-empty' }
+    return { label: 'Não temos', cls: 'badge-missing' }
+}
+
+// Catálogo guarda o hash da Steam; o market já manda URL pronta.
+const imageUrl = (item: SkinPriceCatalogItem) => {
+    if (item.icon_url_large) {
+        return `https://steamcommunity-a.akamaihd.net/economy/image/${item.icon_url_large}/184fx184f`
+    }
+    return item.image_url ?? ''
+}
+
+const openDetail = (item: SkinPriceCatalogItem) => {
+    if (item.id) return router.push(`/skins/prices/${item.id}`)
+    return router.push({ name: 'market-price-history', params: { name: item.market_hash_name } })
+}
+
 onMounted(() => {
     fetchCatalog(1)
     observer = new IntersectionObserver(
@@ -159,7 +195,7 @@ onUnmounted(() => observer?.disconnect())
         <header class="page-header">
             <div>
                 <h1 class="page-title">Evolução de Preços</h1>
-                <p class="page-subtitle">{{ totalItems }} skins no catálogo</p>
+                <p class="page-subtitle">{{ totalItems }} itens do market Dota 2</p>
             </div>
         </header>
 
@@ -189,6 +225,9 @@ onUnmounted(() => observer?.disconnect())
             <select v-model="rarityFilter" @change="onFilterChange" class="filter-select">
                 <option value="">Todas raridades</option>
                 <option v-for="r in facets.rarities" :key="r" :value="r">{{ r }}</option>
+            </select>
+            <select v-model="stockFilter" @change="onFilterChange" class="filter-select">
+                <option v-for="opt in stockOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
             </select>
             <select v-model="priceFilter" @change="onFilterChange" class="filter-select">
                 <option v-for="opt in priceOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
@@ -222,16 +261,17 @@ onUnmounted(() => observer?.disconnect())
                 <div class="cards-grid">
                     <article
                         v-for="item in items"
-                        :key="item.id"
+                        :key="item.market_hash_name"
                         class="card"
-                        @click="router.push(`/skins/prices/${item.id}`)"
+                        @click="openDetail(item)"
                     >
                         <div class="card-img-wrap">
-                            <img v-if="item.icon_url_large" :src="`https://steamcommunity-a.akamaihd.net/economy/image/${item.icon_url_large}/184fx184f`" class="card-img" alt="" loading="lazy" />
+                            <img v-if="imageUrl(item)" :src="imageUrl(item)" class="card-img" alt="" loading="lazy" />
                             <div v-else class="card-img-placeholder"><Icon icon="mdi:sword" /></div>
+                            <span class="badge badge-stock" :class="stockBadge(item).cls">{{ stockBadge(item).label }}</span>
                         </div>
                         <div class="card-body">
-                            <h3 class="card-name" :title="item.name">{{ item.name }}</h3>
+                            <h3 class="card-name" :title="item.name ?? item.market_hash_name">{{ item.name ?? item.market_hash_name }}</h3>
                             <span v-if="item.hero" class="badge badge-hero">{{ item.hero }}</span>
 
                             <div class="card-price-grid">
@@ -470,11 +510,35 @@ onUnmounted(() => observer?.disconnect())
         transform translateY(-2px)
 
 .card-img-wrap
+    position relative
     aspect-ratio 16 / 10
     background rgba(255,255,255,0.03)
     display flex
     align-items center
     justify-content center
+
+.badge-stock
+    position absolute
+    top 6px
+    left 6px
+    padding 2px 7px
+    border-radius 5px
+    font-size 0.65rem
+    font-weight 700
+    letter-spacing 0.02em
+    backdrop-filter blur(2px)
+
+.badge-have
+    background rgba(34,197,94,0.18)
+    color #86efac
+
+.badge-empty
+    background rgba(234,179,8,0.16)
+    color #fde047
+
+.badge-missing
+    background rgba(148,163,184,0.16)
+    color #cbd5e1
 
 .card-img
     width 100%

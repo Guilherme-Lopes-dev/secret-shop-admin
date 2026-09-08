@@ -23,6 +23,7 @@ import type {
   DropshipNotificationsResponse,
   SwapNotificationsResponse,
   PassProgressDto,
+  DemandRow,
   ProfileProgressDto,
   SkinSalesRow,
 } from './types'
@@ -173,6 +174,13 @@ export const adminService = {
     if (filters.to) params.append('to', filters.to)
     if (filters.paymentStatus) params.append('payment_status', filters.paymentStatus)
     return api.get<{ data: SkinSalesRow[]; total: number }>(`/admin/sales/reports/by-skin?${params}`)
+  },
+
+  async getDemandSummary(filters: { from?: string; to?: string } = {}) {
+    const params = new URLSearchParams()
+    if (filters.from) params.append('from', filters.from)
+    if (filters.to) params.append('to', filters.to)
+    return api.get<{ data: DemandRow[]; total: number }>(`/admin/demand?${params}`)
   },
 
   async getBulkAsaasReceipts(filters: { from?: string; to?: string }) {

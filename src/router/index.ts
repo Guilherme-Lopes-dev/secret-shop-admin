@@ -39,6 +39,11 @@ const routes = [
         component: () => import('@/views/sales/SalesBySkin.vue'),
       },
       {
+        path: 'sales/demand',
+        name: 'sales-demand',
+        component: () => import('@/views/sales/DemandSummary.vue'),
+      },
+      {
         path: 'sales/:id',
         name: 'sale-details',
         component: () => import('@/views/sales/SaleDetails.vue'),

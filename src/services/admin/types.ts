@@ -346,3 +346,25 @@ export interface SkinSalesRow {
   stock_blocked: number
   stock_value: number
 }
+
+/** Linha do resumo de demanda (`/admin/demand`). Preço em centavos. */
+export interface DemandRow {
+  kind: 'skin' | 'collector' | 'physical'
+  /** Identidade dentro do catálogo: uuid da skin/produto, ou `market_hash_name|hero_id` no collector. */
+  key: string
+  name: string
+  image: string | null
+  market_hash_name: string | null
+  hero: string | null
+  price: number | null
+  is_dropship: boolean
+  favorites: number
+  last_favorited_at: string | null
+  cart_lines: number
+  cart_quantity: number
+  cart_users: number
+  last_carted_at: string | null
+  stock_available: number
+  /** Unidades em linha soft-deletada — fora da venda, mas o admin quer saber que existe. */
+  stock_deleted: number
+}

@@ -9,8 +9,8 @@ import type { SkinSalesRow } from '@/services/admin/types'
 import { formatCurrency } from '@/utils/formatCurrency'
 import { buildSteamImageUrl } from '@/utils/steamImage'
 import { persistedRef } from '@/utils/persistedRef'
+import { DATE_PRESETS, DATE_RANGE_BUILDERS, type DatePreset } from '@/utils/datePresets'
 
-type Preset = 'today' | '7d' | '30d' | 'month' | 'lastMonth' | 'year'
 type SortKey =
     | 'name'
     | 'quantity'
@@ -33,29 +33,6 @@ type SkinRow = SkinSalesRow & {
     coverageDays: number | null
     hasFullCost: boolean
     imageUrl: string | null
-}
-
-const startOfToday = () => dayjs()
-
-const PRESETS: { key: Preset; label: string }[] = [
-    { key: 'today', label: 'Hoje' },
-    { key: '7d', label: '7 dias' },
-    { key: '30d', label: '30 dias' },
-    { key: 'month', label: 'Mês atual' },
-    { key: 'lastMonth', label: 'Mês passado' },
-    { key: 'year', label: 'Ano' },
-]
-
-const RANGE_BUILDERS: Record<Preset, () => [string, string]> = {
-    today: () => [startOfToday().format('YYYY-MM-DD'), startOfToday().format('YYYY-MM-DD')],
-    '7d': () => [startOfToday().subtract(6, 'day').format('YYYY-MM-DD'), startOfToday().format('YYYY-MM-DD')],
-    '30d': () => [startOfToday().subtract(29, 'day').format('YYYY-MM-DD'), startOfToday().format('YYYY-MM-DD')],
-    month: () => [startOfToday().startOf('month').format('YYYY-MM-DD'), startOfToday().format('YYYY-MM-DD')],
-    lastMonth: () => {
-        const last = startOfToday().subtract(1, 'month')
-        return [last.startOf('month').format('YYYY-MM-DD'), last.endOf('month').format('YYYY-MM-DD')]
-    },
-    year: () => [startOfToday().startOf('year').format('YYYY-MM-DD'), startOfToday().format('YYYY-MM-DD')],
 }
 
 const timestampOf = (value: string | null) => (value ? dayjs(value).valueOf() : 0)
@@ -86,7 +63,7 @@ const COLUMNS: { key: SortKey; label: string; hint?: string }[] = [
 
 const percent = (value: number) => `${value.toFixed(1)}%`
 
-const activePreset = ref<Preset | null>('30d')
+const activePreset = ref<DatePreset | null>('30d')
 const dateFrom = ref('')
 const dateTo = ref('')
 const paymentStatus = persistedRef('sales-by-skin:payment-status', 'PAID')
@@ -171,9 +148,13 @@ const topRows = computed(() =>
         .slice(0, 10),
 )
 
+// Trocar de preset dispara duas buscas; só a resposta do último pedido pode escrever na tela.
+let requestToken = 0
+
 const fetchReport = async () => {
     if (!dateFrom.value || !dateTo.value) return
 
+    const token = ++requestToken
     loading.value = true
     errorMessage.value = ''
 
@@ -183,19 +164,23 @@ const fetchReport = async () => {
             to: dateTo.value,
             paymentStatus: paymentStatus.value || undefined,
         })
+        if (token !== requestToken) return
+
         rows.value = data?.data ?? []
     } catch (requestError: any) {
+        if (token !== requestToken) return
+
         errorMessage.value =
             requestError?.response?.data?.message ?? 'Não foi possível carregar o relatório por skin.'
         rows.value = []
     } finally {
-        loading.value = false
+        if (token === requestToken) loading.value = false
     }
 }
 
-const applyPreset = (key: Preset) => {
+const applyPreset = (key: DatePreset) => {
     activePreset.value = key
-    const [from, to] = RANGE_BUILDERS[key]()
+    const [from, to] = DATE_RANGE_BUILDERS[key]()
     dateFrom.value = from
     dateTo.value = to
     fetchReport()
@@ -326,7 +311,7 @@ onUnmounted(() => chartInstance?.destroy())
         <div class="section filters-section">
             <div class="preset-row">
                 <button
-                    v-for="preset in PRESETS"
+                    v-for="preset in DATE_PRESETS"
                     :key="preset.key"
                     class="preset-btn"
                     :class="{ active: activePreset === preset.key }"
@@ -574,119 +559,7 @@ onUnmounted(() => chartInstance?.destroy())
 </template>
 
 <style lang="stylus" scoped>
-.view-wrap
-    padding 2rem
-    color #fff
-    background #121214
-    min-height 100vh
-
-.page-header
-    display flex
-    align-items flex-start
-    justify-content space-between
-    gap 1rem
-    margin-bottom 1.5rem
-
-.page-title
-    font-size 1.8rem
-    font-weight 700
-    margin-bottom 0.25rem
-
-.page-subtitle
-    color #94a3b8
-    font-size 0.9rem
-
-.ghost-btn
-    display flex
-    align-items center
-    gap 0.4rem
-    background rgba(255,255,255,0.05)
-    border 1px solid rgba(255,255,255,0.08)
-    color #e2e8f0
-    padding 0.5rem 0.9rem
-    border-radius 8px
-    font-size 0.82rem
-    cursor pointer
-    transition all 0.15s
-    white-space nowrap
-
-    &:hover:not(:disabled)
-        background rgba(255,255,255,0.09)
-
-    &:disabled
-        opacity 0.4
-        cursor not-allowed
-
-.section
-    background #1a1a1e
-    padding 1.5rem
-    border-radius 12px
-    border 1px solid rgba(255,255,255,0.05)
-    margin-bottom 1.25rem
-
-.section-head
-    display flex
-    align-items center
-    justify-content space-between
-    gap 1rem
-    flex-wrap wrap
-    margin-bottom 1rem
-    padding-bottom 0.6rem
-    border-bottom 1px solid rgba(255,255,255,0.05)
-
-.section-title
-    font-size 1rem
-    font-weight 600
-
-.section-hint
-    color #64748b
-    font-size 0.78rem
-
-.metric-toggle
-    display flex
-    gap 0.35rem
-
-    button
-        background rgba(255,255,255,0.05)
-        border 1px solid rgba(255,255,255,0.08)
-        color #94a3b8
-        padding 0.3rem 0.8rem
-        border-radius 6px
-        font-size 0.78rem
-        cursor pointer
-
-        &.active
-            background rgba(99,102,241,0.2)
-            color #a5b4fc
-            border-color rgba(99,102,241,0.4)
-
-.filters-section
-    margin-bottom 1.5rem
-
-.preset-row
-    display flex
-    flex-wrap wrap
-    gap 0.5rem
-    margin-bottom 1rem
-
-.preset-btn
-    background rgba(255,255,255,0.05)
-    color #94a3b8
-    border 1px solid rgba(255,255,255,0.08)
-    padding 0.4rem 1rem
-    border-radius 6px
-    font-size 0.82rem
-    cursor pointer
-    transition all 0.15s
-
-    &:hover
-        color #fff
-        background rgba(255,255,255,0.09)
-
-    &.active
-        background rgba(99,102,241,0.2)
-        color #a5b4fc
-        border-color rgba(99,102,241,0.4)
+@import '../../styles/report-view.styl'
 
 .intent-note
     display flex
@@ -695,115 +568,6 @@ onUnmounted(() => chartInstance?.destroy())
     margin 1rem 0 0
     color #fbbf24
     font-size 0.78rem
-
-.filter-grid
-    display grid
-    grid-template-columns repeat(auto-fit, minmax(160px, 1fr))
-    gap 1rem
-
-.filter-field
-    display flex
-    flex-direction column
-    gap 0.35rem
-
-    label
-        font-size 0.78rem
-        color #94a3b8
-
-    input,
-    select
-        background #2a2a30
-        border 1px solid rgba(255,255,255,0.08)
-        border-radius 6px
-        color #fff
-        padding 0.5rem 0.7rem
-        font-size 0.875rem
-        outline none
-
-        &:focus
-            border-color rgba(99,102,241,0.4)
-
-.stats-grid
-    display grid
-    grid-template-columns repeat(auto-fit, minmax(200px, 1fr))
-    gap 1.25rem
-    margin-bottom 1.25rem
-
-.stat-card
-    background #1a1a1e
-    padding 1.25rem
-    border-radius 12px
-    display flex
-    align-items center
-    gap 1rem
-    border 1px solid rgba(255,255,255,0.05)
-
-.stat-icon
-    width 44px
-    height 44px
-    border-radius 10px
-    display flex
-    align-items center
-    justify-content center
-    flex-shrink 0
-
-.stat-info
-    display flex
-    flex-direction column
-
-.stat-label
-    font-size 0.8rem
-    color #94a3b8
-    margin-bottom 0.2rem
-
-.stat-value
-    font-size 1.25rem
-    font-weight 700
-
-.stat-sub
-    font-size 0.75rem
-    color #64748b
-
-.canvas-wrap
-    height 340px
-    position relative
-
-.table-wrapper
-    overflow-x auto
-
-table
-    width 100%
-    border-collapse collapse
-
-    th
-        text-align left
-        color #94a3b8
-        font-size 0.75rem
-        font-weight 500
-        padding 0.6rem 0.5rem
-        border-bottom 1px solid rgba(255,255,255,0.06)
-        text-transform uppercase
-        white-space nowrap
-
-    td
-        padding 0.65rem 0.5rem
-        font-size 0.875rem
-        border-bottom 1px solid rgba(255,255,255,0.04)
-        white-space nowrap
-
-.sortable
-    cursor pointer
-    user-select none
-
-    &:hover
-        color #e2e8f0
-
-    &.active
-        color #a5b4fc
-
-.rank-col
-    width 40px
-    color #64748b
 
 tr.idle td
     opacity 0.6
@@ -834,58 +598,6 @@ tr.idle td
     font-size 0.72rem
     color #64748b
 
-.fw
-    font-weight 600
-
-.green
-    color #4caf50
-    font-weight 600
-
 .red
-    color #f43f5e
     font-weight 600
-
-.muted
-    color #64748b
-    font-size 0.78rem
-
-.error-banner
-    display flex
-    align-items center
-    gap 0.6rem
-    background rgba(244,63,94,0.1)
-    border 1px solid rgba(244,63,94,0.3)
-    color #fda4af
-    padding 0.8rem 1rem
-    border-radius 8px
-    margin-bottom 1.25rem
-    font-size 0.85rem
-
-.loading-state
-    display flex
-    align-items center
-    gap 0.75rem
-    color #64748b
-    padding 3rem
-    justify-content center
-
-.spin
-    animation spin 0.8s linear infinite
-
-@keyframes spin
-    from transform rotate(0deg)
-    to transform rotate(360deg)
-
-.empty-state
-    display flex
-    flex-direction column
-    align-items center
-    gap 0.75rem
-    color #475569
-    padding 3rem
-    text-align center
-
-    p
-        margin 0
-        font-size 0.9rem
 </style>

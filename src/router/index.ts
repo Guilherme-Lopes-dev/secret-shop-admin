@@ -34,6 +34,11 @@ const routes = [
         component: () => import('@/views/sales/SalesSummary.vue'),
       },
       {
+        path: 'sales/by-skin',
+        name: 'sales-by-skin',
+        component: () => import('@/views/sales/SalesBySkin.vue'),
+      },
+      {
         path: 'sales/:id',
         name: 'sale-details',
         component: () => import('@/views/sales/SaleDetails.vue'),

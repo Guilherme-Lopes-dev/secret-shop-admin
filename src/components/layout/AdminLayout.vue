@@ -41,6 +41,7 @@ const navGroups: NavGroup[] = [
             { label: 'Vendas', icon: 'mdi:cart-outline', to: '/sales', name: 'sales' },
             { label: 'Presentes', icon: 'mdi:gift-outline', to: '/gifts', name: 'gifts' },
             { label: 'Resumo', icon: 'mdi:chart-bar', to: '/sales/summary', name: 'sales-summary' },
+            { label: 'Vendas por Skin', icon: 'mdi:chart-timeline-variant', to: '/sales/by-skin', name: 'sales-by-skin' },
             { label: 'Pedidos Collector', icon: 'mdi:receipt-text-outline', to: '/collector-orders', name: 'collector-orders' },
             { label: 'Envios Dropship', icon: 'mdi:package-variant-closed', to: '/dropship-orders', name: 'dropship-orders' },
             { label: 'Pedidos Físicos', icon: 'mdi:truck-outline', to: '/physical-orders', name: 'physical-orders' },

@@ -325,3 +325,24 @@ export interface DiscordWebhookCreatedDto {
   channel_id: string | null
   guild_id: string | null
 }
+
+/** Linha do ranking de vendas por skin (`/admin/sales/reports/by-skin`). Valores em centavos. */
+export interface SkinSalesRow {
+  skin_name: string
+  market_hash_name: string | null
+  skin_image: string | null
+  quantity: number
+  items: number
+  orders: number
+  buyers: number
+  revenue: number
+  cost: number
+  /** Itens vendidos com custo conhecido; menor que `items` = lucro parcial (dropship não tem custo). */
+  cost_items: number
+  discount: number
+  first_sale_at: string | null
+  last_sale_at: string | null
+  stock_available: number
+  stock_blocked: number
+  stock_value: number
+}

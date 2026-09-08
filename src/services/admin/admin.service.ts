@@ -24,6 +24,7 @@ import type {
   SwapNotificationsResponse,
   PassProgressDto,
   ProfileProgressDto,
+  SkinSalesRow,
 } from './types'
 
 /** Origem da trade: quem a API classificou como brinde, swap ou compra. */
@@ -164,6 +165,14 @@ export const adminService = {
     return api.get<{ data: any[]; total: number; returned: number; capped: boolean }>(
       `/admin/sales/reports/export?${params}`,
     )
+  },
+
+  async getSalesBySkinReport(filters: { from?: string; to?: string; paymentStatus?: string }) {
+    const params = new URLSearchParams()
+    if (filters.from) params.append('from', filters.from)
+    if (filters.to) params.append('to', filters.to)
+    if (filters.paymentStatus) params.append('payment_status', filters.paymentStatus)
+    return api.get<{ data: SkinSalesRow[]; total: number }>(`/admin/sales/reports/by-skin?${params}`)
   },
 
   async getBulkAsaasReceipts(filters: { from?: string; to?: string }) {

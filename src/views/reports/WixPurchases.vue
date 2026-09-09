@@ -24,6 +24,7 @@ type Curve = 'A' | 'B' | 'C'
 
 /** Linha do export da Wix já normalizada: dinheiro em centavos e métricas derivadas. */
 type WixRow = {
+    key: string
     name: string
     variant: string | null
     quantity: number
@@ -36,6 +37,9 @@ type WixRow = {
     cumulativeShare: number
     curve: Curve
 }
+
+/** Linha antes do ranking: share, acumulado e curva dependem de quem ficou visível. */
+type RawRow = Omit<WixRow, 'share' | 'cumulativeShare' | 'curve'>
 
 const COLUMNS: { key: SortKey; label: string; hint: string }[] = [
     {
@@ -117,6 +121,8 @@ const CHART_METRICS: { key: ChartMetric; label: string }[] = [
 
 const PAGE_SIZES = [50, 100, 500, 0]
 
+const HIDDEN_PREVIEW_LIMIT = 100
+
 /** "R$ 6.344,42" vira 634442. Campo vazio ou "Desconhecido" vira zero. */
 const toCents = (value: string | undefined) => {
     if (!value) return 0
@@ -147,8 +153,32 @@ const curveOf = (cumulativeShare: number): Curve => {
     return 'C'
 }
 
+/** Chave da linha para ocultar/selecionar: o export não tem id, então vale o conteúdo. */
+const keyOf = (row: Omit<RawRow, 'key'>) =>
+    [row.name, row.variant ?? '', row.quantity, row.gross, row.net].join('|')
+
+const toRow = (line: Record<string, string>): RawRow => {
+    const gross = toCents(line['Vendas brutas'])
+    const discount = toCents(line['Descontos'])
+    const quantity = Number(line['Quantidade']) || 0
+    const net = toCents(line['Total de itens'])
+
+    const row = {
+        name: (line['Nome do produto'] ?? '').trim(),
+        variant: known(line['Variante de produto']),
+        quantity,
+        gross,
+        discount,
+        net,
+        discountRate: gross ? (discount / gross) * 100 : 0,
+        avgPrice: quantity ? Math.round(net / quantity) : 0,
+    }
+
+    return { ...row, key: keyOf(row) }
+}
+
 /** Ranking por líquido: share individual, acumulado e curva ABC (A até 80%, B até 95%). */
-const withRanking = (rows: Omit<WixRow, 'share' | 'cumulativeShare' | 'curve'>[]): WixRow[] => {
+const withRanking = (rows: RawRow[]): WixRow[] => {
     const totalNet = rows.reduce((accumulated, row) => accumulated + row.net, 0)
     let running = 0
 
@@ -179,6 +209,11 @@ const pageSize = persistedRef('wix-purchases:page-size', 100)
 const page = ref(1)
 const chartMetric = ref<ChartMetric>('net')
 
+// Exclusão é só de tela: as chaves ocultas ficam no localStorage, o CSV nunca muda.
+const hiddenKeys = persistedRef<string[]>('wix-purchases:hidden', [])
+const selectedKeys = ref<string[]>([])
+const showHiddenPanel = ref(false)
+
 const chartCanvas = ref<HTMLCanvasElement | null>(null)
 let chartInstance: Chart | null = null
 
@@ -191,27 +226,33 @@ const parsed = computed(() => {
     return result.data.filter(line => line['Nome do produto'])
 })
 
-const baseRows = computed<WixRow[]>(() => {
-    const rows = parsed.value.map(line => {
-        const gross = toCents(line['Vendas brutas'])
-        const discount = toCents(line['Descontos'])
-        const quantity = Number(line['Quantidade']) || 0
-        const net = toCents(line['Total de itens'])
+/** Duas linhas idênticas no export teriam a mesma chave: a segunda ganha sufixo. */
+const withUniqueKey = (row: RawRow, seen: Map<string, number>): RawRow => {
+    const repeated = seen.get(row.key) ?? 0
+    seen.set(row.key, repeated + 1)
 
-        return {
-            name: (line['Nome do produto'] ?? '').trim(),
-            variant: known(line['Variante de produto']),
-            quantity,
-            gross,
-            discount,
-            net,
-            discountRate: gross ? (discount / gross) * 100 : 0,
-            avgPrice: quantity ? Math.round(net / quantity) : 0,
-        }
-    })
+    if (!repeated) return row
 
-    return withRanking(rows)
+    return { ...row, key: `${row.key}#${repeated}` }
+}
+
+const allRows = computed<RawRow[]>(() => {
+    const seen = new Map<string, number>()
+
+    return parsed.value.map(line => withUniqueKey(toRow(line), seen))
 })
+
+const hiddenSet = computed(() => new Set(hiddenKeys.value))
+
+const hiddenRows = computed(() => allRows.value.filter(row => hiddenSet.value.has(row.key)))
+
+// Ocultar em massa pode passar de 2 mil itens: a lista mostra os primeiros e conta o resto.
+const hiddenPreview = computed(() => hiddenRows.value.slice(0, HIDDEN_PREVIEW_LIMIT))
+
+// Item oculto sai da conta inteira: totais, share e curva ABC valem só pro que sobrou.
+const baseRows = computed<WixRow[]>(() =>
+    withRanking(allRows.value.filter(row => !hiddenSet.value.has(row.key))),
+)
 
 const activeFilters = computed(() => {
     const term = search.value.trim().toLowerCase()
@@ -297,6 +338,57 @@ const topRows = computed(() =>
         .slice(0, 10),
 )
 
+const selectedSet = computed(() => new Set(selectedKeys.value))
+
+const pageKeys = computed(() => paginated.value.map(row => row.key))
+
+const pageFullySelected = computed(
+    () => pageKeys.value.length > 0 && pageKeys.value.every(key => selectedSet.value.has(key)),
+)
+
+const hide = (keys: string[]) => {
+    if (!keys.length) return
+
+    const removed = new Set(keys)
+
+    hiddenKeys.value = [...new Set([...hiddenKeys.value, ...keys])]
+    selectedKeys.value = selectedKeys.value.filter(key => !removed.has(key))
+}
+
+const restore = (key: string) => {
+    hiddenKeys.value = hiddenKeys.value.filter(hidden => hidden !== key)
+}
+
+const restoreAll = () => {
+    hiddenKeys.value = []
+}
+
+const toggleSelection = (key: string) => {
+    if (selectedSet.value.has(key)) {
+        selectedKeys.value = selectedKeys.value.filter(selected => selected !== key)
+        return
+    }
+
+    selectedKeys.value = [...selectedKeys.value, key]
+}
+
+const togglePageSelection = () => {
+    if (pageFullySelected.value) {
+        selectedKeys.value = selectedKeys.value.filter(key => !pageKeys.value.includes(key))
+        return
+    }
+
+    selectedKeys.value = [...new Set([...selectedKeys.value, ...pageKeys.value])]
+}
+
+const selectAllFiltered = () => {
+    selectedKeys.value = sorted.value.map(row => row.key)
+}
+
+const clearSelection = () => {
+    selectedKeys.value = []
+}
+
 const percent = (value: number) => `${value.toFixed(1)}%`
 
 const rankOf = (index: number) => (page.value - 1) * rowsPerPage.value + index + 1
@@ -334,7 +426,10 @@ const applyCsv = (text: string, name: string) => {
         return
     }
 
+    // Chave é conteúdo da linha: no arquivo novo ela não vale mais nada.
     errorMessage.value = ''
+    hiddenKeys.value = []
+    selectedKeys.value = []
     csvText.value = text
     sourceName.value = name
 }
@@ -439,9 +534,16 @@ const exportCsv = () => {
     setTimeout(() => URL.revokeObjectURL(url), 0)
 }
 
-// Filtro novo pode deixar a página atual fora do fim da lista.
-watch([filtered, pageSize], () => {
+// Filtro novo recomeça do topo e larga quem saiu da tela: excluir seleção invisível é armadilha.
+watch([activeFilters, pageSize], () => {
+    const visible = new Set(filtered.value.map(row => row.key))
+
     page.value = 1
+    selectedKeys.value = selectedKeys.value.filter(key => visible.has(key))
+})
+
+watch(totalPages, pages => {
+    page.value = Math.min(page.value, pages)
 })
 
 // Dado vem do import, não de request: sem o onMounted o canvas ainda não existe
@@ -478,6 +580,43 @@ onUnmounted(() => chartInstance?.destroy())
         <div v-if="errorMessage" class="error-banner">
             <Icon icon="mdi:alert-circle-outline" width="20" />
             {{ errorMessage }}
+        </div>
+
+        <div v-if="hiddenRows.length" class="hidden-banner">
+            <Icon icon="mdi:eye-off-outline" width="18" />
+            <span>
+                {{ hiddenRows.length }} {{ hiddenRows.length === 1 ? 'item excluído' : 'itens excluídos' }}
+                da tela — fora dos totais, do gráfico e da curva ABC. O CSV continua intacto.
+            </span>
+            <button class="ghost-btn" @click="showHiddenPanel = !showHiddenPanel">
+                {{ showHiddenPanel ? 'Esconder lista' : 'Ver lista' }}
+            </button>
+            <button class="ghost-btn" @click="restoreAll">Restaurar todos</button>
+        </div>
+
+        <div v-if="showHiddenPanel && hiddenRows.length" class="section hidden-panel">
+            <div class="section-head">
+                <h2 class="section-title">Itens excluídos ({{ hiddenRows.length }})</h2>
+                <span class="section-hint">Clique no item para trazer de volta</span>
+            </div>
+            <div class="hidden-chips">
+                <button
+                    v-for="row in hiddenPreview"
+                    :key="row.key"
+                    class="hidden-chip"
+                    :title="`Restaurar ${row.name}`"
+                    @click="restore(row.key)"
+                >
+                    <Icon icon="mdi:undo-variant" width="13" />
+                    {{ row.name }}
+                    <span class="muted">{{ formatCurrency(row.net) }}</span>
+                </button>
+            </div>
+
+            <p v-if="hiddenRows.length > hiddenPreview.length" class="muted preview-note">
+                Mostrando {{ hiddenPreview.length }} de {{ hiddenRows.length }}. Para o resto, use
+                "Restaurar todos".
+            </p>
         </div>
 
         <div class="section filters-section">
@@ -616,10 +755,34 @@ onUnmounted(() => chartInstance?.destroy())
                 <span class="section-hint">Clique no cabeçalho para ordenar</span>
             </div>
 
+            <div v-if="selectedKeys.length" class="bulk-bar">
+                <span class="fw">{{ selectedKeys.length }} selecionados</span>
+                <button class="ghost-btn danger" @click="hide([...selectedKeys])">
+                    <Icon icon="mdi:eye-off-outline" width="16" />
+                    Excluir selecionados
+                </button>
+                <button
+                    v-if="selectedKeys.length < sorted.length"
+                    class="ghost-btn"
+                    @click="selectAllFiltered"
+                >
+                    Selecionar os {{ sorted.length }} filtrados
+                </button>
+                <button class="ghost-btn" @click="clearSelection">Limpar seleção</button>
+            </div>
+
             <div class="table-wrapper">
                 <table>
                     <thead>
                         <tr>
+                            <th class="select-col">
+                                <input
+                                    type="checkbox"
+                                    :checked="pageFullySelected"
+                                    :title="pageFullySelected ? 'Desmarcar a página' : 'Marcar a página'"
+                                    @change="togglePageSelection"
+                                />
+                            </th>
                             <th class="rank-col">
                                 #
                                 <span class="col-info" @click.stop>
@@ -648,10 +811,22 @@ onUnmounted(() => chartInstance?.destroy())
                                     <span class="col-tip">{{ CURVE_HINT }}</span>
                                 </span>
                             </th>
+                            <th class="action-col"></th>
                         </tr>
                     </thead>
                     <tbody>
-                        <tr v-for="(row, index) in paginated" :key="`${row.name}-${index}`">
+                        <tr
+                            v-for="(row, index) in paginated"
+                            :key="row.key"
+                            :class="{ selected: selectedSet.has(row.key) }"
+                        >
+                            <td class="select-col">
+                                <input
+                                    type="checkbox"
+                                    :checked="selectedSet.has(row.key)"
+                                    @change="toggleSelection(row.key)"
+                                />
+                            </td>
                             <td class="rank-col">{{ rankOf(index) }}</td>
                             <td>
                                 <span class="product-name" :title="row.name">{{ row.name }}</span>
@@ -669,6 +844,11 @@ onUnmounted(() => chartInstance?.destroy())
                             </td>
                             <td>
                                 <span class="curve-tag" :class="`curve-${row.curve}`">{{ row.curve }}</span>
+                            </td>
+                            <td class="action-col">
+                                <button class="row-btn" title="Excluir da tela" @click="hide([row.key])">
+                                    <Icon icon="mdi:close" width="15" />
+                                </button>
                             </td>
                         </tr>
                     </tbody>
@@ -711,6 +891,95 @@ onUnmounted(() => chartInstance?.destroy())
     text-overflow ellipsis
     vertical-align bottom
 
+.hidden-banner
+    display flex
+    align-items center
+    gap 0.6rem
+    flex-wrap wrap
+    background rgba(148,163,184,0.08)
+    border 1px solid rgba(255,255,255,0.07)
+    color #cbd5e1
+    padding 0.7rem 1rem
+    border-radius 8px
+    margin-bottom 1.25rem
+    font-size 0.82rem
+
+    span
+        flex 1
+        min-width 240px
+
+.preview-note
+    margin 0.6rem 0 0
+
+.hidden-chips
+    display flex
+    flex-wrap wrap
+    gap 0.4rem
+    max-height 220px
+    overflow-y auto
+
+.hidden-chip
+    display inline-flex
+    align-items center
+    gap 0.35rem
+    background rgba(255,255,255,0.05)
+    border 1px solid rgba(255,255,255,0.08)
+    border-radius 6px
+    color #e2e8f0
+    padding 0.35rem 0.6rem
+    font-size 0.78rem
+    cursor pointer
+
+    &:hover
+        background rgba(99,102,241,0.18)
+        border-color rgba(99,102,241,0.4)
+
+.bulk-bar
+    display flex
+    align-items center
+    flex-wrap wrap
+    gap 0.6rem
+    background rgba(99,102,241,0.12)
+    border 1px solid rgba(99,102,241,0.3)
+    border-radius 8px
+    padding 0.6rem 0.9rem
+    margin-bottom 1rem
+    font-size 0.82rem
+
+.ghost-btn.danger
+    color #fda4af
+    border-color rgba(244,63,94,0.35)
+
+    &:hover:not(:disabled)
+        background rgba(244,63,94,0.15)
+
+.select-col
+    width 34px
+
+    input
+        cursor pointer
+        accent-color #6366f1
+
+.action-col
+    width 34px
+    text-align right
+
+.row-btn
+    background transparent
+    border none
+    color #64748b
+    cursor pointer
+    padding 0.2rem
+    border-radius 4px
+    display inline-flex
+
+    &:hover
+        color #f43f5e
+        background rgba(244,63,94,0.12)
+
+tr.selected td
+    background rgba(99,102,241,0.08)
+
 // Balão de ajuda do cabeçalho: só CSS, some junto com o hover.
 .col-info
     position relative
@@ -751,8 +1020,8 @@ onUnmounted(() => chartInstance?.destroy())
     z-index 5
 
 // Últimas colunas: balão ancorado à direita, senão estoura a largura da tabela.
-th:last-child .col-tip,
-th:nth-last-child(2) .col-tip
+th:nth-last-child(2) .col-tip,
+th:nth-last-child(3) .col-tip
     left auto
     right 0
 

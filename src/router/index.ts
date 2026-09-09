@@ -181,6 +181,11 @@ const routes = [
         component: () => import('@/views/reports/Reports.vue'),
       },
       {
+        path: 'reports/wix',
+        name: 'wix-purchases',
+        component: () => import('@/views/reports/WixPurchases.vue'),
+      },
+      {
         path: 'historico',
         name: 'historico',
         component: () => import('@/views/historico/Historico.vue'),

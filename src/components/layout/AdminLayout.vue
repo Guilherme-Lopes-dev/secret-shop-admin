@@ -124,6 +124,7 @@ const navGroups: NavGroup[] = [
         key: 'relatorios',
         items: [
             { label: 'Relatórios', icon: 'mdi:file-chart-outline', to: '/reports', name: 'reports' },
+            { label: 'Compras Wix', icon: 'mdi:store-outline', to: '/reports/wix', name: 'wix-purchases' },
             { label: 'Histórico', icon: 'mdi:history', to: '/historico', name: 'historico' },
         ],
     },

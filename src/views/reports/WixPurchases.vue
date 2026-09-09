@@ -9,6 +9,7 @@ import defaultCsv from './data/compras-wix.csv?raw'
 
 type SortKey =
     | 'name'
+    | 'variant'
     | 'quantity'
     | 'gross'
     | 'discount'
@@ -36,19 +37,62 @@ type WixRow = {
     curve: Curve
 }
 
-const COLUMNS: { key: SortKey; label: string; hint?: string }[] = [
-    { key: 'name', label: 'Produto' },
-    { key: 'quantity', label: 'Unid.', hint: 'Unidades vendidas no período do export' },
-    { key: 'gross', label: 'Bruto', hint: 'Vendas brutas, antes do desconto' },
-    { key: 'discount', label: 'Desconto' },
-    { key: 'discountRate', label: '% Desc', hint: 'Desconto sobre as vendas brutas' },
-    { key: 'net', label: 'Líquido', hint: 'Total de itens: bruto menos desconto' },
-    { key: 'avgPrice', label: 'Preço médio', hint: 'Líquido dividido pelas unidades' },
-    { key: 'share', label: 'Share', hint: 'Fatia do líquido total, com o acumulado da curva ABC' },
+const COLUMNS: { key: SortKey; label: string; hint: string }[] = [
+    {
+        key: 'name',
+        label: 'Produto',
+        hint: 'Nome do produto como estava cadastrado na Wix. Nome repetido vira linha separada: o export não junta duplicados.',
+    },
+    {
+        key: 'variant',
+        label: 'Variante',
+        hint: 'Variação do produto (modelo, herói). O export quase sempre traz "Desconhecido", e aí a coluna mostra "—".',
+    },
+    {
+        key: 'quantity',
+        label: 'Unid.',
+        hint: 'Unidades vendidas do produto em todo o período do arquivo, somando todos os pedidos.',
+    },
+    {
+        key: 'gross',
+        label: 'Bruto',
+        hint: 'Vendas brutas: preço cheio dos itens vendidos, antes de qualquer cupom ou promoção.',
+    },
+    {
+        key: 'discount',
+        label: 'Desconto',
+        hint: 'Quanto foi abatido do preço cheio em cupom ou promoção neste produto.',
+    },
+    {
+        key: 'discountRate',
+        label: '% Desc',
+        hint: 'Desconto dividido pelo bruto. Fica vermelho a partir de 50%: preço de tabela alto demais ou promoção agressiva.',
+    },
+    {
+        key: 'net',
+        label: 'Líquido',
+        hint: 'Coluna "Total de itens" do export: bruto menos desconto. É o dinheiro que entrou de fato.',
+    },
+    {
+        key: 'avgPrice',
+        label: 'Preço médio',
+        hint: 'Líquido dividido pelas unidades: quanto o produto vendeu, em média, por unidade já com desconto.',
+    },
+    {
+        key: 'share',
+        label: 'Share',
+        hint: 'Fatia deste produto no líquido total filtrado. Embaixo, o acumulado dele e de todos os produtos com líquido maior.',
+    },
 ]
+
+const CURVE_HINT =
+    'Curva ABC pelo líquido acumulado: A até 80% do faturamento, B até 95%, C o resto (cauda longa).'
+
+const RANK_HINT = 'Posição na ordenação atual da tabela.'
 
 const SORTERS: Record<SortKey, (a: WixRow, b: WixRow) => number> = {
     name: (a, b) => b.name.localeCompare(a.name),
+    variant: (a, b) => (b.variant ?? '').localeCompare(a.variant ?? ''),
     quantity: (a, b) => a.quantity - b.quantity,
     gross: (a, b) => a.gross - b.gross,
     discount: (a, b) => a.discount - b.discount,
@@ -576,19 +620,34 @@ onUnmounted(() => chartInstance?.destroy())
                 <table>
                     <thead>
                         <tr>
-                            <th class="rank-col">#</th>
+                            <th class="rank-col">
+                                #
+                                <span class="col-info" @click.stop>
+                                    <Icon icon="mdi:information-outline" width="13" />
+                                    <span class="col-tip">{{ RANK_HINT }}</span>
+                                </span>
+                            </th>
                             <th
                                 v-for="column in COLUMNS"
                                 :key="column.key"
                                 class="sortable"
                                 :class="{ active: sortKey === column.key }"
-                                :title="column.hint"
                                 @click="toggleSort(column.key)"
                             >
                                 {{ column.label }}
+                                <span class="col-info" @click.stop>
+                                    <Icon icon="mdi:information-outline" width="13" />
+                                    <span class="col-tip">{{ column.hint }}</span>
+                                </span>
                                 <span v-if="sortKey === column.key">{{ sortDesc ? '▼' : '▲' }}</span>
                             </th>
-                            <th>Curva</th>
+                            <th>
+                                Curva
+                                <span class="col-info" @click.stop>
+                                    <Icon icon="mdi:information-outline" width="13" />
+                                    <span class="col-tip">{{ CURVE_HINT }}</span>
+                                </span>
+                            </th>
                         </tr>
                     </thead>
                     <tbody>
@@ -651,6 +710,51 @@ onUnmounted(() => chartInstance?.destroy())
     overflow hidden
     text-overflow ellipsis
     vertical-align bottom
+
+// Balão de ajuda do cabeçalho: só CSS, some junto com o hover.
+.col-info
+    position relative
+    display inline-flex
+    align-items center
+    margin-left 0.2rem
+    color #64748b
+    cursor help
+    vertical-align middle
+
+    &:hover
+        color #a5b4fc
+
+    &:hover .col-tip
+        opacity 1
+        visibility visible
+
+.col-tip
+    position absolute
+    top calc(100% + 6px)
+    left 0
+    width 240px
+    padding 0.55rem 0.65rem
+    background #0f0f12
+    border 1px solid rgba(255,255,255,0.1)
+    border-radius 6px
+    box-shadow 0 8px 20px rgba(0,0,0,0.45)
+    color #cbd5e1
+    font-size 0.72rem
+    font-weight 400
+    line-height 1.4
+    letter-spacing 0
+    text-transform none
+    white-space normal
+    opacity 0
+    visibility hidden
+    transition opacity 0.12s
+    z-index 5
+
+// Últimas colunas: balão ancorado à direita, senão estoura a largura da tabela.
+th:last-child .col-tip,
+th:nth-last-child(2) .col-tip
+    left auto
+    right 0
 
 .curve-tag
     display inline-block

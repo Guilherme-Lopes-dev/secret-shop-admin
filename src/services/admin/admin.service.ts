@@ -601,8 +601,9 @@ export const adminService = {
     )
   },
 
-  async toggleSkinPriceLock(skinUuid: string, locked: boolean) {
-    return api.patch(`/skins/admin/skin/${skinUuid}/price-lock`, { locked })
+  /** `manualPrice` (centavos) junto com locked=true fixa o preço na mão. */
+  async toggleSkinPriceLock(skinUuid: string, locked: boolean, manualPrice?: number) {
+    return api.patch(`/skins/admin/skin/${skinUuid}/price-lock`, { locked, manual_price: manualPrice })
   },
 
   /** Veta (ou libera) a skin no sorteio de brindes de nível. */
@@ -1538,6 +1539,10 @@ export interface MarketExplorerItem {
   priceLatest: number | null
   priceMedian: number | null
   priceUpdatedAt: string | null
+  // Só na fonte Banco: linha em `skins` (preço real da vitrine + lock manual).
+  skinUuid?: string | null
+  manualPrice?: number | null
+  priceLocked?: boolean
 }
 
 export interface MarketExplorerFacets {

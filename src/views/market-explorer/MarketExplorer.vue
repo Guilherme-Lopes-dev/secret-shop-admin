@@ -236,6 +236,57 @@ const prevPage = () => { if (currentPage.value > 1) currentPage.value -= 1 }
 const openItem = (item: MarketExplorerItem) => {
   router.push({ name: 'market-explorer-item', query: { name: item.marketHashName } })
 }
+
+// --- Preço manual (fonte Banco): editar = travar; cadeado destrava (volta pro sync) ---
+const editingName = ref<string | null>(null)
+const priceDraft = ref('')
+const savingName = ref<string | null>(null)
+
+const livePrice = (item: MarketExplorerItem) => item.manualPrice ?? item.salePrice ?? item.priceLatest
+const isEditable = (item: MarketExplorerItem) => source.value === 'db' && !!item.skinUuid
+
+// "1.250,50" → 125050. `toCents` cru trata o ponto de milhar como decimal.
+const draftToCents = (draft: string) => toCents(draft.split('.').join(''))
+// Preview do que a vitrine vai mostrar enquanto digita.
+const draftPreview = computed(() => {
+  const cents = draftToCents(priceDraft.value)
+  return cents ? formatCurrency(cents) : null
+})
+
+const startPriceEdit = (item: MarketExplorerItem) => {
+  if (!isEditable(item)) return
+  editingName.value = item.marketHashName
+  priceDraft.value = livePrice(item) != null ? (livePrice(item)! / 100).toFixed(2).replace('.', ',') : ''
+}
+
+const cancelPriceEdit = () => { editingName.value = null }
+
+// `autofocus` só vale no load da página; input nasce por v-if.
+const focusOnMount = (el: unknown) => { if (el instanceof HTMLInputElement) el.focus() }
+
+const applyLock = async (item: MarketExplorerItem, locked: boolean, manualPrice?: number) => {
+  if (!item.skinUuid) return
+  savingName.value = item.marketHashName
+  try {
+    await adminService.toggleSkinPriceLock(item.skinUuid, locked, manualPrice)
+    item.priceLocked = locked
+    if (manualPrice != null) item.manualPrice = manualPrice
+    toast.success(locked ? 'Preço fixado.' : 'Preço liberado para sync.')
+  } catch (e: any) {
+    toast.error(e?.response?.data?.message || 'Erro ao salvar preço.')
+  } finally {
+    savingName.value = null
+  }
+}
+
+const commitPriceEdit = async (item: MarketExplorerItem) => {
+  const cents = draftToCents(priceDraft.value)
+  if (!cents) { toast.error('Preço inválido.'); return }
+  await applyLock(item, true, cents)
+  editingName.value = null
+}
+
+const toggleLock = (item: MarketExplorerItem) => applyLock(item, !item.priceLocked)
 </script>
 
 <template>
@@ -371,12 +422,41 @@ const openItem = (item: MarketExplorerItem) => {
                 </a>
               </div>
               <div class="card-prices">
-                <!-- Cache antigo não tem salePrice: cai no valor Steam. -->
-                <span class="card-price" :class="{ 'no-price': (item.salePrice ?? item.priceLatest) == null }">
-                  {{ (item.salePrice ?? item.priceLatest) != null
-                    ? formatCurrency(item.salePrice ?? item.priceLatest!)
-                    : 'Sem preço' }}
+                <div v-if="editingName === item.marketHashName" class="card-price-edit" @click.stop>
+                  <input
+                    v-model="priceDraft"
+                    class="card-price-input"
+                    inputmode="decimal"
+                    placeholder="0,00"
+                    :ref="focusOnMount"
+                    @keydown.enter.prevent="commitPriceEdit(item)"
+                    @keydown.esc.prevent="cancelPriceEdit"
+                    @blur="cancelPriceEdit"
+                  />
+                  <span class="card-price-preview" :class="{ 'is-invalid': !draftPreview }">
+                    {{ draftPreview ? `Site: ${draftPreview}` : 'Preço inválido' }}
+                  </span>
+                </div>
+                <!-- Banco: manualPrice é o preço vivo da vitrine. API/cache antigo: cai no salePrice/Steam. -->
+                <span
+                  v-else
+                  class="card-price"
+                  :class="{ 'no-price': livePrice(item) == null, 'is-editable': isEditable(item) }"
+                  :title="isEditable(item) ? 'Clique para editar o preço' : undefined"
+                  @click="isEditable(item) && ($event.stopPropagation(), startPriceEdit(item))"
+                >
+                  {{ livePrice(item) != null ? formatCurrency(livePrice(item)!) : 'Sem preço' }}
                 </span>
+                <button
+                  v-if="isEditable(item)"
+                  class="card-lock"
+                  :class="{ 'is-locked': item.priceLocked }"
+                  :title="item.priceLocked ? 'Preço fixado — clique para liberar sync' : 'Preço automático — clique para travar'"
+                  :disabled="savingName === item.marketHashName"
+                  @click.stop="toggleLock(item)"
+                >
+                  <Icon :icon="item.priceLocked ? 'mdi:lock' : 'mdi:lock-open-outline'" />
+                </button>
                 <span v-if="item.salePrice != null && item.priceLatest != null" class="card-market-price">
                   Steam {{ formatCurrency(item.priceLatest) }}
                 </span>
@@ -763,6 +843,57 @@ const openItem = (item: MarketExplorerItem) => {
     font-size 0.72rem
     color #94a3b8
     text-decoration line-through
+
+.card-price.is-editable
+    cursor text
+    border-bottom 1px dashed rgba(76,175,80,0.5)
+
+.card-price-edit
+    display flex
+    flex-direction column
+    gap 0.2rem
+
+.card-price-preview
+    font-size 0.72rem
+    color #94a3b8
+
+    &.is-invalid
+        color #f87171
+
+.card-price-input
+    width 6.5rem
+    padding 0.15rem 0.35rem
+    font-size 0.9rem
+    font-weight 700
+    color #4caf50
+    background rgba(0,0,0,0.35)
+    border 1px solid #4caf50
+    border-radius 4px
+    outline none
+
+.card-lock
+    margin-left auto
+    width 22px
+    height 22px
+    border none
+    border-radius 4px
+    background transparent
+    color #64748b
+    cursor pointer
+    display flex
+    align-items center
+    justify-content center
+
+    &:hover
+        color #e2e8f0
+        background rgba(255,255,255,0.08)
+
+    &.is-locked
+        color #fbbf24
+
+    &:disabled
+        opacity 0.5
+        cursor default
 
 .quality-row
     display flex

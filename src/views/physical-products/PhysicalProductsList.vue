@@ -2,7 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { Icon } from '@iconify/vue'
 import { toast } from 'vue3-toastify'
-import { adminService } from '@/services/admin/admin.service'
+import { adminService, type MediaAsset } from '@/services/admin/admin.service'
 import { formatCurrency } from '@/utils/formatCurrency'
 
 const API_URL = import.meta.env.VITE_API_URL?.trim() || ''
@@ -23,10 +23,10 @@ const emptyForm = () => ({
 })
 
 const form = ref(emptyForm())
-const pendingMedia = ref<{ url: string; media_type: 'image' | 'video'; previewUrl: string }[]>([])
+const pendingMedia = ref<(MediaAsset & { previewUrl: string })[]>([])
 
 const editingUuid = ref<string | null>(null)
-const existingMedia = ref<{ id: string; url: string; media_type: string }[]>([])
+const existingMedia = ref<MediaAsset[]>([])
 
 const mediaUrl = (path: string) => `${API_URL}${path}`
 
@@ -58,21 +58,16 @@ const onFilesSelected = async (e: Event) => {
     if (files.length === 0) return
     uploading.value = true
     try {
+        // Editando: sobe já vinculado. Novo: sobe órfão, vincula no create via media_uuids.
         for (const file of files) {
-            const { data } = await adminService.uploadMedia(file)
-            const media_type: 'image' | 'video' = file.type.startsWith('video/') ? 'video' : 'image'
+            const { data } = await adminService.uploadMedia(file, { physical_product_uuid: editingUuid.value ?? undefined })
 
             if (editingUuid.value) {
-                const { data: added } = await adminService.addPhysicalProductMedia(editingUuid.value, { url: data.url, media_type })
-                existingMedia.value.push(added)
+                existingMedia.value.push(data)
                 continue
             }
 
-            pendingMedia.value.push({
-                url: data.url,
-                media_type,
-                previewUrl: URL.createObjectURL(file),
-            })
+            pendingMedia.value.push({ ...data, previewUrl: URL.createObjectURL(file) })
         }
     } catch (e: any) {
         toast.error(e?.response?.data?.message || 'Erro no upload de mídia.')
@@ -82,14 +77,16 @@ const onFilesSelected = async (e: Event) => {
     }
 }
 
-const removePendingMedia = (index: number) => {
-    pendingMedia.value.splice(index, 1)
+// Órfão já está no disco — apaga no servidor também, senão vira lixo.
+const removePendingMedia = async (index: number) => {
+    const [removed] = pendingMedia.value.splice(index, 1)
+    if (removed) await adminService.deleteMedia(removed.id).catch(() => null)
 }
 
 const removeExistingMedia = async (mediaUuid: string) => {
-    if (!confirm('Remover esta mídia do produto?')) return
+    if (!confirm('Remover esta mídia do produto? O arquivo é apagado do disco.')) return
     try {
-        await adminService.removePhysicalProductMedia(mediaUuid)
+        await adminService.deleteMedia(mediaUuid)
         existingMedia.value = existingMedia.value.filter((m) => m.id !== mediaUuid)
     } catch (e: any) {
         toast.error(e?.response?.data?.message || 'Erro ao remover mídia.')
@@ -152,7 +149,7 @@ const handleSubmit = async () => {
         } else {
             await adminService.createPhysicalProduct({
                 ...payload,
-                media: pendingMedia.value.map(({ url, media_type }) => ({ url, media_type })),
+                media_uuids: pendingMedia.value.map((media) => media.id),
             })
             toast.success('Produto físico cadastrado!')
         }
@@ -251,7 +248,7 @@ onMounted(fetchProducts)
             <div class="form-row">
                 <div class="field field--full">
                     <label class="field-label">Mídias (fotos/vídeo) <span v-if="!editingUuid" class="required">*</span></label>
-                    <input type="file" multiple accept="image/png,image/jpeg,image/webp" @change="onFilesSelected" class="field-file" :disabled="uploading" />
+                    <input type="file" multiple accept="image/png,image/jpeg,image/webp,video/mp4,video/webm" @change="onFilesSelected" class="field-file" :disabled="uploading" />
                     <span v-if="uploading" class="field-hint-ok"><Icon icon="mdi:loading" class="spinning" /> Enviando...</span>
 
                     <div v-if="existingMedia.length" class="media-grid">

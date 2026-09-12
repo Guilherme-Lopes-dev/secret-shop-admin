@@ -308,9 +308,9 @@ const routes = [
         component: () => import('@/views/feedbacks/FeedbacksList.vue'),
       },
       {
-        path: 'uploads/test',
-        name: 'upload-test',
-        component: () => import('@/views/uploads/UploadTest.vue'),
+        path: 'media',
+        name: 'media',
+        component: () => import('@/views/media/MediaLibrary.vue'),
       },
       {
         path: 'backup',

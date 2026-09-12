@@ -29,6 +29,35 @@ import type {
 } from './types'
 
 /** Origem da trade: quem a API classificou como brinde, swap ou compra. */
+export type MediaListFilter = 'all' | 'orphans' | 'owner_gone'
+
+export interface MediaLink {
+  market_hash_name?: string
+  level?: 1 | 2 | 3
+  physical_product_uuid?: string
+}
+
+export interface MediaAsset {
+  id: string
+  url: string
+  mimetype: string
+  size: number
+  media_type: 'image' | 'video'
+  market_hash_name: string | null
+  level: number | null
+  position: number
+  created_at: string
+  physical_products?: { id: string; name: string } | null
+}
+
+export interface MediaTarget {
+  type: 'skin' | 'collector' | 'physical'
+  key: string
+  label: string
+  rarity: string | null
+  icon: string | null
+}
+
 export type TradeOfferType = 'purchase' | 'gift' | 'swap'
 
 export interface TradeOfferFilters {
@@ -862,14 +891,42 @@ export const adminService = {
     return api.post('/skins/admin/products', dto)
   },
 
-  // Uploads
-  async uploadMedia(file: File) {
+  // Mídia (/admin/media) — todo arquivo em /media/*, vinculado ou órfão
+  async uploadMedia(file: File, link: MediaLink = {}) {
     const formData = new FormData()
     formData.append('file', file)
-    return api.post<{ url: string; filename: string; mimetype: string; size: number }>(
-      '/uploads/media',
-      formData,
-    )
+    Object.entries(link)
+      .filter(([, value]) => value != null && value !== '')
+      .forEach(([key, value]) => formData.append(key, String(value)))
+    return api.post<MediaAsset>('/admin/media', formData)
+  },
+
+  async listMedia(filter: MediaListFilter) {
+    return api.get<MediaAsset[]>('/admin/media', { params: { filter } })
+  },
+
+  async searchMediaTargets(q: string) {
+    return api.get<MediaTarget[]>('/admin/media/targets', { params: { q } })
+  },
+
+  async mediaGallery(params: { market_hash_name?: string; physical_product_uuid?: string }) {
+    return api.get<MediaAsset[]>('/admin/media/gallery', { params })
+  },
+
+  async relinkMedia(uuid: string, link: MediaLink) {
+    return api.patch<MediaAsset>(`/admin/media/${uuid}`, link)
+  },
+
+  async reorderMedia(uuids: string[]) {
+    return api.put('/admin/media/order', { uuids })
+  },
+
+  async deleteMedia(uuid: string) {
+    return api.delete(`/admin/media/${uuid}`)
+  },
+
+  async syncMedia() {
+    return api.post<{ created: number; removed: number; updated: number; skipped: number }>('/admin/media/sync')
   },
 
   // Produtos Físicos
@@ -881,7 +938,7 @@ export const adminService = {
     height_cm?: number
     width_cm?: number
     length_cm?: number
-    media?: { url: string; media_type: 'image' | 'video' }[]
+    media_uuids?: string[]
   }) {
     return api.post('/physical-products/admin', dto)
   },
@@ -905,14 +962,6 @@ export const adminService = {
 
   async deletePhysicalProduct(uuid: string) {
     return api.delete(`/physical-products/admin/${uuid}`)
-  },
-
-  async addPhysicalProductMedia(uuid: string, dto: { url: string; media_type: 'image' | 'video' }) {
-    return api.post(`/physical-products/admin/${uuid}/media`, dto)
-  },
-
-  async removePhysicalProductMedia(mediaUuid: string) {
-    return api.delete(`/physical-products/admin/media/${mediaUuid}`)
   },
 
   // Pedidos de Produto Físico

@@ -133,7 +133,7 @@ const navGroups: NavGroup[] = [
         icon: 'mdi:cog-outline',
         key: 'sistema',
         items: [
-            { label: 'Teste Upload', icon: 'mdi:cloud-upload-outline', to: '/uploads/test', name: 'upload-test' },
+            { label: 'Mídia', icon: 'mdi:multimedia', to: '/media', name: 'media' },
             { label: 'Backup do Banco', icon: 'mdi:database-cog-outline', to: '/backup', name: 'backup' },
         ],
     },

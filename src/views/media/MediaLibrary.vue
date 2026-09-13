@@ -57,7 +57,8 @@ const linkFor = (level: Level = null): MediaLink => {
 
 // --- Galeria do alvo ---------------------------------------------------------
 const gallery = ref<MediaAsset[]>([])
-const uploadingLevel = ref<Level | 'none'>('none')
+// Qual botão está enviando: nível da galeria, 'orphan' (avulso) ou nenhum.
+const uploadingLevel = ref<Level | 'orphan' | 'none'>('none')
 
 const loadGallery = async () => {
     if (!target.value) return
@@ -70,15 +71,20 @@ const loadGallery = async () => {
 
 const groupOf = (level: Level) => gallery.value.filter((m) => (m.level ?? null) === level)
 
-const onUpload = async (e: Event, level: Level) => {
+const onUpload = async (e: Event, level: Level) => uploadFiles(e, level, linkFor(level))
+
+// Avulso: sem vínculo, cai em Órfãos. Vincula depois pelo 🔗.
+const onUploadOrphan = async (e: Event) => uploadFiles(e, 'orphan', {})
+
+const uploadFiles = async (e: Event, key: Level | 'orphan', link: MediaLink) => {
     const input = e.target as HTMLInputElement
     const files = Array.from(input.files ?? [])
     if (!files.length) return
-    uploadingLevel.value = level
+    uploadingLevel.value = key
     try {
-        for (const file of files) await adminService.uploadMedia(file, linkFor(level))
+        for (const file of files) await adminService.uploadMedia(file, link)
         toast.success(`${files.length} arquivo(s) enviado(s).`)
-        await loadGallery()
+        await Promise.all([loadGallery(), loadUnlinked()])
     } catch (e: any) {
         toast.error(e?.response?.data?.message || 'Erro no upload.')
     } finally {
@@ -212,7 +218,12 @@ onMounted(loadUnlinked)
         <section class="card">
             <header class="card-header">
                 <h2 class="card-title">Órfãos <span class="count">{{ orphans.length }}</span></h2>
-                <p class="card-hint">No disco, sem dono. Escolha um alvo acima e vincule, ou apague.</p>
+                <label class="btn-upload" :class="{ disabled: uploadingLevel !== 'none' }">
+                    <Icon :icon="uploadingLevel === 'orphan' ? 'mdi:loading' : 'mdi:plus'" :class="{ spinning: uploadingLevel === 'orphan' }" />
+                    {{ uploadingLevel === 'orphan' ? 'Enviando...' : 'Upload avulso' }}
+                    <input type="file" multiple accept="image/png,image/jpeg,image/webp,video/mp4,video/webm" hidden :disabled="uploadingLevel !== 'none'" @change="onUploadOrphan" />
+                </label>
+                <p class="card-hint">No disco, sem dono. Suba avulso aqui, ou escolha um alvo acima e vincule com 🔗. Ou apague.</p>
             </header>
             <p v-if="!orphans.length" class="empty">Nenhum.</p>
             <div v-else class="media-grid">

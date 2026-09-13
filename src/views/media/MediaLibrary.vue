@@ -13,7 +13,8 @@ const ARCANA_LEVELS: Level[] = [null, 1, 2, 3]
 const levelLabel = (level: Level) => (level ? `Nível ${level}` : 'Sem nível')
 const typeLabel: Record<MediaTarget['type'], string> = { skin: 'Skin', collector: 'Collector', physical: 'Físico' }
 
-const fileName = (url: string) => url.split('/').pop() ?? url
+// Linha antiga/sincronizada não tem nome original — cai no uuid.ext do disco.
+const fileName = (m: MediaAsset) => m.original_name ?? m.url.split('/').pop() ?? m.url
 
 const formatSize = (bytes: number) => {
     if (bytes >= 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`
@@ -196,7 +197,7 @@ onMounted(loadUnlinked)
                     <div v-for="(m, i) in groupOf(level)" :key="m.id" class="media-thumb">
                         <video v-if="m.media_type === 'video'" :src="mediaUrl(m.url)" class="media-preview" muted preload="metadata" />
                         <img v-else :src="mediaUrl(m.url)" class="media-preview" alt="" />
-                        <span class="media-name" :title="fileName(m.url)">{{ fileName(m.url) }}</span>
+                        <span class="media-name" :title="fileName(m)">{{ fileName(m) }}</span>
                         <span class="media-meta">{{ m.media_type === 'video' ? '▶ ' : '' }}{{ formatSize(m.size) }}</span>
                         <div class="media-actions">
                             <button type="button" :disabled="i === 0" @click="move(m, -1)"><Icon icon="mdi:chevron-left" /></button>
@@ -218,7 +219,7 @@ onMounted(loadUnlinked)
                 <div v-for="m in orphans" :key="m.id" class="media-thumb media-thumb--wide">
                     <video v-if="m.media_type === 'video'" :src="mediaUrl(m.url)" class="media-preview" muted preload="metadata" />
                     <img v-else :src="mediaUrl(m.url)" class="media-preview" alt="" />
-                    <span class="media-name" :title="fileName(m.url)">{{ fileName(m.url) }}</span>
+                    <span class="media-name" :title="fileName(m)">{{ fileName(m) }}</span>
                         <span class="media-meta">{{ m.media_type === 'video' ? '▶ ' : '' }}{{ formatSize(m.size) }}</span>
                     <div class="media-actions">
                         <select v-if="isArcana" v-model="orphanLevel[m.id]" class="level-select">
@@ -240,7 +241,7 @@ onMounted(loadUnlinked)
                 <div v-for="m in ownerGone" :key="m.id" class="media-thumb media-thumb--wide">
                     <video v-if="m.media_type === 'video'" :src="mediaUrl(m.url)" class="media-preview" muted preload="metadata" />
                     <img v-else :src="mediaUrl(m.url)" class="media-preview" alt="" />
-                    <span class="media-name" :title="fileName(m.url)">{{ fileName(m.url) }}</span>
+                    <span class="media-name" :title="fileName(m)">{{ fileName(m) }}</span>
                     <span class="media-meta" :title="m.market_hash_name ?? ''">{{ m.market_hash_name }}{{ m.level ? ` · N${m.level}` : '' }}</span>
                     <div class="media-actions">
                         <button type="button" class="danger" @click="remove(m)"><Icon icon="mdi:trash-can-outline" /></button>

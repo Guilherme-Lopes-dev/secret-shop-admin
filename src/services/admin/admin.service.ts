@@ -28,7 +28,6 @@ import type {
   SkinSalesRow,
 } from './types'
 
-/** Origem da trade: quem a API classificou como brinde, swap ou compra. */
 export type MediaListFilter = 'all' | 'orphans' | 'owner_gone'
 
 export interface MediaLink {
@@ -40,6 +39,7 @@ export interface MediaLink {
 export interface MediaAsset {
   id: string
   url: string
+  original_name: string | null
   mimetype: string
   size: number
   media_type: 'image' | 'video'
@@ -58,6 +58,7 @@ export interface MediaTarget {
   icon: string | null
 }
 
+/** Origem da trade: quem a API classificou como brinde, swap ou compra. */
 export type TradeOfferType = 'purchase' | 'gift' | 'swap'
 
 export interface TradeOfferFilters {

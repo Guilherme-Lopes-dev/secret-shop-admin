@@ -6,7 +6,8 @@ import dayjs from 'dayjs'
 import { adminService, type CrmCustomerDetail, type CrmOrder } from '@/services/admin/admin.service'
 import { formatCurrency } from '@/utils/formatCurrency'
 import { campaignMeta, campaignReason, daysLabel, daysSince } from '@/utils/campaigns'
-import CatalogCard, { type CatalogItem } from '@/components/users/CatalogCard.vue'
+import CatalogCard from '@/components/users/CatalogCard.vue'
+import { catalogThumb, catalogIcon, type CatalogItem } from '@/utils/catalog'
 
 const route = useRoute()
 const router = useRouter()
@@ -19,13 +20,17 @@ type FavoriteItem = CatalogItem & { id: string; favorited_at: string }
 // fonte da tela /users/:id, sem duplicar query no backend.
 const cart = ref<CartItem[]>([])
 const favorites = ref<FavoriteItem[]>([])
+const profileError = ref('')
 
 // Quanto está parado no carrinho, a preço de vitrine de hoje.
 const cartTotal = computed(() => cart.value.reduce((total, item) => total + item.unit_price * item.quantity, 0))
+// Mesma conta do KPI (soma de quantidade), não número de linhas.
+const cartQuantity = computed(() => cart.value.reduce((total, item) => total + item.quantity, 0))
 const loading = ref(true)
 const error = ref('')
 
 const MONTHS = 12
+const THUMBS_IN_ROW = 4
 
 const SOURCE_LABELS: Record<string, string> = { manual: 'Escolheu', opendota: 'Joga', purchases: 'Comprou' }
 const sourceLabel = (source: string) => SOURCE_LABELS[source] ?? source
@@ -37,6 +42,15 @@ const ORDER_ORIGINS: Record<CrmOrder['kind'], { label: string; path: string; ico
     physical: { label: 'Físico', path: '/physical-orders', icon: 'mdi:package-variant-closed' },
 }
 const openOrder = (order: CrmOrder) => router.push(`${ORDER_ORIGINS[order.kind].path}/${order.id}`)
+
+// Linha expandida mostra os itens; o número do pedido abre a venda.
+const expandedOrders = ref(new Set<string>())
+const isExpanded = (order: CrmOrder) => expandedOrders.value.has(order.id)
+const toggleOrder = (order: CrmOrder) => {
+    if (expandedOrders.value.delete(order.id)) return
+
+    expandedOrders.value.add(order.id)
+}
 
 // WhatsApp: wa.me com só dígitos do telefone.
 const whatsappHref = computed(() => {
@@ -86,10 +100,17 @@ const fetchCustomer = async () => {
     error.value = ''
     try {
         const uuid = route.params.uuid as string
-        const [crm, profile] = await Promise.all([adminService.getCrmCustomer(uuid), adminService.getUserById(uuid)])
-        customer.value = crm.data
-        cart.value = profile.data?.cart ?? []
-        favorites.value = profile.data?.favorites ?? []
+        // Perfil admin (carrinho/favoritos) falhando não pode derrubar o CRM inteiro.
+        const [crm, profile] = await Promise.allSettled([adminService.getCrmCustomer(uuid), adminService.getUserById(uuid)])
+        if (crm.status === 'rejected') throw crm.reason
+        customer.value = crm.value.data
+
+        if (profile.status === 'rejected') {
+            profileError.value = 'Carrinho e favoritos indisponíveis agora.'
+            return
+        }
+        cart.value = profile.value.data?.cart ?? []
+        favorites.value = profile.value.data?.favorites ?? []
     } catch (e: any) {
         error.value = e?.response?.data?.message || 'Erro ao carregar cliente.'
     } finally {
@@ -188,7 +209,7 @@ onMounted(fetchCustomer)
             <div class="two-col">
                 <section class="section">
                     <h3 class="section-title">
-                        <Icon icon="mdi:cart-outline" /> Carrinho <span class="count">{{ cart.length }}</span>
+                        <Icon icon="mdi:cart-outline" /> Carrinho <span class="count">{{ cartQuantity }}</span>
                         <span v-if="cart.length" class="section-note">{{ formatCurrency(cartTotal) }}</span>
                     </h3>
                     <p class="section-sub">O que está parado agora, a preço de vitrine de hoje.</p>
@@ -198,7 +219,7 @@ onMounted(fetchCustomer)
                             · {{ daysLabel(daysSince(item.added_at)) }}
                         </CatalogCard>
                     </div>
-                    <p v-else class="empty">Carrinho vazio.</p>
+                    <p v-else class="empty">{{ profileError || 'Carrinho vazio.' }}</p>
                 </section>
 
                 <section class="section">
@@ -212,7 +233,7 @@ onMounted(fetchCustomer)
                             · {{ dayjs(item.favorited_at).format('DD/MM/YY') }}
                         </CatalogCard>
                     </div>
-                    <p v-else class="empty">Lista de desejos vazia.</p>
+                    <p v-else class="empty">{{ profileError || 'Lista de desejos vazia.' }}</p>
                 </section>
             </div>
 
@@ -241,13 +262,50 @@ onMounted(fetchCustomer)
                             </tr>
                         </thead>
                         <tbody>
-                            <tr v-for="order in customer.orders" :key="order.id" class="clickable-row" @click="openOrder(order)">
-                                <td><code class="mono">{{ order.order_number }}</code></td>
-                                <td><span class="origin"><Icon :icon="ORDER_ORIGINS[order.kind].icon" /> {{ ORDER_ORIGINS[order.kind].label }}</span></td>
-                                <td class="items-cell">{{ order.items.join(', ') || '—' }}</td>
-                                <td class="spent">{{ formatCurrency(order.total_amount) }}</td>
-                                <td>{{ order.created_at ? dayjs(order.created_at).format('DD/MM/YYYY HH:mm') : '—' }}</td>
-                            </tr>
+                            <template v-for="order in customer.orders" :key="order.id">
+                                <tr
+                                    class="clickable-row"
+                                    :class="{ expanded: isExpanded(order) }"
+                                    tabindex="0"
+                                    @click="toggleOrder(order)"
+                                    @keydown.enter.prevent="toggleOrder(order)"
+                                >
+                                    <td>
+                                        <button class="order-link" title="Abrir pedido" @click.stop="openOrder(order)">
+                                            {{ order.order_number }}
+                                            <Icon icon="mdi:open-in-new" width="12" />
+                                        </button>
+                                    </td>
+                                    <td><span class="origin"><Icon :icon="ORDER_ORIGINS[order.kind].icon" /> {{ ORDER_ORIGINS[order.kind].label }}</span></td>
+                                    <td>
+                                        <div v-if="order.items.length" class="thumb-strip">
+                                            <template v-for="(item, index) in order.items.slice(0, THUMBS_IN_ROW)" :key="index">
+                                                <img v-if="catalogThumb(item)" :src="catalogThumb(item)!" class="thumb" :alt="item.name" :title="item.name" />
+                                                <span v-else class="thumb thumb--empty" :title="item.name"><Icon :icon="catalogIcon(item)" /></span>
+                                            </template>
+                                            <span v-if="order.items.length > THUMBS_IN_ROW" class="thumb-more">+{{ order.items.length - THUMBS_IN_ROW }}</span>
+                                            <span class="thumb-count">{{ order.items.length }} item(ns)</span>
+                                        </div>
+                                        <span v-else class="muted">—</span>
+                                    </td>
+                                    <td class="spent">{{ formatCurrency(order.total_amount) }}</td>
+                                    <td>
+                                        {{ order.created_at ? dayjs(order.created_at).format('DD/MM/YYYY HH:mm') : '—' }}
+                                        <Icon :icon="isExpanded(order) ? 'mdi:chevron-up' : 'mdi:chevron-down'" class="chevron" />
+                                    </td>
+                                </tr>
+                                <tr v-if="isExpanded(order)" class="expanded-row">
+                                    <td colspan="5">
+                                        <div class="catalog-grid">
+                                            <CatalogCard v-for="(item, index) in order.items" :key="index" :item="item">
+                                                · {{ item.hero || 'sem herói' }}
+                                                · {{ item.quantity }}× {{ formatCurrency(item.unit_price) }}
+                                            </CatalogCard>
+                                        </div>
+                                        <p v-if="!order.items.length" class="empty">Pedido sem itens registrados.</p>
+                                    </td>
+                                </tr>
+                            </template>
                             <tr v-if="!customer.orders.length">
                                 <td colspan="5" class="empty">Nenhuma compra paga.</td>
                             </tr>
@@ -666,9 +724,64 @@ table
     color #e2e8f0
     font-size 0.82rem
 
-.items-cell
-    color #cbd5e1
-    max-width 420px
+.muted
+    color #64748b
+
+.order-link
+    display inline-flex
+    align-items center
+    gap 0.3rem
+    background none
+    border none
+    padding 0
+    font-family monospace
+    font-size 0.8rem
+    color #818cf8
+    cursor pointer
+
+    &:hover
+        text-decoration underline
+
+.thumb-strip
+    display flex
+    align-items center
+    gap 0.3rem
+
+.thumb
+    width 40px
+    height 40px
+    border-radius 4px
+    object-fit contain
+    background rgba(255,255,255,0.04)
+    flex-shrink 0
+
+    &--empty
+        display inline-flex
+        align-items center
+        justify-content center
+        color #f472b6
+
+.thumb-more
+    color #94a3b8
+    font-size 0.78rem
+    font-weight 600
+
+.thumb-count
+    color #64748b
+    font-size 0.75rem
+    margin-left 0.35rem
+
+.chevron
+    color #64748b
+    margin-left 0.4rem
+    vertical-align middle
+
+.clickable-row.expanded
+    background rgba(255,255,255,0.03)
+
+.expanded-row td
+    padding 0.75rem
+    background rgba(255,255,255,0.02)
 
 .spent
     color #4ade80

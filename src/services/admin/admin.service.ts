@@ -1,4 +1,5 @@
 import { api } from '@/lib/api/api'
+import type { CatalogItem } from '@/utils/catalog'
 import type {
   DiscordAssignRolePayload,
   DiscordBotChannelDto,
@@ -89,13 +90,18 @@ export interface CrmListResponse {
   pages: number
 }
 
+export interface CrmOrderItem extends CatalogItem {
+  quantity: number
+  unit_price: number
+}
+
 export interface CrmOrder {
   kind: 'sale' | 'collector' | 'physical'
   id: string
   order_number: string
   total_amount: number
   created_at: string | null
-  items: string[]
+  items: CrmOrderItem[]
 }
 
 export interface CrmCustomerDetail extends CrmCustomer {

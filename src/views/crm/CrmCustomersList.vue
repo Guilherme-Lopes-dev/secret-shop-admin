@@ -383,14 +383,14 @@ table
     gap 0.625rem
 
 .user-avatar
-    width 34px
-    height 34px
+    width 44px
+    height 44px
     border-radius 50%
     object-fit cover
 
 .user-avatar-placeholder
-    width 34px
-    height 34px
+    width 44px
+    height 44px
     border-radius 50%
     background rgba(255,255,255,0.06)
     display flex
@@ -520,8 +520,8 @@ table
     animation skeleton-shimmer 1.4s infinite
 
 .skeleton-avatar
-    width 34px
-    height 34px
+    width 44px
+    height 44px
     border-radius 50%
     flex-shrink 0
 

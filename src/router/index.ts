@@ -263,6 +263,16 @@ const routes = [
         component: () => import('@/views/match-history/MatchHistory.vue'),
       },
       {
+        path: 'crm',
+        name: 'crm',
+        component: () => import('@/views/crm/CrmCustomersList.vue'),
+      },
+      {
+        path: 'crm/:uuid',
+        name: 'crm-customer',
+        component: () => import('@/views/crm/CrmCustomerDetail.vue'),
+      },
+      {
         path: 'recommendations',
         name: 'recommendations',
         component: () => import('@/views/recommendations/RecommendationsList.vue'),

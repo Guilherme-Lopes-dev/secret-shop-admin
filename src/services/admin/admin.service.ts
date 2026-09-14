@@ -28,6 +28,82 @@ import type {
   SkinSalesRow,
 } from './types'
 
+export type CrmCampaign =
+  | 'abandoned_cart'
+  | 'first_purchase'
+  | 'winback'
+  | 'reactivation'
+  | 'vip'
+  | 'second_purchase'
+  | 'loyalty'
+
+export type CrmSort = 'spent' | 'orders' | 'recent' | 'inactive' | 'newest'
+
+export interface CrmListParams {
+  page?: number
+  limit?: number
+  search?: string
+  campaign?: CrmCampaign
+  hero?: string
+  sort?: CrmSort
+}
+
+export interface CrmHero {
+  hero_name: string
+  score: number
+  sources: string[]
+  slug: string | null
+  image: string | null
+}
+
+export interface CrmCustomer {
+  id: string
+  username: string | null
+  email: string | null
+  contact: string | null
+  steam_id: string | null
+  avatar: string | null
+  created_at: string | null
+  cashback_balance: number
+  tier_rank: number
+  tier_name: string
+  orders_count: number
+  /** Centavos, somando skin + collector + físico (só pago, sem brinde). */
+  total_spent: number
+  avg_ticket: number
+  first_purchase_at: string | null
+  last_purchase_at: string | null
+  days_since_last_purchase: number | null
+  avg_days_between_orders: number | null
+  cart_items: number
+  cart_updated_at: string | null
+  campaign: CrmCampaign
+  heroes: CrmHero[]
+}
+
+export interface CrmListResponse {
+  data: CrmCustomer[]
+  segments: Partial<Record<CrmCampaign, number>>
+  total: number
+  page: number
+  pages: number
+}
+
+export interface CrmOrder {
+  kind: 'sale' | 'collector' | 'physical'
+  id: string
+  order_number: string
+  total_amount: number
+  created_at: string | null
+  items: string[]
+}
+
+export interface CrmCustomerDetail extends CrmCustomer {
+  purchased_heroes: Array<{ hero: string; items: number; spent: number }>
+  orders: CrmOrder[]
+  monthly_spend: Array<{ month: string; orders: number; spent: number }>
+}
+
 export type MediaListFilter = 'all' | 'orphans' | 'owner_gone'
 
 export interface MediaLink {
@@ -1230,6 +1306,20 @@ export const adminService = {
     const params = new URLSearchParams({ page: String(page), limit: String(limit) })
     if (search) params.append('search', search)
     return api.get(`/admin/user-hero-preferences?${params}`)
+  },
+
+  // CRM
+  async getCrmCustomers(params: CrmListParams) {
+    const query = new URLSearchParams({ page: String(params.page ?? 1), limit: String(params.limit ?? 20) })
+    if (params.search) query.append('search', params.search)
+    if (params.campaign) query.append('campaign', params.campaign)
+    if (params.hero) query.append('hero', params.hero)
+    if (params.sort) query.append('sort', params.sort)
+    return api.get<CrmListResponse>(`/admin/crm/customers?${query}`)
+  },
+
+  async getCrmCustomer(uuid: string) {
+    return api.get<CrmCustomerDetail>(`/admin/crm/customers/${uuid}`)
   },
 
   async getNewsList(page = 1, limit = 20) {

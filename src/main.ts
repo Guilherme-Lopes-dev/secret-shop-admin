@@ -3,10 +3,13 @@ import App from './App.vue'
 import { router } from '@/router'
 import { createPinia } from 'pinia'
 import dayjs from 'dayjs'
+import 'dayjs/locale/pt-br'
 import { Icon } from '@iconify/vue'
 import Vue3Toastify, { type ToastContainerOptions } from 'vue3-toastify'
 import { formatCurrency } from '@/utils/formatCurrency'
 import 'vue3-toastify/dist/index.css'
+
+dayjs.locale('pt-br')
 
 const app = createApp(App)
 

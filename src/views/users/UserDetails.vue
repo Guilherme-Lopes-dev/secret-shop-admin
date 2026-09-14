@@ -7,6 +7,7 @@ import { Icon } from '@iconify/vue'
 import { toast } from 'vue3-toastify'
 import UserPassCard from '@/components/passes/UserPassCard.vue'
 import UserProgressCard from '@/components/profile-progress/UserProgressCard.vue'
+import CatalogCard from '@/components/users/CatalogCard.vue'
 import { countryName } from '@/utils/countries'
 import {
     friendshipDuration,
@@ -49,32 +50,6 @@ const openGift = (claim: { order_uuid: string }) => router.push(`/sales/${claim.
 
 const skinThumb = (icon?: string | null): string | null =>
     icon ? `https://steamcommunity-a.akamaihd.net/economy/image/${icon}/62fx62f` : null
-
-const API_URL = import.meta.env.VITE_API_URL?.trim() || ''
-
-// Favoritos e carrinho listam os mesmos três catálogos — os helpers servem os dois.
-const CATALOG_LABELS = { skin: 'Skin', collector: 'Collector', physical: 'Físico' } as const
-const CATALOG_ICONS = {
-    skin: 'mdi:sword-cross',
-    collector: 'mdi:trophy-outline',
-    physical: 'mdi:package-variant-closed',
-} as const
-
-type CatalogKind = keyof typeof CATALOG_LABELS
-
-type CatalogItem = { kind: CatalogKind; image: string | null }
-
-// Skin e collector guardam o hash da Steam; produto físico guarda o path do nosso
-// servidor. Por isso a URL sai do `kind`, não do formato do campo.
-const catalogThumb = (item: CatalogItem): string | null => {
-    if (!item.image) return null
-    if (item.kind === 'physical') return `${API_URL}${item.image}`
-
-    return skinThumb(item.image)
-}
-
-const catalogLabel = (item: CatalogItem) => CATALOG_LABELS[item.kind] ?? item.kind
-const catalogIcon = (item: CatalogItem) => CATALOG_ICONS[item.kind] ?? 'mdi:heart-outline'
 
 // Quanto o usuário tem parado no carrinho, a preço de vitrine de hoje.
 const cartTotal = (items: any[] = []) =>
@@ -528,30 +503,14 @@ onMounted(fetchUser)
                     </summary>
                     <div v-if="!user.favorites?.length" class="empty-state">Lista de desejos vazia.</div>
                     <div v-else class="catalog-grid">
-                        <article
+                        <CatalogCard
                             v-for="favorite in user.favorites"
                             :key="`${favorite.kind}-${favorite.id}`"
-                            class="catalog-card"
+                            :item="favorite"
                         >
-                            <img
-                                v-if="catalogThumb(favorite)"
-                                :src="catalogThumb(favorite)!"
-                                class="catalog-thumb"
-                                :alt="favorite.name"
-                            />
-                            <div v-else class="catalog-thumb catalog-thumb--empty">
-                                <Icon :icon="catalogIcon(favorite)" />
-                            </div>
-
-                            <div class="catalog-info">
-                                <span class="catalog-name">{{ favorite.name }}</span>
-                                <small class="catalog-meta">
-                                    <span class="catalog-kind">{{ catalogLabel(favorite) }}</span>
-                                    · {{ favorite.hero || 'sem herói' }}
-                                    · {{ $dayjs(favorite.favorited_at).format('DD/MM/YY') }}
-                                </small>
-                            </div>
-                        </article>
+                            · {{ favorite.hero || 'sem herói' }}
+                            · {{ $dayjs(favorite.favorited_at).format('DD/MM/YY') }}
+                        </CatalogCard>
                     </div>
                 </details>
 
@@ -565,33 +524,17 @@ onMounted(fetchUser)
                     </summary>
                     <div v-if="!user.cart?.length" class="empty-state">Carrinho vazio.</div>
                     <div v-else class="catalog-grid">
-                        <article
+                        <CatalogCard
                             v-for="item in user.cart"
                             :key="`${item.kind}-${item.id}`"
-                            class="catalog-card"
+                            :item="item"
                         >
-                            <img
-                                v-if="catalogThumb(item)"
-                                :src="catalogThumb(item)!"
-                                class="catalog-thumb"
-                                :alt="item.name"
-                            />
-                            <div v-else class="catalog-thumb catalog-thumb--empty">
-                                <Icon :icon="catalogIcon(item)" />
-                            </div>
-
-                            <div class="catalog-info">
-                                <span class="catalog-name">{{ item.name }}</span>
-                                <small class="catalog-meta">
-                                    <span class="catalog-kind">{{ catalogLabel(item) }}</span>
-                                    · {{ item.quantity }}× {{ formatCurrency(item.unit_price) }}
-                                    ·
-                                    <span :title="item.added_at ? $dayjs(item.added_at).format('DD/MM/YY HH:mm') : ''">
-                                        {{ ageLabel(daysSince(item.added_at)) }}
-                                    </span>
-                                </small>
-                            </div>
-                        </article>
+                            · {{ item.quantity }}× {{ formatCurrency(item.unit_price) }}
+                            ·
+                            <span :title="item.added_at ? $dayjs(item.added_at).format('DD/MM/YY HH:mm') : ''">
+                                {{ ageLabel(daysSince(item.added_at)) }}
+                            </span>
+                        </CatalogCard>
                     </div>
                 </details>
             </div>
@@ -951,50 +894,6 @@ details.section:not([open]) > summary.section-title
     grid-template-columns repeat(auto-fill, minmax(230px, 1fr))
     gap 0.75rem
     padding 0.75rem
-
-.catalog-card
-    display flex
-    align-items center
-    gap 0.625rem
-    padding 0.625rem
-    border 1px solid rgba(255,255,255,0.06)
-    border-radius 8px
-    background rgba(255,255,255,0.02)
-    min-width 0
-
-.catalog-thumb
-    width 48px
-    height 48px
-    flex-shrink 0
-    object-fit contain
-    border-radius 4px
-    background rgba(255,255,255,0.04)
-
-    &--empty
-        display flex
-        align-items center
-        justify-content center
-        color #f472b6
-
-.catalog-info
-    min-width 0
-
-.catalog-name
-    display block
-    font-weight 500
-    font-size 0.85rem
-    overflow hidden
-    text-overflow ellipsis
-    white-space nowrap
-
-.catalog-meta
-    display block
-    color #64748b
-    font-size 0.73rem
-
-.catalog-kind
-    color #94a3b8
-    font-weight 600
 
 .info-list
     display flex

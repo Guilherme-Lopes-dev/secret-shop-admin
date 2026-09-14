@@ -6,10 +6,22 @@ import dayjs from 'dayjs'
 import { adminService, type CrmCustomerDetail, type CrmOrder } from '@/services/admin/admin.service'
 import { formatCurrency } from '@/utils/formatCurrency'
 import { campaignMeta, campaignReason, daysLabel, daysSince } from '@/utils/campaigns'
+import CatalogCard, { type CatalogItem } from '@/components/users/CatalogCard.vue'
 
 const route = useRoute()
 const router = useRouter()
 const customer = ref<CrmCustomerDetail | null>(null)
+
+type CartItem = CatalogItem & { id: string; quantity: number; unit_price: number; added_at: string | null }
+type FavoriteItem = CatalogItem & { id: string; favorited_at: string }
+
+// Carrinho e favoritos já saem prontos do perfil admin do usuário — mesma
+// fonte da tela /users/:id, sem duplicar query no backend.
+const cart = ref<CartItem[]>([])
+const favorites = ref<FavoriteItem[]>([])
+
+// Quanto está parado no carrinho, a preço de vitrine de hoje.
+const cartTotal = computed(() => cart.value.reduce((total, item) => total + item.unit_price * item.quantity, 0))
 const loading = ref(true)
 const error = ref('')
 
@@ -73,8 +85,11 @@ const fetchCustomer = async () => {
     loading.value = true
     error.value = ''
     try {
-        const { data } = await adminService.getCrmCustomer(route.params.uuid as string)
-        customer.value = data
+        const uuid = route.params.uuid as string
+        const [crm, profile] = await Promise.all([adminService.getCrmCustomer(uuid), adminService.getUserById(uuid)])
+        customer.value = crm.data
+        cart.value = profile.data?.cart ?? []
+        favorites.value = profile.data?.favorites ?? []
     } catch (e: any) {
         error.value = e?.response?.data?.message || 'Erro ao carregar cliente.'
     } finally {
@@ -167,6 +182,37 @@ onMounted(fetchCustomer)
                         </li>
                     </ul>
                     <p v-else class="empty">Nenhuma compra com herói.</p>
+                </section>
+            </div>
+
+            <div class="two-col">
+                <section class="section">
+                    <h3 class="section-title">
+                        <Icon icon="mdi:cart-outline" /> Carrinho <span class="count">{{ cart.length }}</span>
+                        <span v-if="cart.length" class="section-note">{{ formatCurrency(cartTotal) }}</span>
+                    </h3>
+                    <p class="section-sub">O que está parado agora, a preço de vitrine de hoje.</p>
+                    <div v-if="cart.length" class="catalog-grid">
+                        <CatalogCard v-for="item in cart" :key="`${item.kind}-${item.id}`" :item="item">
+                            · {{ item.quantity }}× {{ formatCurrency(item.unit_price) }}
+                            · {{ daysLabel(daysSince(item.added_at)) }}
+                        </CatalogCard>
+                    </div>
+                    <p v-else class="empty">Carrinho vazio.</p>
+                </section>
+
+                <section class="section">
+                    <h3 class="section-title">
+                        <Icon icon="mdi:heart-outline" /> Lista de desejos <span class="count">{{ favorites.length }}</span>
+                    </h3>
+                    <p class="section-sub">Favoritou mas não comprou — material de campanha.</p>
+                    <div v-if="favorites.length" class="catalog-grid">
+                        <CatalogCard v-for="item in favorites" :key="`${item.kind}-${item.id}`" :item="item">
+                            · {{ item.hero || 'sem herói' }}
+                            · {{ dayjs(item.favorited_at).format('DD/MM/YY') }}
+                        </CatalogCard>
+                    </div>
+                    <p v-else class="empty">Lista de desejos vazia.</p>
                 </section>
             </div>
 
@@ -439,6 +485,17 @@ onMounted(fetchCustomer)
     color #64748b
     font-size 0.8rem
     margin 0 0 1rem
+
+.section-note
+    margin-left auto
+    color #4ade80
+    font-size 0.85rem
+    font-weight 600
+
+.catalog-grid
+    display grid
+    grid-template-columns repeat(auto-fill, minmax(230px, 1fr))
+    gap 0.6rem
 
 .empty
     color #64748b

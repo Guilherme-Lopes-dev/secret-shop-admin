@@ -50,6 +50,14 @@ const navGroups: NavGroup[] = [
         ],
     },
     {
+        label: 'CRM',
+        icon: 'mdi:account-heart-outline',
+        key: 'crm',
+        items: [
+            { label: 'Clientes & Campanhas', icon: 'mdi:bullseye-arrow', to: '/crm', name: 'crm' },
+        ],
+    },
+    {
         label: 'Catálogo',
         icon: 'mdi:view-grid-outline',
         key: 'catalogo',
@@ -112,7 +120,6 @@ const navGroups: NavGroup[] = [
             { label: 'Sorteios', icon: 'mdi:ticket-confirmation-outline', to: '/raffles', name: 'raffles' },
             { label: 'Novidades', icon: 'mdi:bullhorn-outline', to: '/news', name: 'news' },
             { label: 'Feedbacks', icon: 'mdi:comment-quote-outline', to: '/feedbacks', name: 'feedbacks' },
-            { label: 'CRM · Campanhas', icon: 'mdi:account-heart-outline', to: '/crm', name: 'crm' },
             { label: 'WhatsApp Blast', icon: 'mdi:whatsapp', to: '/whatsapp/blast', name: 'whatsapp-blast' },
             { label: 'Recomendações', icon: 'mdi:star-shooting-outline', to: '/recommendations', name: 'recommendations' },
             { label: 'Brindes', icon: 'mdi:gift-outline', to: '/rewards', name: 'rewards' },

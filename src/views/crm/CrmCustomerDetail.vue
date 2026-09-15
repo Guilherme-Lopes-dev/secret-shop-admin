@@ -79,6 +79,20 @@ const monthlyBars = computed(() => {
 
 const purchasedMax = computed(() => Math.max(1, ...(customer.value?.purchased_heroes ?? []).map((hero) => hero.items)))
 
+// Contatos que a pessoa usou no Wix e não são os do cadastro atual — pra saber
+// por onde ela comprava antes. Telefone compara só dígitos sem o 55 do país.
+const phoneKey = (value: string | null) => (value || '').replace(/\D/g, '').replace(/^55(?=\d{10,11}$)/, '')
+const wixOtherPhones = computed(() => {
+    const current = phoneKey(customer.value?.contact ?? null)
+    return (customer.value?.wix_phones ?? []).filter((phone) => phone !== current)
+})
+const wixOtherEmails = computed(() => {
+    const current = (customer.value?.email ?? '').toLowerCase()
+    return (customer.value?.wix_emails ?? []).filter((email) => email !== current)
+})
+const formatPhone = (digits: string) =>
+    digits.length === 11 ? `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}` : digits
+
 // Wix (loja antiga) entra na soma do topo; o split fica no sub e no bloco próprio.
 const wixSplit = (data: CrmCustomerDetail) =>
     data.wix_orders ? `Secret ${formatCurrency(data.total_spent)} · Wix ${formatCurrency(data.wix_spent)}` : ''
@@ -183,6 +197,16 @@ onMounted(fetchCustomer)
                         <template v-if="customer.wix_refunded">reembolsado {{ formatCurrency(customer.wix_refunded)}} · </template>
                         ticket {{ formatCurrency(Math.round(customer.wix_spent / customer.wix_orders)) }} · sem data por pedido (o Wix só exporta o agregado)
                     </span>
+                    <div v-if="wixOtherPhones.length || wixOtherEmails.length" class="wix-contacts">
+                        <span class="wix-contacts-label">No Wix usava:</span>
+                        <a v-for="phone in wixOtherPhones" :key="phone" :href="`https://wa.me/55${phone}`" target="_blank" rel="noopener" class="wix-contact">
+                            <Icon icon="mdi:whatsapp" /> {{ formatPhone(phone) }}
+                        </a>
+                        <span v-for="email in wixOtherEmails" :key="email" class="wix-contact">
+                            <Icon icon="mdi:email-outline" /> {{ email }}
+                        </span>
+                        <span class="wix-contacts-hint">· cadastro atual: {{ customer.contact || 'sem telefone' }} · {{ customer.email || 'sem e-mail' }}</span>
+                    </div>
                 </div>
             </section>
 
@@ -547,6 +571,36 @@ onMounted(fetchCustomer)
 .wix-sub
     color #94a3b8
     font-size 0.78rem
+
+.wix-contacts
+    display flex
+    align-items center
+    flex-wrap wrap
+    gap 0.5rem
+    margin-top 0.4rem
+    font-size 0.8rem
+
+.wix-contacts-label
+    color #fb923c
+    font-weight 600
+
+.wix-contact
+    display inline-flex
+    align-items center
+    gap 0.3rem
+    background rgba(255,255,255,0.06)
+    border 1px solid rgba(255,255,255,0.08)
+    border-radius 999px
+    padding 2px 9px
+    color #e2e8f0
+    text-decoration none
+
+    &:hover
+        background rgba(255,255,255,0.1)
+
+.wix-contacts-hint
+    color #64748b
+    font-size 0.74rem
 
 .kpi-icon
     color #6366f1

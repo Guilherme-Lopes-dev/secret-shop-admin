@@ -91,6 +91,9 @@ export interface CrmCustomer {
   wix_orders: number
   wix_spent: number
   wix_refunded: number
+  /** Contatos das contas Wix que casaram (telefone só dígitos, sem 55; e-mail minúsculo). */
+  wix_phones: string[]
+  wix_emails: string[]
   heroes: CrmHero[]
 }
 

@@ -40,12 +40,16 @@ export type CrmCampaign =
 
 export type CrmSort = 'spent' | 'orders' | 'recent' | 'inactive' | 'newest'
 
+/** secret = só conta no Secret; both = conta + compra no Wix; wix = só comprou no Wix (sem conta). */
+export type CrmSource = 'secret' | 'both' | 'wix'
+
 export interface CrmListParams {
   page?: number
   limit?: number
   search?: string
   campaign?: CrmCampaign
   hero?: string
+  source?: CrmSource
   sort?: CrmSort
 }
 
@@ -58,7 +62,8 @@ export interface CrmHero {
 }
 
 export interface CrmCustomer {
-  id: string
+  /** null = linha só do Wix, sem usuário por trás (não abre detalhe). */
+  id: string | null
   username: string | null
   email: string | null
   contact: string | null
@@ -67,7 +72,8 @@ export interface CrmCustomer {
   created_at: string | null
   cashback_balance: number
   tier_rank: number
-  tier_name: string
+  tier_name: string | null
+  /** Só Secret. Wix fica em wix_orders. */
   orders_count: number
   /** Centavos, somando skin + collector + físico (só pago, sem brinde). */
   total_spent: number
@@ -78,13 +84,20 @@ export interface CrmCustomer {
   avg_days_between_orders: number | null
   cart_items: number
   cart_updated_at: string | null
-  campaign: CrmCampaign
+  /** null na linha só-Wix: sem conta, sem carrinho, sem data — não tem campanha. */
+  campaign: CrmCampaign | null
+  source: CrmSource
+  /** Loja antiga (Wix), centavos. Sem data: o relatório só dá o agregado por cliente. */
+  wix_orders: number
+  wix_spent: number
+  wix_refunded: number
   heroes: CrmHero[]
 }
 
 export interface CrmListResponse {
   data: CrmCustomer[]
   segments: Partial<Record<CrmCampaign, number>>
+  sources: Partial<Record<CrmSource, number>>
   total: number
   page: number
   pages: number
@@ -1320,8 +1333,15 @@ export const adminService = {
     if (params.search) query.append('search', params.search)
     if (params.campaign) query.append('campaign', params.campaign)
     if (params.hero) query.append('hero', params.hero)
+    if (params.source) query.append('source', params.source)
     if (params.sort) query.append('sort', params.sort)
     return api.get<CrmListResponse>(`/admin/crm/customers?${query}`)
+  },
+
+  async importWixCustomers(file: File) {
+    const formData = new FormData()
+    formData.append('file', file)
+    return api.post<{ imported: number; matched: number; wix_only: number }>('/admin/crm/customers/wix-import', formData)
   },
 
   async getCrmCustomer(uuid: string) {

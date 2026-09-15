@@ -51,7 +51,7 @@ export const CAMPAIGN_OPTIONS = (Object.keys(CAMPAIGNS) as CrmCampaign[]).map((v
     label: CAMPAIGNS[value].label,
 }))
 
-export const campaignMeta = (campaign: CrmCampaign) => CAMPAIGNS[campaign] ?? CAMPAIGNS.loyalty
+export const campaignMeta = (campaign: CrmCampaign | null) => (campaign && CAMPAIGNS[campaign]) || CAMPAIGNS.loyalty
 
 export const daysSince = (date: string | null | undefined): number | null => {
     if (!date) return null
@@ -81,4 +81,5 @@ const REASONS: Record<CrmCampaign, (customer: CrmCustomer) => string> = {
     loyalty: activeBuyer,
 }
 
-export const campaignReason = (customer: CrmCustomer): string => REASONS[customer.campaign](customer)
+export const campaignReason = (customer: CrmCustomer): string =>
+    customer.campaign ? REASONS[customer.campaign](customer) : ''

@@ -2,7 +2,8 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
-import { adminService, type CrmCampaign, type CrmCustomer, type CrmSort } from '@/services/admin/admin.service'
+import { toast } from 'vue3-toastify'
+import { adminService, type CrmCampaign, type CrmCustomer, type CrmSort, type CrmSource } from '@/services/admin/admin.service'
 import { formatCurrency } from '@/utils/formatCurrency'
 import { persistedRef } from '@/utils/persistedRef'
 import { CAMPAIGN_OPTIONS, campaignMeta, campaignReason, daysLabel } from '@/utils/campaigns'
@@ -10,6 +11,8 @@ import { CAMPAIGN_OPTIONS, campaignMeta, campaignReason, daysLabel } from '@/uti
 const router = useRouter()
 const customers = ref<CrmCustomer[]>([])
 const segments = ref<Partial<Record<CrmCampaign, number>>>({})
+const sources = ref<Partial<Record<CrmSource, number>>>({})
+const importing = ref(false)
 const heroes = ref<Array<{ name: string }>>([])
 const loading = ref(true)
 const currentPage = ref(1)
@@ -20,6 +23,7 @@ const limit = 20
 const search = persistedRef('crm:search', '')
 const campaignFilter = persistedRef<CrmCampaign | ''>('crm:campaign', '')
 const heroFilter = persistedRef('crm:hero', '')
+const sourceFilter = persistedRef<CrmSource | ''>('crm:source', '')
 const sortFilter = persistedRef<CrmSort>('crm:sort', 'spent')
 
 const sortOptions: Array<{ label: string; value: CrmSort }> = [
@@ -29,6 +33,26 @@ const sortOptions: Array<{ label: string; value: CrmSort }> = [
     { label: 'Mais tempo sem comprar', value: 'inactive' },
     { label: 'Cadastro mais recente', value: 'newest' },
 ]
+
+const SOURCE_OPTIONS: Array<{ label: string; value: CrmSource }> = [
+    { label: 'Clientes Secret', value: 'secret' },
+    { label: 'Wix + Secret', value: 'both' },
+    { label: 'Clientes Wix', value: 'wix' },
+]
+const sourceLabel = (option: { label: string; value: CrmSource }) =>
+    `${option.label} (${sources.value[option.value] ?? 0})`
+
+const SOURCE_BADGE: Record<CrmSource, { label: string; hint: string } | null> = {
+    secret: null,
+    both: { label: 'Wix + Secret', hint: 'Comprou na loja antiga (Wix) e tem conta aqui — e-mail ou telefone bateu.' },
+    wix: { label: 'Wix', hint: 'Só comprou na loja antiga (Wix). Não tem conta no Secret.' },
+}
+const UNKNOWN_HINT = 'Pedidos do Wix sem cliente identificado (checkout como convidado). Não dá pra vincular a ninguém.'
+const isUnknownWix = (customer: CrmCustomer) => customer.source === 'wix' && !customer.email
+
+// Lista mostra a soma; o split fica na sub-linha e na interna.
+const combinedSpent = (customer: CrmCustomer) => customer.total_spent + customer.wix_spent
+const combinedOrders = (customer: CrmCustomer) => customer.orders_count + customer.wix_orders
 
 // Cards de segmento seguem a ordem de prioridade das campanhas.
 const segmentCards = computed(() =>
@@ -48,10 +72,12 @@ const fetchCustomers = async (page: number) => {
             search: search.value || undefined,
             campaign: campaignFilter.value || undefined,
             hero: heroFilter.value || undefined,
+            source: sourceFilter.value || undefined,
             sort: sortFilter.value,
         })
         customers.value = data.data
         segments.value = data.segments
+        sources.value = data.sources
         totalPages.value = data.pages
         totalItems.value = data.total
         currentPage.value = data.page
@@ -83,7 +109,30 @@ const toggleSegment = (campaign: CrmCampaign) => {
     fetchCustomers(1)
 }
 
-const openCustomer = (customer: CrmCustomer) => router.push(`/crm/${customer.id}`)
+// Linha só-Wix não tem usuário: tudo que existe dela já está na própria linha.
+const openCustomer = (customer: CrmCustomer) => {
+    if (!customer.id) return
+
+    router.push(`/crm/${customer.id}`)
+}
+
+const onImportWix = async (event: Event) => {
+    const input = event.target as HTMLInputElement
+    const file = input.files?.[0]
+    input.value = ''
+    if (!file) return
+
+    importing.value = true
+    try {
+        const { data } = await adminService.importWixCustomers(file)
+        toast.success(`Wix: ${data.imported} clientes importados, ${data.matched} com conta no Secret, ${data.wix_only} só Wix.`)
+        fetchCustomers(1)
+    } catch (e: any) {
+        toast.error(e?.response?.data?.message || 'Erro ao importar CSV do Wix.')
+    } finally {
+        importing.value = false
+    }
+}
 
 const nextPage = () => { if (currentPage.value < totalPages.value) fetchCustomers(currentPage.value + 1) }
 const prevPage = () => { if (currentPage.value > 1) fetchCustomers(currentPage.value - 1) }
@@ -101,6 +150,11 @@ onMounted(() => {
                 <h1 class="page-title">CRM · Campanhas</h1>
                 <p class="page-subtitle">{{ totalItems }} clientes · gasto, recência, heróis e a campanha que faz sentido pra cada um</p>
             </div>
+            <label class="btn-import" :class="{ disabled: importing }" title="CSV 'Vendas por cliente' exportado do Wix. Substitui o import anterior.">
+                <Icon :icon="importing ? 'mdi:loading' : 'mdi:upload'" :class="{ spin: importing }" />
+                {{ importing ? 'Importando...' : 'Importar CSV do Wix' }}
+                <input type="file" accept=".csv,text/csv" hidden :disabled="importing" @change="onImportWix" />
+            </label>
         </header>
 
         <div class="segments">
@@ -130,6 +184,10 @@ onMounted(() => {
                     class="search-input"
                 />
             </div>
+            <select v-model="sourceFilter" @change="onFilterChange" class="filter-select">
+                <option value="">Todos os clientes</option>
+                <option v-for="opt in SOURCE_OPTIONS" :key="opt.value" :value="opt.value">{{ sourceLabel(opt) }}</option>
+            </select>
             <select v-model="campaignFilter" @change="onFilterChange" class="filter-select">
                 <option value="">Todas as campanhas</option>
                 <option v-for="opt in CAMPAIGN_OPTIONS" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
@@ -178,24 +236,41 @@ onMounted(() => {
                             </tr>
                         </template>
                         <template v-else>
-                            <tr v-for="customer in customers" :key="customer.id" class="clickable-row" @click="openCustomer(customer)">
+                            <tr
+                                v-for="(customer, index) in customers"
+                                :key="customer.id ?? `wix-${index}`"
+                                :class="customer.id ? 'clickable-row' : 'static-row'"
+                                @click="openCustomer(customer)"
+                            >
                                 <td>
                                     <div class="user-cell">
                                         <img v-if="customer.avatar" :src="customer.avatar" class="user-avatar" alt="" />
-                                        <div v-else class="user-avatar-placeholder"><Icon icon="mdi:account" /></div>
+                                        <div v-else class="user-avatar-placeholder"><Icon :icon="customer.source === 'wix' ? 'mdi:store-outline' : 'mdi:account'" /></div>
                                         <div>
-                                            <span class="user-name">{{ customer.username || '—' }}</span>
-                                            <small class="user-sub">{{ customer.tier_name }} · {{ customer.email || customer.steam_id || '—' }}</small>
+                                            <span class="user-name">
+                                                <template v-if="isUnknownWix(customer)">
+                                                    Sem cliente
+                                                    <Icon icon="mdi:information-outline" class="info-icon" :title="UNKNOWN_HINT" />
+                                                </template>
+                                                <template v-else>{{ customer.username || '—' }}</template>
+                                                <span v-if="SOURCE_BADGE[customer.source]" class="source-badge" :class="customer.source" :title="SOURCE_BADGE[customer.source]!.hint">
+                                                    {{ SOURCE_BADGE[customer.source]!.label }}
+                                                </span>
+                                            </span>
+                                            <small class="user-sub">{{ customer.tier_name || 'Loja antiga' }} · {{ customer.email || customer.contact || customer.steam_id || '—' }}</small>
                                         </div>
                                     </div>
                                 </td>
                                 <td>
-                                    <span class="spent">{{ formatCurrency(customer.total_spent) }}</span>
-                                    <small v-if="customer.orders_count" class="cell-sub">ticket {{ formatCurrency(customer.avg_ticket) }}</small>
+                                    <span class="spent">{{ formatCurrency(combinedSpent(customer)) }}</span>
+                                    <small v-if="customer.wix_orders && customer.orders_count" class="cell-sub">Secret {{ formatCurrency(customer.total_spent) }} · Wix {{ formatCurrency(customer.wix_spent) }}</small>
+                                    <small v-else-if="customer.wix_refunded" class="cell-sub">reembolsado {{ formatCurrency(customer.wix_refunded) }}</small>
+                                    <small v-else-if="customer.orders_count" class="cell-sub">ticket {{ formatCurrency(customer.avg_ticket) }}</small>
                                 </td>
                                 <td>
-                                    <span class="count-badge">{{ customer.orders_count }}</span>
-                                    <small v-if="customer.avg_days_between_orders != null" class="cell-sub">a cada {{ customer.avg_days_between_orders }}d</small>
+                                    <span class="count-badge">{{ combinedOrders(customer) }}</span>
+                                    <small v-if="customer.wix_orders && customer.orders_count" class="cell-sub">{{ customer.orders_count }} Secret · {{ customer.wix_orders }} Wix</small>
+                                    <small v-else-if="customer.avg_days_between_orders != null" class="cell-sub">a cada {{ customer.avg_days_between_orders }}d</small>
                                 </td>
                                 <td>
                                     <span :class="{ muted: customer.days_since_last_purchase == null }">{{ daysLabel(customer.days_since_last_purchase) }}</span>
@@ -208,14 +283,20 @@ onMounted(() => {
                                     <span v-else class="muted">—</span>
                                 </td>
                                 <td>
-                                    <span class="campaign-badge" :style="{ '--accent': campaignMeta(customer.campaign).color }">
-                                        <Icon :icon="campaignMeta(customer.campaign).icon" />
-                                        {{ campaignMeta(customer.campaign).label }}
-                                    </span>
-                                    <small class="cell-sub">{{ campaignReason(customer) }}</small>
+                                    <template v-if="customer.campaign">
+                                        <span class="campaign-badge" :style="{ '--accent': campaignMeta(customer.campaign).color }">
+                                            <Icon :icon="campaignMeta(customer.campaign).icon" />
+                                            {{ campaignMeta(customer.campaign).label }}
+                                        </span>
+                                        <small class="cell-sub">{{ campaignReason(customer) }}</small>
+                                    </template>
+                                    <template v-else>
+                                        <span class="muted">—</span>
+                                        <small class="cell-sub">sem conta no Secret</small>
+                                    </template>
                                 </td>
                                 <td>
-                                    <button class="btn-view" @click.stop="openCustomer(customer)">Ver</button>
+                                    <button v-if="customer.id" class="btn-view" @click.stop="openCustomer(customer)">Ver</button>
                                 </td>
                             </tr>
                             <tr v-if="customers.length === 0">
@@ -243,7 +324,67 @@ onMounted(() => {
     min-height 100vh
 
 .page-header
+    display flex
+    align-items flex-start
+    justify-content space-between
+    gap 1rem
+    flex-wrap wrap
     margin-bottom 1.5rem
+
+.btn-import
+    display inline-flex
+    align-items center
+    gap 0.4rem
+    background #2a2a30
+    color #fff
+    border 1px solid rgba(255,255,255,0.1)
+    padding 0.5rem 1rem
+    border-radius 8px
+    font-size 0.85rem
+    cursor pointer
+    transition all 0.2s
+    white-space nowrap
+
+    &:hover
+        background #3a3a42
+
+    &.disabled
+        opacity 0.6
+        cursor wait
+
+.spin
+    animation spin 1s linear infinite
+
+@keyframes spin
+    to
+        transform rotate(360deg)
+
+.source-badge
+    display inline-block
+    margin-left 0.4rem
+    padding 1px 7px
+    border-radius 999px
+    font-size 0.68rem
+    font-weight 600
+    vertical-align middle
+    cursor help
+
+    &.wix
+        background rgba(251,146,60,0.15)
+        color #fb923c
+
+    &.both
+        background rgba(74,222,128,0.15)
+        color #4ade80
+
+.info-icon
+    color #94a3b8
+    font-size 0.95rem
+    vertical-align middle
+    cursor help
+
+.static-row
+    cursor default
 
 .page-title
     font-size 1.8rem

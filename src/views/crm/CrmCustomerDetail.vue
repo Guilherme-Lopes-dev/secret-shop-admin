@@ -79,13 +79,17 @@ const monthlyBars = computed(() => {
 
 const purchasedMax = computed(() => Math.max(1, ...(customer.value?.purchased_heroes ?? []).map((hero) => hero.items)))
 
+// Wix (loja antiga) entra na soma do topo; o split fica no sub e no bloco próprio.
+const wixSplit = (data: CrmCustomerDetail) =>
+    data.wix_orders ? `Secret ${formatCurrency(data.total_spent)} · Wix ${formatCurrency(data.wix_spent)}` : ''
+
 const kpis = computed(() => {
     const data = customer.value
     if (!data) return []
 
     return [
-        { label: 'Total gasto', value: formatCurrency(data.total_spent), icon: 'mdi:cash-multiple', tone: 'green' },
-        { label: 'Compras', value: String(data.orders_count), icon: 'mdi:cart-outline' },
+        { label: 'Total gasto', value: formatCurrency(data.total_spent + data.wix_spent), sub: wixSplit(data), icon: 'mdi:cash-multiple', tone: 'green' },
+        { label: 'Compras', value: String(data.orders_count + data.wix_orders), sub: data.wix_orders ? `${data.orders_count} Secret · ${data.wix_orders} Wix` : '', icon: 'mdi:cart-outline' },
         { label: 'Ticket médio', value: formatCurrency(data.avg_ticket), icon: 'mdi:receipt-text-outline' },
         { label: 'Última compra', value: daysLabel(data.days_since_last_purchase), sub: formatDate(data.last_purchase_at), icon: 'mdi:clock-outline' },
         { label: 'Primeira compra', value: formatDate(data.first_purchase_at), icon: 'mdi:calendar-start' },
@@ -167,6 +171,18 @@ onMounted(fetchCustomer)
                     <small>{{ kpi.label }}</small>
                     <strong>{{ kpi.value }}</strong>
                     <span v-if="kpi.sub" class="kpi-sub">{{ kpi.sub }}</span>
+                </div>
+            </section>
+
+            <section v-if="customer.wix_orders" class="wix-card">
+                <Icon icon="mdi:store-outline" class="wix-icon" />
+                <div class="wix-body">
+                    <small>Loja antiga (Wix)</small>
+                    <strong>{{ customer.wix_orders }} pedido(s) · {{ formatCurrency(customer.wix_spent) }}</strong>
+                    <span class="wix-sub">
+                        <template v-if="customer.wix_refunded">reembolsado {{ formatCurrency(customer.wix_refunded)}} · </template>
+                        ticket {{ formatCurrency(Math.round(customer.wix_spent / customer.wix_orders)) }} · sem data por pedido (o Wix só exporta o agregado)
+                    </span>
                 </div>
             </section>
 
@@ -498,6 +514,39 @@ onMounted(fetchCustomer)
 
     &.green strong
         color #4ade80
+
+.wix-card
+    display flex
+    align-items center
+    gap 0.9rem
+    background rgba(251,146,60,0.08)
+    border 1px solid rgba(251,146,60,0.25)
+    border-radius 12px
+    padding 0.9rem 1.1rem
+    margin-bottom 1.25rem
+
+.wix-icon
+    color #fb923c
+    font-size 1.6rem
+    flex-shrink 0
+
+.wix-body
+    display flex
+    flex-direction column
+    gap 0.15rem
+
+    small
+        color #fb923c
+        font-size 0.75rem
+        text-transform uppercase
+        letter-spacing 0.04em
+
+    strong
+        font-size 1.05rem
+
+.wix-sub
+    color #94a3b8
+    font-size 0.78rem
 
 .kpi-icon
     color #6366f1

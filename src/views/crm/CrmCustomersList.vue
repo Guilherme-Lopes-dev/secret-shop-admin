@@ -50,6 +50,12 @@ const SOURCE_BADGE: Record<CrmSource, { label: string; hint: string } | null> = 
 const UNKNOWN_HINT = 'Pedidos do Wix sem cliente identificado (checkout como convidado). Não dá pra vincular a ninguém.'
 const isUnknownWix = (customer: CrmCustomer) => customer.source === 'wix' && !customer.email
 
+// Só-Wix não tem interna: telefone vai na própria linha, já como WhatsApp.
+// contact aqui vem só dígitos sem o 55 (normalizePhone do import).
+const wixPhone = (customer: CrmCustomer) => (customer.source === 'wix' ? customer.contact : null)
+const formatPhone = (digits: string) =>
+    digits.length === 11 ? `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}` : digits
+
 // Lista mostra a soma; o split fica na sub-linha e na interna.
 const combinedSpent = (customer: CrmCustomer) => customer.total_spent + customer.wix_spent
 const combinedOrders = (customer: CrmCustomer) => customer.orders_count + customer.wix_orders
@@ -257,7 +263,12 @@ onMounted(() => {
                                                     {{ SOURCE_BADGE[customer.source]!.label }}
                                                 </span>
                                             </span>
-                                            <small class="user-sub">{{ customer.tier_name || 'Loja antiga' }} · {{ customer.email || customer.contact || customer.steam_id || '—' }}</small>
+                                            <small class="user-sub">
+                                                {{ customer.tier_name || 'Loja antiga' }} · {{ customer.email || customer.steam_id || (wixPhone(customer) ? '' : '—') }}
+                                                <a v-if="wixPhone(customer)" :href="`https://wa.me/55${wixPhone(customer)}`" target="_blank" rel="noopener" class="wa-link" @click.stop>
+                                                    <Icon icon="mdi:whatsapp" /> {{ formatPhone(wixPhone(customer)!) }}
+                                                </a>
+                                            </small>
                                         </div>
                                     </div>
                                 </td>
@@ -547,10 +558,21 @@ table
     display block
     color #64748b
     font-size 0.72rem
-    max-width 220px
+    max-width 340px
     overflow hidden
     text-overflow ellipsis
     white-space nowrap
+
+.wa-link
+    display inline-flex
+    align-items center
+    gap 0.25rem
+    margin-left 0.35rem
+    color #25d366
+    text-decoration none
+
+    &:hover
+        text-decoration underline
 
 .cell-sub
     display block

@@ -9,6 +9,8 @@ import UserPassCard from '@/components/passes/UserPassCard.vue'
 import UserProgressCard from '@/components/profile-progress/UserProgressCard.vue'
 import CatalogCard from '@/components/users/CatalogCard.vue'
 import { countryName } from '@/utils/countries'
+import dayjs from 'dayjs'
+import { RUNE_TYPES, runeInfo } from '@/utils/runes'
 import {
     friendshipDuration,
     friendshipIcon,
@@ -47,6 +49,13 @@ const openOrder = (order: { kind: string; id: string }) =>
 
 // Brinde é uma venda de skin — abre na mesma tela de pedido.
 const openGift = (claim: { order_uuid: string }) => router.push(`/sales/${claim.order_uuid}`)
+
+const ownedRune = (type: string) => (user.value?.runes ?? []).some((r: any) => r.type === type)
+const runeTitle = (type: string) => {
+    const owned = (user.value?.runes ?? []).find((r: any) => r.type === type)
+    if (!owned) return `${runeInfo(type).label} — não pegou`
+    return `${runeInfo(type).label} — ${owned.times}x, primeira em ${dayjs(owned.first_found_at).format('DD/MM/YY')}`
+}
 
 const skinThumb = (icon?: string | null): string | null =>
     icon ? `https://steamcommunity-a.akamaihd.net/economy/image/${icon}/62fx62f` : null
@@ -277,6 +286,22 @@ onMounted(fetchUser)
                         <span class="stat-value">{{ user.orders_count ?? 0 }}</span>
                     </div>
                 </div>
+                <div class="stat-card stat-card--runes">
+                    <div class="stat-info">
+                        <span class="stat-label">Runas {{ (user.runes ?? []).length }}/{{ RUNE_TYPES.length }}</span>
+                        <div class="rune-row">
+                            <img
+                                v-for="rune in RUNE_TYPES"
+                                :key="rune.value"
+                                :src="rune.image"
+                                :alt="rune.label"
+                                class="rune-row__item"
+                                :class="{ 'rune-row__item--owned': ownedRune(rune.value) }"
+                                :title="runeTitle(rune.value)"
+                            />
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <UserPassCard :user-uuid="user.id" />
@@ -451,7 +476,7 @@ onMounted(fetchUser)
                             <thead>
                                 <tr>
                                     <th>Item</th>
-                                    <th>Nível</th>
+                                    <th>Origem</th>
                                     <th>Valor de vitrine</th>
                                     <th>Entrega</th>
                                     <th>Pedido</th>
@@ -482,7 +507,10 @@ onMounted(fetchUser)
                                             </div>
                                         </div>
                                     </td>
-                                    <td>{{ claim.tier ?? '—' }}</td>
+                                    <td>
+                                        <span v-if="claim.source === 'rune'" class="origin-pill origin-pill--rune">Runa</span>
+                                        <span v-else>Nível {{ claim.tier ?? '—' }}</span>
+                                    </td>
                                     <td>{{ formatCurrency(claim.item?.retail_price) }}</td>
                                     <td>
                                         <span class="status-badge" :class="getStatusClass(claim.fulfillment_status)">
@@ -716,6 +744,25 @@ onMounted(fetchUser)
 .stat-info
     display flex
     flex-direction column
+
+.stat-card--runes
+    flex 1
+
+.rune-row
+    display flex
+    gap 6px
+    margin-top 4px
+
+    &__item
+        width 34px
+        height 34px
+        object-fit contain
+        filter grayscale(1) brightness(0.5)
+        opacity 0.4
+
+        &--owned
+            filter drop-shadow(0 0 6px rgba(56,189,248,0.45))
+            opacity 1
 
 .stat-label
     font-size 0.78rem
@@ -1009,6 +1056,18 @@ table
     align-items center
     gap 0.5rem
     margin-top 0.75rem
+
+.origin-pill
+    display inline-block
+    padding 2px 8px
+    border-radius 999px
+    font-size 0.72rem
+    font-weight 700
+    letter-spacing 0.04em
+
+    &--rune
+        background rgba(251,191,36,0.14)
+        color #fbbf24
 
 .btn-toggle-active
     display inline-flex

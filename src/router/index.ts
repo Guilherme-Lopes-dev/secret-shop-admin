@@ -253,6 +253,21 @@ const routes = [
         component: () => import('@/views/coupons/CouponForm.vue'),
       },
       {
+        path: 'runes',
+        name: 'runes',
+        component: () => import('@/views/runes/RunesList.vue'),
+      },
+      {
+        path: 'runes/new',
+        name: 'rune-new',
+        component: () => import('@/views/runes/RuneForm.vue'),
+      },
+      {
+        path: 'runes/:uuid/edit',
+        name: 'rune-edit',
+        component: () => import('@/views/runes/RuneForm.vue'),
+      },
+      {
         path: 'whatsapp/blast',
         name: 'whatsapp-blast',
         component: () => import('@/views/whatsapp/WhatsappBlast.vue'),

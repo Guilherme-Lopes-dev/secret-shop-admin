@@ -8,6 +8,7 @@ import {
   adminService,
   type BulkReleaseFilters,
   type BulkReleaseGift,
+  type GiftSource,
   type RewardClaim,
 } from '@/services/admin/admin.service'
 import BulkReleaseConsole from './BulkReleaseConsole.vue'
@@ -28,6 +29,7 @@ const searchQuery = persistedRef('reward-claims:search', '')
 // Abre na fila de análise: é pra isso que a tela existe.
 const statusFilter = persistedRef('reward-claims:status', 'AWAITING_REVIEW')
 const tierFilter = persistedRef('reward-claims:tier', '')
+const sourceFilter = persistedRef<'' | GiftSource>('reward-claims:source', '')
 // Valor digitado em reais; a API filtra em centavos.
 const minPrice = persistedRef('reward-claims:min-price', '')
 const maxPrice = persistedRef('reward-claims:max-price', '')
@@ -108,6 +110,7 @@ const fetchClaims = async (page: number) => {
       status: statusFilter.value || undefined,
       search: searchQuery.value || undefined,
       tier: Number(tierFilter.value) || undefined,
+      source: sourceFilter.value || undefined,
       min_price: toCents(minPrice.value),
       max_price: toCents(maxPrice.value),
       from: dateFrom.value || undefined,
@@ -161,6 +164,16 @@ const release = (claim: RewardClaim) =>
 // null direto — o botão Negar pararia de funcionar em silêncio numa triagem.
 const rejecting = ref<RewardClaim | null>(null)
 const rejectReason = ref('')
+
+// Runa não tem nível pra devolver: só a skin volta pro estoque.
+const rejectCopy = (claim: RewardClaim) => {
+  const skin = claim.item.name || 'A skin sorteada'
+  const who = claim.user.username || 'o usuário'
+  const tail = `O pedido ${claim.order_number} fica gravado como negado.`
+  if (claim.source === 'rune') return `${skin} volta pro estoque. ${who} não ganha outra runa no lugar. ${tail}`
+
+  return `${skin} volta pro estoque e ${who} pode resgatar o nível ${claim.tier} de novo — vai cair outro sorteio. ${tail}`
+}
 
 const askReject = (claim: RewardClaim) => {
   rejectReason.value = ''
@@ -221,6 +234,7 @@ const bulkFilters = (): BulkReleaseFilters => ({
   limit: bulkLimit.value,
   search: searchQuery.value || undefined,
   tier: Number(tierFilter.value) || undefined,
+  source: sourceFilter.value || undefined,
   min_price: toCents(minPrice.value),
   max_price: toCents(maxPrice.value),
   min_spent: toCents(minSpent.value),
@@ -310,6 +324,7 @@ const hasFilters = computed(() =>
   Boolean(
     searchQuery.value ||
     tierFilter.value ||
+    sourceFilter.value ||
     minPrice.value ||
     maxPrice.value ||
     minSpent.value ||
@@ -322,6 +337,7 @@ const hasFilters = computed(() =>
 const clearFilters = () => {
   searchQuery.value = ''
   tierFilter.value = ''
+  sourceFilter.value = ''
   minPrice.value = ''
   maxPrice.value = ''
   minSpent.value = ''
@@ -387,6 +403,15 @@ onMounted(() => {
           class="search-input"
         />
       </div>
+
+      <label class="filter-field">
+        <span>Origem</span>
+        <select v-model="sourceFilter" @change="onFilterChange" class="filter-select">
+          <option value="">Todos</option>
+          <option value="reward">Brinde de nível</option>
+          <option value="rune">Brinde de runa</option>
+        </select>
+      </label>
 
       <label class="filter-field">
         <span>Nível</span>
@@ -526,7 +551,10 @@ onMounted(() => {
                     </div>
                   </div>
                 </td>
-                <td class="center">{{ claim.tier ?? '—' }}</td>
+                <td class="center">
+                  <span v-if="claim.source === 'rune'" class="origin-pill">Runa</span>
+                  <template v-else>{{ claim.tier ?? '—' }}</template>
+                </td>
                 <td class="price">{{ formatCurrency(claim.item.retail_price) }}</td>
                 <td class="price spent">{{ claim.user.spent === null ? '—' : formatCurrency(claim.user.spent) }}</td>
                 <td>
@@ -574,7 +602,7 @@ onMounted(() => {
       variant="danger"
       title="Negar este brinde"
       :description="rejecting
-        ? `${rejecting.item.name || 'A skin sorteada'} volta pro estoque e ${rejecting.user.username || 'o usuário'} pode resgatar o nível ${rejecting.tier} de novo — vai cair outro sorteio. O pedido ${rejecting.order_number} fica gravado como negado.`
+        ? rejectCopy(rejecting)
         : ''"
       confirm-label="Negar brinde"
       loading-label="Negando..."
@@ -931,6 +959,16 @@ table
     display block
     color #64748b
     font-size 0.73rem
+
+.origin-pill
+  display inline-block
+  padding 2px 8px
+  border-radius 999px
+  font-size 0.72rem
+  font-weight 700
+  letter-spacing 0.04em
+  background rgba(251,191,36,0.14)
+  color #fbbf24
 
 .status-badge
     padding 3px 8px

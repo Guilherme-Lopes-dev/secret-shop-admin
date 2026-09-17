@@ -377,8 +377,10 @@ export const adminService = {
     maxSpent?: number,
     tierRank?: number,
     friendship?: { friendship?: string; minFriendDays?: number; maxFriendDays?: number },
+    runes: string[] = [],
   ) {
     const params = new URLSearchParams({ page: String(page), limit: String(limit) })
+    if (runes.length) params.append('runes', runes.join(','))
     if (search) params.append('search', search)
     if (sort) params.append('sort', sort)
     if (minOrders !== undefined) params.append('minOrders', String(minOrders))
@@ -753,6 +755,7 @@ export const adminService = {
     if (filters.status) params.append('status', filters.status)
     if (filters.search) params.append('search', filters.search)
     if (filters.tier) params.append('tier', String(filters.tier))
+    if (filters.source) params.append('source', filters.source)
     if (filters.min_price != null) params.append('min_price', String(filters.min_price))
     if (filters.max_price != null) params.append('max_price', String(filters.max_price))
     if (filters.from) params.append('from', filters.from)
@@ -1247,6 +1250,36 @@ export const adminService = {
     return api.delete(`/coupons/${uuid}`)
   },
 
+  // ── Runas ───────────────────────────────────────────────────────────────────
+
+  async getRunes() {
+    return api.get('/runes')
+  },
+
+  async getRune(uuid: string) {
+    return api.get(`/runes/${uuid}`)
+  },
+
+  async getRuneDiscoveries(uuid: string) {
+    return api.get(`/runes/${uuid}/discoveries`)
+  },
+
+  async createRune(data: Record<string, unknown>) {
+    return api.post('/runes', data)
+  },
+
+  async updateRune(uuid: string, data: Record<string, unknown>) {
+    return api.patch(`/runes/${uuid}`, data)
+  },
+
+  async deleteRune(uuid: string) {
+    return api.delete(`/runes/${uuid}`)
+  },
+
+  async createRuneCoupon(uuid: string, data: Record<string, unknown>) {
+    return api.post(`/runes/${uuid}/coupon`, data)
+  },
+
   // ── Sorteios ────────────────────────────────────────────────────────────────
 
   /** Preview ao vivo da tela 2. Não grava nada — o snapshot só nasce no save. */
@@ -1516,6 +1549,8 @@ export interface RewardClaimFilters {
   /** Username ou número do pedido. */
   search?: string
   tier?: number
+  /** Vazio = nível e runa juntos. */
+  source?: GiftSource
   /** Faixa de valor do item sorteado, em centavos. */
   min_price?: number
   max_price?: number
@@ -1524,10 +1559,14 @@ export interface RewardClaimFilters {
   to?: string
 }
 
+/** 'reward' = brinde de nível, 'rune' = pego numa runa. */
+export type GiftSource = 'reward' | 'rune'
+
 export interface RewardClaim {
   order_uuid:   string
   order_number: string
   tier:         number | null
+  source:       GiftSource
   status:       string
   created_at:   string
   user: {
@@ -1570,6 +1609,7 @@ export interface BulkReleaseFilters {
   order_uuids?: string[]
   search?:    string
   tier?:      number
+  source?:    GiftSource
   min_price?: number
   max_price?: number
   /** Gasto total do usuário — filtro que só existe no lote. */

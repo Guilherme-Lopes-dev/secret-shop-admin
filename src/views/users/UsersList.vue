@@ -15,6 +15,7 @@ import {
     friendshipLabel,
     friendshipTone,
 } from '@/utils/friendship'
+import { RUNE_TYPES, runeInfo } from '@/utils/runes'
 
 const router = useRouter()
 const users = ref<any[]>([])
@@ -32,6 +33,14 @@ const minSpentInput = persistedRef('users:min-spent', '')
 const maxSpentInput = persistedRef('users:max-spent', '')
 const friendshipFilter = persistedRef('users:friendship', '')
 const friendDurationIndex = persistedRef('users:friend-duration', '0')
+// multi: quem pegou qualquer uma das marcadas
+const runeFilter = ref<string[]>([])
+const toggleRune = (type: string) => {
+    runeFilter.value = runeFilter.value.includes(type)
+        ? runeFilter.value.filter((t) => t !== type)
+        : [...runeFilter.value, type]
+    fetchUsers(1)
+}
 let searchTimeout: ReturnType<typeof setTimeout> | null = null
 
 const TIERS = [
@@ -75,6 +84,7 @@ const fetchUsers = async (page: number) => {
                 minFriendDays: duration.min,
                 maxFriendDays: duration.max,
             },
+            runeFilter.value,
         )
         if (response.data) {
             users.value = response.data.data
@@ -159,6 +169,19 @@ onMounted(() => fetchUsers(1))
                     {{ preset.label }}
                 </option>
             </select>
+            <div class="rune-filter" title="Filtra quem pegou qualquer runa marcada">
+                <button
+                    v-for="rune in RUNE_TYPES"
+                    :key="rune.value"
+                    type="button"
+                    class="rune-filter__chip"
+                    :class="{ 'rune-filter__chip--on': runeFilter.includes(rune.value) }"
+                    :title="rune.label"
+                    @click="toggleRune(rune.value)"
+                >
+                    <img :src="rune.image" :alt="rune.label" />
+                </button>
+            </div>
             <div class="range-group">
                 <span class="range-label">Pedidos</span>
                 <input
@@ -211,6 +234,7 @@ onMounted(() => fetchUsers(1))
                             <th>E-mail</th>
                             <th>Tier</th>
                             <th>Amizade Collector</th>
+                            <th>Runas</th>
                             <th>Pedidos</th>
                             <th>Valor Gasto</th>
                             <th>Role</th>
@@ -273,6 +297,13 @@ onMounted(() => fetchUsers(1))
                                         <Icon :icon="friendshipIcon(user.friendship)" />
                                         {{ friendshipLabel(user.friendship) }}
                                     </span>
+                                </td>
+                                <td>
+                                    <span
+                                        class="count-badge"
+                                        :class="{ 'count-badge--rune': user.runes_found }"
+                                        :title="(user.rune_types ?? []).map((t: string) => runeInfo(t).label).join(', ') || 'Nenhuma'"
+                                    >{{ user.runes_found ?? 0 }}/{{ RUNE_TYPES.length }}</span>
                                 </td>
                                 <td><span class="count-badge">{{ user._count?.sales ?? 0 }}</span></td>
                                 <td class="spent-cell">{{ formatCurrency(user.total_spent ?? 0) }}</td>
@@ -536,6 +567,43 @@ table
     border-radius 4px
     font-size 0.8rem
     font-weight 600
+
+    &--rune
+        background rgba(56,189,248,0.12)
+        color #38bdf8
+
+.rune-filter
+    display inline-flex
+    gap 4px
+    padding 3px 6px
+    background #1a1a1e
+    border 1px solid rgba(255,255,255,0.08)
+    border-radius 8px
+
+    &__chip
+        width 30px
+        height 30px
+        padding 2px
+        border none
+        border-radius 6px
+        background none
+        cursor pointer
+        filter grayscale(1) brightness(0.55)
+        opacity 0.5
+        transition filter .15s ease, opacity .15s ease, background .15s ease
+
+        img
+            width 100%
+            height 100%
+            object-fit contain
+
+        &:hover
+            opacity 0.85
+
+        &--on
+            filter none
+            opacity 1
+            background rgba(56,189,248,0.14)
 
 .spent-cell
     color #4caf50

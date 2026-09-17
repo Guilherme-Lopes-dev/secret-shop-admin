@@ -134,22 +134,12 @@
 
           <div class="field">
             <label>Usuários específicos</label>
-            <input v-model="userQuery" type="search" placeholder="Nome, e-mail ou steam id..." class="form-input" @input="onUserQuery" />
+            <button type="button" class="btn-ghost" @click="pickerOpen = true">
+              <Icon icon="mdi:account-multiple-plus" width="16" />
+              {{ audience.length ? `Selecionar usuários (${audience.length})` : 'Selecionar usuários' }}
+            </button>
             <p class="field-hint">Com lista, só quem está nela vê a runa.</p>
           </div>
-          <div v-if="searchingUsers" class="loading-state small"><Icon icon="mdi:loading" class="spin" width="20" /></div>
-          <ul v-else-if="userResults.length" class="skin-results">
-            <li v-for="user in userResults" :key="user.id">
-              <button type="button" class="skin-option" @click="addUser(user)">
-                <img v-if="user.avatar" :src="user.avatar" class="avatar" alt="" />
-                <span v-else class="avatar avatar--empty" />
-                <span class="skin-option__text">
-                  <strong>{{ user.username || user.email || user.id }}</strong>
-                  <small>{{ user.steam_id ?? user.email ?? '' }}</small>
-                </span>
-              </button>
-            </li>
-          </ul>
           <div v-if="audience.length" class="chip-row">
             <button v-for="user in audience" :key="user.id" type="button" class="chip" @click="removeUser(user.id)">
               <img v-if="user.avatar" :src="user.avatar" class="avatar avatar--xs" alt="" />
@@ -350,6 +340,7 @@
         </section>
       </div>
     </div>
+    <UserPickerModal :open="pickerOpen" :selected="audience" @close="pickerOpen = false" @apply="applyAudience" />
   </div>
 </template>
 
@@ -360,6 +351,7 @@ import { Icon } from '@iconify/vue'
 import dayjs from 'dayjs'
 import { adminService } from '@/services/admin/admin.service'
 import { RUNE_PAGES, RUNE_TYPES, runeInfo, type RunePage, type RuneType } from '@/utils/runes'
+import UserPickerModal from '@/components/users/UserPickerModal.vue'
 
 type DiscoveryStatus = 'seen' | 'found' | 'redeemed' | 'expired' | 'awaiting_review' | 'released' | 'delivered' | 'action_required' | 'rejected'
 type PrizeType = 'COUPON' | 'SKIN'
@@ -520,35 +512,11 @@ let skinTimer: ReturnType<typeof setTimeout> | null = null
 // Lista vazia = todo mundo. Payload manda só os uuids; a API devolve o resumo.
 
 const audience = ref<any[]>([])
-const userQuery = ref('')
-const userResults = ref<any[]>([])
-const searchingUsers = ref(false)
-let userTimer: ReturnType<typeof setTimeout> | null = null
+const pickerOpen = ref(false)
 
-const searchUsers = async () => {
-  const search = userQuery.value.trim()
-  if (search.length < 2) { userResults.value = []; return }
-  searchingUsers.value = true
-  try {
-    const res = await adminService.getAllUsers(1, 8, search)
-    const chosen = new Set(audience.value.map((user) => user.id))
-    userResults.value = (res.data.data ?? []).filter((user: any) => !chosen.has(user.id))
-  } catch {
-    userResults.value = []
-  } finally {
-    searchingUsers.value = false
-  }
-}
-
-const onUserQuery = () => {
-  if (userTimer) clearTimeout(userTimer)
-  userTimer = setTimeout(searchUsers, 300)
-}
-
-const addUser = (user: any) => {
-  audience.value = [...audience.value, user]
-  userQuery.value = ''
-  userResults.value = []
+const applyAudience = (users: any[]) => {
+  audience.value = users
+  pickerOpen.value = false
 }
 
 const removeUser = (id: string) => {

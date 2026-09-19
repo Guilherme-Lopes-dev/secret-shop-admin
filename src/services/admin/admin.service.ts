@@ -1280,6 +1280,48 @@ export const adminService = {
     return api.post(`/runes/${uuid}/coupon`, data)
   },
 
+  // ── Instagram ───────────────────────────────────────────────────────────────
+
+  async getInstagramAccount() {
+    return api.get('/instagram/account')
+  },
+
+  async connectInstagramAccount(access_token: string) {
+    return api.put('/instagram/account', { access_token })
+  },
+
+  async getInstagramPrompt() {
+    return api.get('/instagram/prompt')
+  },
+
+  async saveInstagramPrompt(content: string) {
+    return api.put('/instagram/prompt', { content })
+  },
+
+  async resetInstagramPrompt() {
+    return api.delete('/instagram/prompt')
+  },
+
+  async getInstagramPosts() {
+    return api.get('/instagram/posts')
+  },
+
+  async createInstagramPost(data: InstagramPostOrder) {
+    return api.post('/instagram/posts', data)
+  },
+
+  async updateInstagramPost(uuid: string, data: { caption?: string }) {
+    return api.patch(`/instagram/posts/${uuid}`, data)
+  },
+
+  async publishInstagramPost(uuid: string) {
+    return api.post(`/instagram/posts/${uuid}/publish`)
+  },
+
+  async deleteInstagramPost(uuid: string) {
+    return api.delete(`/instagram/posts/${uuid}`)
+  },
+
   // ── Sorteios ────────────────────────────────────────────────────────────────
 
   /** Preview ao vivo da tela 2. Não grava nada — o snapshot só nasce no save. */
@@ -1561,6 +1603,19 @@ export interface RewardClaimFilters {
 
 /** 'reward' = brinde de nível, 'rune' = pego numa runa. */
 export type GiftSource = 'reward' | 'rune'
+
+/** Vira a ORDEM DE STORY do prompt mestre no backend. */
+export type InstagramPostOrder = {
+  kind: 'FEED' | 'STORY'
+  skin_uuid?: string
+  price_brl?: number
+  coupon_code?: string
+  coupon_rule?: string
+  message?: string
+  cta?: string
+  cta_url?: string
+  caption?: string
+}
 
 export interface RewardClaim {
   order_uuid:   string

@@ -39,6 +39,7 @@ const resolving = ref(false)
 const resolveModal = ref(false)
 const unresolving = ref(false)
 const unresolveModal = ref(false)
+const purchasing = ref(false)
 const copiedKey = ref('')
 let copyTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -80,6 +81,12 @@ const operationItems = computed<OperationItem[]>(() => {
 })
 
 const isResolved = computed(() => notification.value?.is_read === true)
+const isPurchased = computed(() => !!metadata.value?.purchasedAt)
+const queueLabel = computed(() => {
+    if (isResolved.value) return 'Resolvido'
+    if (isPurchased.value) return 'Comprado · falta enviar'
+    return 'Pendente de compra'
+})
 const orderNumber = computed(() =>
     sale.value?.order_number ?? metadata.value?.orderNumber ?? 'Pedido dropship',
 )
@@ -109,7 +116,7 @@ const findNotification = async (saleUuid: string) => {
 
     // ponytail: acesso direto por URL varre até 500 alertas; criar GET /admin/notifications/:id se a fila crescer.
     const notificationId = String(route.query.notification ?? '')
-    const response = await adminService.getDropshipNotifications(1, 500, false)
+    const response = await adminService.getDropshipNotifications(1, 500)
     const entries = response.data.data
 
     return entries.find(entry => entry.id === notificationId)
@@ -216,6 +223,27 @@ const markResolved = async () => {
     }
 }
 
+// Comprou no Market mas ainda não enviou: sem modal, é um passo reversível com um clique.
+const setPurchased = async (purchasedAt: string | null) => {
+    if (!notification.value || purchasing.value) return
+    purchasing.value = true
+    try {
+        await (purchasedAt
+            ? adminService.markDropshipPurchased(notification.value.id)
+            : adminService.unmarkDropshipPurchased(notification.value.id))
+        notification.value = {
+            ...notification.value,
+            metadata: { ...notification.value.metadata, purchasedAt },
+        }
+        toast.success(purchasedAt ? 'Marcado como comprado. Falta enviar.' : 'Compra desmarcada.')
+    } catch (requestError) {
+        console.error('Erro ao marcar compra dropship:', requestError)
+        toast.error('Não foi possível atualizar a etapa de compra.')
+    } finally {
+        purchasing.value = false
+    }
+}
+
 const markUnresolved = async () => {
     if (!notification.value || !notification.value.is_read) return
     unresolving.value = true
@@ -269,9 +297,9 @@ onUnmounted(() => {
                     <div class="eyebrow">Operação manual · Dropship</div>
                     <div class="heading-row">
                         <h1>{{ orderNumber }}</h1>
-                        <span class="queue-badge" :class="{ resolved: isResolved }">
+                        <span class="queue-badge" :class="{ resolved: isResolved, purchased: isPurchased && !isResolved }">
                             <span></span>
-                            {{ isResolved ? 'Resolvido' : 'Pendente de envio' }}
+                            {{ queueLabel }}
                         </span>
                     </div>
                     <p>
@@ -280,15 +308,34 @@ onUnmounted(() => {
                     </p>
                 </div>
 
-                <button
-                    v-if="notification && !isResolved"
-                    class="complete-btn"
-                    :disabled="resolving"
-                    @click="resolveModal = true"
-                >
-                    <Icon icon="mdi:check-circle-outline" />
-                    Marcar como resolvido
-                </button>
+                <div v-if="notification && !isResolved" class="header-actions">
+                    <button
+                        v-if="!isPurchased"
+                        class="purchase-btn"
+                        :disabled="purchasing"
+                        @click="setPurchased(new Date().toISOString())"
+                    >
+                        <Icon icon="mdi:cart-check" />
+                        Marcar como comprado
+                    </button>
+                    <button
+                        v-else
+                        class="undo-btn"
+                        :disabled="purchasing"
+                        @click="setPurchased(null)"
+                    >
+                        <Icon icon="mdi:undo-variant" />
+                        Desmarcar compra
+                    </button>
+                    <button
+                        class="complete-btn"
+                        :disabled="resolving"
+                        @click="resolveModal = true"
+                    >
+                        <Icon icon="mdi:check-circle-outline" />
+                        Marcar como resolvido
+                    </button>
+                </div>
 
                 <button
                     v-if="notification && isResolved"
@@ -310,15 +357,16 @@ onUnmounted(() => {
                     </div>
                 </div>
                 <Icon icon="mdi:chevron-right" class="workflow-arrow" />
-                <div class="workflow-step active">
+                <div class="workflow-step" :class="isPurchased || isResolved ? 'done' : 'active'">
                     <span><Icon icon="mdi:steam" /></span>
                     <div>
                         <strong>Comprar no Market</strong>
-                        <small>{{ operationItems.length }} item{{ operationItems.length === 1 ? '' : 's' }}</small>
+                        <small v-if="isPurchased">Comprado em {{ $dayjs(metadata?.purchasedAt).format('DD/MM [às] HH:mm') }}</small>
+                        <small v-else>{{ operationItems.length }} item{{ operationItems.length === 1 ? '' : 's' }}</small>
                     </div>
                 </div>
                 <Icon icon="mdi:chevron-right" class="workflow-arrow" />
-                <div class="workflow-step" :class="{ done: isResolved }">
+                <div class="workflow-step" :class="{ done: isResolved, active: isPurchased && !isResolved }">
                     <span><Icon icon="mdi:swap-horizontal" /></span>
                     <div>
                         <strong>Enviar ao cliente</strong>
@@ -779,6 +827,38 @@ onUnmounted(() => {
         border-color rgba(34,197,94,0.22)
         color #4ade80
         background rgba(34,197,94,0.1)
+
+    &.purchased
+        border-color rgba(96,165,250,0.25)
+        color #93c5fd
+        background rgba(59,130,246,0.12)
+
+.header-actions
+    display flex
+    align-items center
+    gap 0.6rem
+    flex-wrap wrap
+
+.purchase-btn
+    height 42px
+    display inline-flex
+    align-items center
+    gap 0.45rem
+    padding 0 1rem
+    border 1px solid rgba(96,165,250,0.28)
+    border-radius 9px
+    color #bfdbfe
+    background rgba(59,130,246,0.18)
+    cursor pointer
+    font-size 0.8rem
+    font-weight 650
+
+    &:hover:not(:disabled)
+        background rgba(59,130,246,0.3)
+
+    &:disabled
+        opacity 0.55
+        cursor not-allowed
 
 .undo-btn
     height 42px

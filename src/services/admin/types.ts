@@ -26,6 +26,7 @@ export interface DropshipNotificationMetadata {
   tradeLink?: string | null
   totalAmount: number
   items: DropshipNotificationItem[]
+  purchasedAt?: string | null
 }
 
 export interface DropshipNotificationDto {
@@ -37,6 +38,13 @@ export interface DropshipNotificationDto {
   is_read: boolean
   read_at: string | null
   created_at: string
+}
+
+export type DropshipStage = 'purchased' | 'to_buy'
+
+export interface DropshipQueueFilter {
+  onlyUnread?: boolean
+  stage?: DropshipStage
 }
 
 export interface DropshipNotificationsResponse {
@@ -70,6 +78,7 @@ export interface DropshipTask {
   total_amount: number
   items: string[]
   waiting_days: number
+  purchased_at: string | null
 }
 
 export interface TodayTasks {

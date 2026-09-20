@@ -22,6 +22,7 @@ import type {
   DiscordUpdateRolePayload,
   DiscordWebhookCreatedDto,
   DropshipNotificationsResponse,
+  DropshipQueueFilter,
   SwapNotificationsResponse,
   PassProgressDto,
   DemandRow,
@@ -617,13 +618,14 @@ export const adminService = {
   },
 
   // Dropship shipping queue
-  async getDropshipNotifications(page: number = 1, limit: number = 20, onlyUnread: boolean = true) {
+  async getDropshipNotifications(page: number = 1, limit: number = 20, filter: DropshipQueueFilter = {}) {
     const params = new URLSearchParams({
       page: String(page),
       limit: String(limit),
       types: dropshipNotificationTypes,
     })
-    if (onlyUnread) params.append('onlyUnread', 'true')
+    if (filter.onlyUnread) params.append('onlyUnread', 'true')
+    if (filter.stage) params.append('stage', filter.stage)
     return api.get<DropshipNotificationsResponse>(`/admin/notifications?${params}`)
   },
 
@@ -640,6 +642,15 @@ export const adminService = {
   // Desfaz o "resolvido": volta pra fila e reverte o fulfillment da venda.
   async markDropshipNotificationUnread(id: string) {
     return api.patch(`/admin/notifications/${id}/unread`)
+  },
+
+  // Etapa intermediária: "já comprei no Market, falta enviar".
+  async markDropshipPurchased(id: string) {
+    return api.patch(`/admin/notifications/${id}/purchased`)
+  },
+
+  async unmarkDropshipPurchased(id: string) {
+    return api.delete(`/admin/notifications/${id}/purchased`)
   },
 
   /**

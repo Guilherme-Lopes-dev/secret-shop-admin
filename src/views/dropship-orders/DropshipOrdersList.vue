@@ -7,16 +7,33 @@ import { adminService } from '@/services/admin/admin.service'
 import type {
     DropshipNotificationDto,
     DropshipNotificationItem,
+    DropshipQueueFilter,
 } from '@/services/admin/types'
 import { formatCurrency } from '@/utils/formatCurrency'
 import ConfirmActionModal from '@/components/common/ConfirmActionModal.vue'
 import { persistedRef } from '@/utils/persistedRef'
 
+interface QueueStatus {
+    cls: string
+    label: string
+}
+
 interface ShippingRow {
     key: string
     notification: DropshipNotificationDto
     item: DropshipNotificationItem
+    status: QueueStatus
 }
+
+// Filtro é server-side: a página inteira já vem no estágio pedido.
+const QUEUE_FILTERS = {
+    pending: { onlyUnread: true },
+    to_buy: { onlyUnread: true, stage: 'to_buy' },
+    purchased: { onlyUnread: true, stage: 'purchased' },
+    all: {},
+} satisfies Record<string, DropshipQueueFilter>
+
+type QueueFilter = keyof typeof QUEUE_FILTERS
 
 const router = useRouter()
 const notifications = ref<DropshipNotificationDto[]>([])
@@ -28,7 +45,13 @@ const totalOrders = ref(0)
 const pendingCount = ref(0)
 const limit = 20
 const search = persistedRef('dropship-orders:search', '')
-const queueFilter = ref<'pending' | 'all'>('pending')
+const queueFilter = ref<QueueFilter>('pending')
+
+const queueStatus = (notification: DropshipNotificationDto): QueueStatus => {
+    if (notification.is_read) return { cls: 'status-resolved', label: 'Resolvido' }
+    if (notification.metadata?.purchasedAt) return { cls: 'status-purchased', label: 'Comprado · falta enviar' }
+    return { cls: 'status-pending', label: 'Falta comprar' }
+}
 
 const rows = computed<ShippingRow[]>(() => {
     const query = search.value.trim().toLowerCase()
@@ -52,6 +75,7 @@ const rows = computed<ShippingRow[]>(() => {
                 key: `${notification.id}-${index}`,
                 notification,
                 item,
+                status: queueStatus(notification),
             }))
     })
 })
@@ -66,9 +90,8 @@ const currentItemCount = computed(() =>
 const fetchQueue = async (page = 1) => {
     loading.value = true
     try {
-        const onlyUnread = queueFilter.value === 'pending'
         const [queueResponse, countResponse] = await Promise.all([
-            adminService.getDropshipNotifications(page, limit, onlyUnread),
+            adminService.getDropshipNotifications(page, limit, QUEUE_FILTERS[queueFilter.value]),
             adminService.getDropshipUnreadCount(),
         ])
 
@@ -202,7 +225,9 @@ onMounted(() => fetchQueue())
             </div>
 
             <select v-model="queueFilter" class="filter-select" @change="onFilterChange">
-                <option value="pending">Pendentes de envio</option>
+                <option value="pending">Pendentes (todos)</option>
+                <option value="to_buy">Falta comprar</option>
+                <option value="purchased">Comprado · falta enviar</option>
                 <option value="all">Todos os registros</option>
             </select>
 
@@ -275,12 +300,9 @@ onMounted(() => fetchQueue())
                                     {{ $dayjs(row.notification.created_at).format('DD/MM/YY HH:mm') }}
                                 </td>
                                 <td>
-                                    <span
-                                        class="status-badge"
-                                        :class="row.notification.is_read ? 'status-resolved' : 'status-pending'"
-                                    >
+                                    <span class="status-badge" :class="row.status.cls">
                                         <span class="status-dot"></span>
-                                        {{ row.notification.is_read ? 'Resolvido' : 'Pendente' }}
+                                        {{ row.status.label }}
                                     </span>
                                 </td>
                                 <td>
@@ -687,6 +709,11 @@ table
     color #4ade80
     background rgba(34,197,94,0.1)
     border 1px solid rgba(34,197,94,0.2)
+
+.status-purchased
+    color #93c5fd
+    background rgba(59,130,246,0.12)
+    border 1px solid rgba(96,165,250,0.25)
 
 .actions-heading
     text-align right

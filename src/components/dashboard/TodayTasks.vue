@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { Icon } from '@iconify/vue'
 import { adminService } from '@/services/admin/admin.service'
-import type { CollectorTask, CollectorTaskAction, TodayTasks } from '@/services/admin/types'
+import type { CollectorTask, CollectorTaskAction, DropshipStage, DropshipTask, TodayTasks } from '@/services/admin/types'
 import { formatCurrency } from '@/utils/formatCurrency'
 import { persistedRef } from '@/utils/persistedRef'
 import RefreshFriendshipButton from '@/components/common/RefreshFriendshipButton.vue'
@@ -49,6 +49,27 @@ const visibleSections = computed(() =>
 )
 
 const dropship = computed(() => tasks.value?.dropship ?? [])
+
+// "Comprado" primeiro: é o que dá pra fechar hoje; "falta comprar" ainda depende do Market.
+const dropshipSections = [
+    { key: 'purchased', title: 'Dropship: comprado, falta enviar', icon: 'mdi:cart-check', tone: 'ok' },
+    { key: 'to_buy', title: 'Dropship: falta comprar no Market', icon: 'mdi:package-variant-closed', tone: 'warn' },
+] as const
+
+const dropshipByStage = computed(() => ({
+    purchased: dropship.value.filter(task => task.purchased_at),
+    to_buy: dropship.value.filter(task => !task.purchased_at),
+}))
+
+const visibleDropshipSections = computed(() =>
+    dropshipSections.filter(section => dropshipByStage.value[section.key].length > 0),
+)
+
+// Já comprado: a espera é só o envio, não vira vermelho.
+const waitingTone = (task: DropshipTask, stage: DropshipStage) => {
+    if (stage === 'purchased') return 'badge--muted'
+    return task.waiting_days >= DROPSHIP_LATE_DAYS ? 'badge--critical' : 'badge--warn'
+}
 
 const totalCount = computed(() => (tasks.value?.collector.length ?? 0) + dropship.value.length)
 
@@ -119,14 +140,14 @@ onMounted(fetchTasks)
             </router-link>
         </div>
 
-        <div v-if="dropship.length" class="task-group task-group--warn">
+        <div v-for="section in visibleDropshipSections" :key="section.key" class="task-group" :class="`task-group--${section.tone}`">
             <h3 class="group-title">
-                <Icon icon="mdi:package-variant-closed" width="16" />
-                Dropship: compra pendente de envio
-                <span class="group-count">{{ dropship.length }}</span>
+                <Icon :icon="section.icon" width="16" />
+                {{ section.title }}
+                <span class="group-count">{{ dropshipByStage[section.key].length }}</span>
             </h3>
             <router-link
-                v-for="task in dropship"
+                v-for="task in dropshipByStage[section.key]"
                 :key="task.id"
                 :to="task.sale_uuid ? `/dropship-orders/${task.sale_uuid}` : '/dropship-orders'"
                 class="task-row"
@@ -135,7 +156,7 @@ onMounted(fetchTasks)
                 <span class="task-user">{{ task.user_name }}</span>
                 <span class="task-items" :title="task.items.join(', ')">{{ task.items.join(', ') }}</span>
                 <span class="task-meta">
-                    <span class="badge" :class="task.waiting_days >= DROPSHIP_LATE_DAYS ? 'badge--critical' : 'badge--warn'">
+                    <span class="badge" :class="waitingTone(task, section.key)">
                         aguardando há {{ days(task.waiting_days) }}
                     </span>
                     <span class="task-amount">{{ formatCurrency(task.total_amount) }}</span>

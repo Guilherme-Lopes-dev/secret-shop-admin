@@ -27,6 +27,7 @@ import type {
   DemandRow,
   ProfileProgressDto,
   SkinSalesRow,
+  TodayTasks,
 } from './types'
 
 export type CrmCampaign =
@@ -259,6 +260,10 @@ export const adminService = {
   async getDashboardPendings(pendingFrom?: string) {
     const p = pendingFrom ? `?pending_from=${encodeURIComponent(pendingFrom)}` : ''
     return api.get<Record<string, number>>(`/dashboard/pendings${p}`)
+  },
+
+  async getDashboardTodayTasks() {
+    return api.get<TodayTasks>('/dashboard/today-tasks')
   },
 
   async getAllSales(

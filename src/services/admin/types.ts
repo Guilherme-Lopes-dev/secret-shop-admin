@@ -46,6 +46,38 @@ export interface DropshipNotificationsResponse {
   limit: number
 }
 
+export type CollectorTaskAction = 'ready' | 'waiting' | 'add_friend' | 'check_friendship'
+
+/** Pedido collector pago com linha ainda não enviada — o que falta pra presentear. */
+export interface CollectorTask {
+  id: string
+  order_number: string
+  total_amount: number
+  user_name: string
+  items: string[]
+  paid_days_ago: number
+  overdue: boolean
+  action: CollectorTaskAction
+  friendship_age_days: number | null
+  unlocks_in_days: number | null
+}
+
+export interface DropshipTask {
+  id: string
+  sale_uuid: string | null
+  order_number: string
+  user_name: string
+  total_amount: number
+  items: string[]
+  waiting_days: number
+}
+
+export interface TodayTasks {
+  generated_at: string
+  collector: CollectorTask[]
+  dropship: DropshipTask[]
+}
+
 export type SwapNotificationType =
   | 'swap_approve_conflict'
   | 'swap_review'

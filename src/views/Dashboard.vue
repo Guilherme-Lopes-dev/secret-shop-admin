@@ -4,6 +4,7 @@ import { Icon } from '@iconify/vue'
 import Chart from 'chart.js/auto'
 import { formatCurrency } from '@/utils/formatCurrency'
 import { adminService } from '@/services/admin/admin.service'
+import TodayTasks from '@/components/dashboard/TodayTasks.vue'
 
 const salesChart = ref<HTMLCanvasElement | null>(null)
 const chartInstance = ref<Chart | null>(null)
@@ -257,6 +258,8 @@ onMounted(fetchDashboardData)
                 </router-link>
             </div>
         </div>
+
+        <TodayTasks />
 
         <div class="stats-grid">
             <div v-for="stat in stats" :key="stat.label" class="stat-card">

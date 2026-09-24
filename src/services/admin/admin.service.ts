@@ -1023,8 +1023,13 @@ export const adminService = {
     return api.get<MediaAsset[]>('/admin/media', { params: { filter } })
   },
 
-  async searchMediaTargets(q: string) {
-    return api.get<MediaTarget[]>('/admin/media/targets', { params: { q } })
+  /** Com `hero`, o back devolve só as skins dele — `q`, se vier, filtra dentro. */
+  async searchMediaTargets(q: string, hero?: string) {
+    return api.get<MediaTarget[]>('/admin/media/targets', { params: { q, hero } })
+  },
+
+  async mediaHeroes() {
+    return api.get<string[]>('/admin/media/heroes')
   },
 
   async mediaGallery(params: { market_hash_name?: string; physical_product_uuid?: string }) {

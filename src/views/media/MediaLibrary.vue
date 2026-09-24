@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 import { toast } from 'vue3-toastify'
 import { adminService, type MediaAsset, type MediaLink, type MediaTarget } from '@/services/admin/admin.service'
@@ -25,19 +25,45 @@ const formatSize = (bytes: number) => {
 const query = ref('')
 const suggestions = ref<MediaTarget[]>([])
 const target = ref<MediaTarget | null>(null)
+const heroes = ref<string[]>([])
+const hero = ref('')
 let searchTimer: ReturnType<typeof setTimeout> | null = null
+// Troca de herói busca na hora e pode cruzar com um debounce em voo: só a última resposta vale.
+let searchSeq = 0
 
-const onQueryInput = () => {
-    if (searchTimer) clearTimeout(searchTimer)
-    if (query.value.trim().length < 2) {
+// 'Other' é o balde do catálogo pra skin sem herói — no select ele precisa dizer isso.
+const heroLabel = (name: string) => (name === 'Other' ? 'Sem herói / diversos' : name)
+
+// Com herói a lista já sai inteira; sem ele, o texto solto precisa de 2 letras pra não varrer o catálogo.
+const canSearch = () => Boolean(hero.value) || query.value.trim().length >= 2
+
+const search = async () => {
+    const seq = ++searchSeq
+    if (!canSearch()) {
         suggestions.value = []
         return
     }
-    searchTimer = setTimeout(async () => {
-        const { data } = await adminService.searchMediaTargets(query.value.trim())
-        suggestions.value = data
-    }, 250)
+    const { data } = await adminService.searchMediaTargets(query.value.trim(), hero.value || undefined)
+    if (seq === searchSeq) suggestions.value = data
 }
+
+const onQueryInput = () => {
+    if (searchTimer) clearTimeout(searchTimer)
+    // Abaixo do mínimo, o próprio search limpa a lista na hora e invalida a resposta em voo.
+    if (!canSearch()) {
+        void search()
+        return
+    }
+    searchTimer = setTimeout(search, 250)
+}
+
+// Trocar de herói zera o texto: ele guarda o rótulo do alvo já escolhido e filtraria a lista nova.
+watch(hero, async () => {
+    if (searchTimer) clearTimeout(searchTimer)
+    query.value = ''
+    suggestions.value = []
+    await search()
+})
 
 const selectTarget = async (item: MediaTarget) => {
     target.value = item
@@ -149,7 +175,18 @@ const sync = async () => {
     }
 }
 
-onMounted(loadUnlinked)
+const loadHeroes = async () => {
+    const { data } = await adminService.mediaHeroes()
+    heroes.value = data
+}
+
+onMounted(async () => {
+    try {
+        await Promise.all([loadUnlinked(), loadHeroes()])
+    } catch (e: any) {
+        toast.error(e?.response?.data?.message || 'Erro ao carregar a biblioteca.')
+    }
+})
 </script>
 
 <template>
@@ -164,18 +201,31 @@ onMounted(loadUnlinked)
             </button>
         </header>
 
-        <div class="search-box">
-            <Icon icon="mdi:magnify" class="search-icon" />
-            <input v-model="query" type="text" class="field-input" placeholder="Buscar skin, collector ou produto físico..." @input="onQueryInput" />
-            <ul v-if="suggestions.length" class="suggestions">
-                <li v-for="s in suggestions" :key="`${s.type}:${s.key}`" @click="selectTarget(s)">
-                    <img v-if="s.icon" :src="buildSteamImageUrl(s.icon, '64fx64f') ?? ''" class="suggestion-icon" alt="" />
-                    <span v-else class="suggestion-icon suggestion-icon--empty"><Icon icon="mdi:package-variant" /></span>
-                    <span class="suggestion-label">{{ s.label }}</span>
-                    <span class="badge" :class="`badge--${s.type}`">{{ typeLabel[s.type] }}</span>
-                    <span v-if="s.rarity" class="suggestion-rarity">{{ s.rarity }}</span>
-                </li>
-            </ul>
+        <div class="search-row">
+            <select v-model="hero" class="field-input hero-select">
+                <option value="">Todos os heróis</option>
+                <option v-for="h in heroes" :key="h" :value="h">{{ heroLabel(h) }}</option>
+            </select>
+
+            <div class="search-box">
+                <Icon icon="mdi:magnify" class="search-icon" />
+                <input
+                    v-model="query"
+                    type="text"
+                    class="field-input"
+                    :placeholder="hero ? `Filtrar skins de ${heroLabel(hero)} pelo nome...` : 'Buscar skin, collector ou produto físico...'"
+                    @input="onQueryInput"
+                />
+                <ul v-if="suggestions.length" class="suggestions">
+                    <li v-for="s in suggestions" :key="`${s.type}:${s.key}`" @click="selectTarget(s)">
+                        <img v-if="s.icon" :src="buildSteamImageUrl(s.icon, '64fx64f') ?? ''" class="suggestion-icon" alt="" />
+                        <span v-else class="suggestion-icon suggestion-icon--empty"><Icon icon="mdi:package-variant" /></span>
+                        <span class="suggestion-label">{{ s.label }}</span>
+                        <span class="badge" :class="`badge--${s.type}`">{{ typeLabel[s.type] }}</span>
+                        <span v-if="s.rarity" class="suggestion-rarity">{{ s.rarity }}</span>
+                    </li>
+                </ul>
+            </div>
         </div>
 
         <section v-if="target" class="card">
@@ -312,9 +362,18 @@ onMounted(loadUnlinked)
         opacity 0.5
         cursor default
 
+.search-row
+    display flex
+    align-items stretch
+    gap 0.6rem
+    margin-bottom 1.5rem
+
+    @media (max-width 640px)
+        flex-direction column
+
 .search-box
     position relative
-    margin-bottom 1.5rem
+    flex 1
 
 .search-icon
     position absolute
@@ -336,6 +395,15 @@ onMounted(loadUnlinked)
 
     &:focus
         border-color #6366f1
+
+.hero-select
+    flex-shrink 0
+    width auto
+    min-width 200px
+    padding-left 0.9rem
+    cursor pointer
+    // deixa a seta e o popup nativos combinarem com o tema escuro
+    color-scheme dark
 
 .suggestions
     position absolute

@@ -122,6 +122,15 @@ export interface CrmOrder {
   items: CrmOrderItem[]
 }
 
+/** Cliente que pode receber e-mail (tem conta, e-mail e não se descadastrou). */
+export interface CrmEmailRecipient {
+  /** `uuid` chega como `id`: interceptor do backend renomeia. */
+  id: string
+  username: string | null
+  email: string
+  campaign: CrmCampaign | null
+}
+
 export interface CrmCustomerDetail extends CrmCustomer {
   purchased_heroes: Array<{ hero: string; items: number; spent: number }>
   orders: CrmOrder[]
@@ -1435,6 +1444,17 @@ export const adminService = {
     if (params.source) query.append('source', params.source)
     if (params.sort) query.append('sort', params.sort)
     return api.get<CrmListResponse>(`/admin/crm/customers?${query}`)
+  },
+
+  async getEmailRecipients(params: { campaign?: CrmCampaign; hero?: string }) {
+    const query = new URLSearchParams()
+    if (params.campaign) query.append('campaign', params.campaign)
+    if (params.hero) query.append('hero', params.hero)
+    return api.get<CrmEmailRecipient[]>(`/admin/crm/email/recipients?${query}`)
+  },
+
+  async sendEmailBlast(data: { userUuids: string[]; subject: string; body: string; couponUuid: string | null }) {
+    return api.post<{ queued: number; alreadySentToday: number; skipped: number }>('/admin/crm/email', data)
   },
 
   async importWixCustomers(file: File) {

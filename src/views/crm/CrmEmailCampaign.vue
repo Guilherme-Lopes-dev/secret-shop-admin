@@ -21,6 +21,8 @@ interface Coupon {
 
 /** Espelha MAX_EMAIL_RECIPIENTS do backend (crm.service.ts). */
 const MAX_RECIPIENTS = 1000
+/** Entram no lugar do nome em `{nome}` pra quem tiver uma escolhida. */
+const NICKNAMES = ['Dom', 'Padrim', 'Patrão', 'Chefe', 'Mestre', 'Lenda', 'Craque']
 
 const campaign = ref<CrmCampaign | ''>('')
 const hero = ref('')
@@ -29,6 +31,9 @@ const recipients = ref<CrmEmailRecipient[]>([])
 const selected = ref(new Set<string>())
 const recipientSearch = ref('')
 const loadingRecipients = ref(false)
+/** id do cliente → alcunha. Sem entrada = vai o nome dele. */
+const nicknames = ref<Record<string, string>>({})
+const bulkNickname = ref('')
 
 const subject = ref('')
 const body = ref('Fala, {nome}!\n\n')
@@ -63,14 +68,30 @@ const allVisibleSelected = computed(() =>
 )
 const canSend = computed(() => selected.value.size > 0 && subject.value.trim() !== '' && body.value.trim() !== '')
 
+const displayName = (recipient: CrmEmailRecipient) => nicknames.value[recipient.id] || recipient.username || 'jogador'
+
+const setNickname = (id: string, nickname: string) => {
+    const { [id]: _previous, ...rest } = nicknames.value
+    nicknames.value = nickname ? { ...rest, [id]: nickname } : rest
+}
+
+const applyNicknameToSelected = () => {
+    selected.value.forEach((id) => setNickname(id, bulkNickname.value))
+}
+
 // Mesma conversão do backend (email-body.ts), só pra prévia.
 const escapeHtml = (text: string) =>
     text.replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]!)
-const previewName = computed(() => recipients.value.find((recipient) => selected.value.has(recipient.id))?.username || 'jogador')
+const linkify = (html: string) =>
+    html.replace(/https?:\/\/(?:[^\s<&]|&amp;)+/g, (match) => {
+        const url = match.replace(/[.,;:!?)]+$/, '')
+        return `<a href="${url}" target="_blank" rel="noopener">${url}</a>${match.slice(url.length)}`
+    })
+const previewRecipient = computed(() => recipients.value.find((recipient) => selected.value.has(recipient.id)) ?? null)
+const previewName = computed(() => (previewRecipient.value ? displayName(previewRecipient.value) : 'jogador'))
 const previewHtml = computed(() =>
-    escapeHtml(body.value)
+    linkify(escapeHtml(body.value))
         .split('{nome}').join(escapeHtml(previewName.value))
-        .replace(/https?:\/\/[^\s<]+/g, (url) => `<a href="${url}" target="_blank" rel="noopener">${url}</a>`)
         .replace(/\r?\n/g, '<br>'),
 )
 
@@ -119,6 +140,7 @@ const send = async () => {
             subject: subject.value,
             body: body.value,
             couponUuid: couponId.value || null,
+            nicknames: Object.fromEntries(Object.entries(nicknames.value).filter(([id]) => selected.value.has(id))),
         })
         const notes = [
             data.alreadySentToday && `${data.alreadySentToday} já receberam campanha hoje`,
@@ -180,6 +202,14 @@ onMounted(() => {
                     </label>
                     <input v-model="recipientSearch" type="search" class="search-input" placeholder="Filtrar por nome ou e-mail..." />
                 </div>
+                <div class="nickname-bulk">
+                    <span>Chamar os marcados de</span>
+                    <select v-model="bulkNickname" class="filter-select">
+                        <option value="">Nome do cliente</option>
+                        <option v-for="nickname in NICKNAMES" :key="nickname" :value="nickname">{{ nickname }}</option>
+                    </select>
+                    <button class="btn-apply" :disabled="!selected.size" @click="applyNicknameToSelected">Aplicar</button>
+                </div>
 
                 <div class="recipients">
                     <p v-if="loadingRecipients" class="muted pad">Carregando...</p>
@@ -193,6 +223,17 @@ onMounted(() => {
                         <span v-if="recipient.campaign && !campaign" class="campaign-tag" :style="{ '--accent': campaignMeta(recipient.campaign).color }">
                             {{ campaignMeta(recipient.campaign).label }}
                         </span>
+                        <select
+                            class="nickname-select"
+                            :class="{ active: nicknames[recipient.id] }"
+                            :value="nicknames[recipient.id] ?? ''"
+                            title="Como chamar esse cliente no {nome}"
+                            @click.stop
+                            @change="setNickname(recipient.id, ($event.target as HTMLSelectElement).value)"
+                        >
+                            <option value="">Nome</option>
+                            <option v-for="nickname in NICKNAMES" :key="nickname" :value="nickname">{{ nickname }}</option>
+                        </select>
                     </label>
                 </div>
                 <p v-if="recipients.length >= MAX_RECIPIENTS" class="hint warn">
@@ -210,7 +251,7 @@ onMounted(() => {
                 <label class="field">
                     <span>Texto</span>
                     <textarea v-model="body" rows="9" maxlength="10000" class="text-input" />
-                    <small class="hint"><code>{nome}</code> vira o nome do cliente (vale no assunto também). Links (https://...) ficam clicáveis.</small>
+                    <small class="hint"><code>{nome}</code> vira o nome do cliente, ou a alcunha escolhida na lista (vale no assunto também). Links (https://...) ficam clicáveis.</small>
                 </label>
                 <label class="field">
                     <span>Cupom (opcional)</span>
@@ -373,6 +414,47 @@ onMounted(() => {
     gap 0.4rem
     font-size 0.85rem
     cursor pointer
+
+.nickname-bulk
+    display flex
+    align-items center
+    gap 0.5rem
+    flex-wrap wrap
+    margin-bottom 0.5rem
+    font-size 0.85rem
+    color #cbd5e1
+
+.btn-apply
+    background #2a2a30
+    color #fff
+    border 1px solid rgba(255,255,255,0.1)
+    padding 0.45rem 0.9rem
+    border-radius 8px
+    font-size 0.85rem
+    cursor pointer
+
+    &:hover:not(:disabled)
+        background #3a3a42
+
+    &:disabled
+        opacity 0.4
+        cursor not-allowed
+
+.nickname-select
+    background transparent
+    border 1px solid rgba(255,255,255,0.08)
+    border-radius 6px
+    color #94a3b8
+    padding 2px 4px
+    font-size 0.75rem
+    cursor pointer
+
+    &.active
+        color #818cf8
+        border-color rgba(99,102,241,0.4)
+
+    option
+        background #1a1a1e
 
 .recipients
     max-height 420px

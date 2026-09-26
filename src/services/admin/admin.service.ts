@@ -1453,7 +1453,14 @@ export const adminService = {
     return api.get<CrmEmailRecipient[]>(`/admin/crm/email/recipients?${query}`)
   },
 
-  async sendEmailBlast(data: { userUuids: string[]; subject: string; body: string; couponUuid: string | null }) {
+  async sendEmailBlast(data: {
+    userUuids: string[]
+    subject: string
+    body: string
+    couponUuid: string | null
+    /** id do cliente → alcunha que substitui o nome em `{nome}`. */
+    nicknames: Record<string, string>
+  }) {
     return api.post<{ queued: number; alreadySentToday: number; skipped: number }>('/admin/crm/email', data)
   },
 

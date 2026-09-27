@@ -27,12 +27,22 @@
         <h2 class="section-title">Novo post</h2>
 
         <div class="kind-tabs">
+          <button type="button" class="tab" :class="{ 'tab--on': mode === 'AI' }" @click="mode = 'AI'">
+            <Icon icon="mdi:creation" width="14" /> Gerar com IA
+          </button>
+          <button type="button" class="tab" :class="{ 'tab--on': mode === 'COMPOSE' }" @click="mode = 'COMPOSE'">
+            <Icon icon="mdi:layers-outline" width="14" /> Montar com fundo
+          </button>
+        </div>
+
+        <div class="kind-tabs">
           <button type="button" class="tab" :class="{ 'tab--on': kind === 'FEED' }" @click="setKind('FEED')">Feed</button>
           <button type="button" class="tab" :class="{ 'tab--on': kind === 'STORY' }" @click="setKind('STORY')">Story</button>
         </div>
 
         <div class="field">
-          <label>Produto <span class="text-muted">(opcional; vira PRODUCT_LOCKED na arte)</span></label>
+          <label v-if="mode === 'COMPOSE'">Skin</label>
+          <label v-else>Produto <span class="text-muted">(opcional; vira PRODUCT_LOCKED na arte)</span></label>
           <div v-if="subject" class="subject-chip">
             <Icon icon="mdi:sword" width="14" /> {{ subject }}
             <button type="button" class="subject-chip__clear" @click="clearSubject"><Icon icon="mdi:close" width="14" /></button>
@@ -53,37 +63,46 @@
           </ul>
         </div>
 
+        <ArtPicker
+          v-if="mode === 'COMPOSE'"
+          v-model:media="composeMedia"
+          v-model:background="composeBackground"
+          :market-hash-name="pickedUnit?.skins?.market_hash_name ?? null"
+        />
+
         <div class="field-row">
           <div class="field">
             <label>Preço (R$)</label>
             <input v-model="priceBrl" type="number" min="0" step="0.01" class="form-input" placeholder="sem preço" />
           </div>
-          <div class="field">
+          <div v-if="mode === 'AI'" class="field">
             <label>Cupom</label>
             <input v-model="couponCode" class="form-input" placeholder="ex: RUNA10" />
           </div>
         </div>
 
-        <div v-if="couponCode.trim()" class="field">
-          <label>Regra do cupom</label>
-          <input v-model="couponRule" class="form-input" placeholder="ex: 10% em qualquer skin até domingo" />
-        </div>
-
-        <div class="field">
-          <label>Mensagem <span class="text-muted">(o que a arte precisa dizer)</span></label>
-          <textarea v-model="message" class="form-input" rows="3" placeholder="ex: chegou no estoque, poucas unidades confirmadas" />
-        </div>
-
-        <div class="field-row">
-          <div class="field">
-            <label>CTA</label>
-            <input v-model="cta" class="form-input" placeholder="VER NO SITE" />
+        <template v-if="mode === 'AI'">
+          <div v-if="couponCode.trim()" class="field">
+            <label>Regra do cupom</label>
+            <input v-model="couponRule" class="form-input" placeholder="ex: 10% em qualquer skin até domingo" />
           </div>
+
           <div class="field">
-            <label>Link</label>
-            <input v-model="ctaUrl" class="form-input" placeholder="https://secretshopgg.com" />
+            <label>Mensagem <span class="text-muted">(o que a arte precisa dizer)</span></label>
+            <textarea v-model="message" class="form-input" rows="3" placeholder="ex: chegou no estoque, poucas unidades confirmadas" />
           </div>
-        </div>
+
+          <div class="field-row">
+            <div class="field">
+              <label>CTA</label>
+              <input v-model="cta" class="form-input" placeholder="VER NO SITE" />
+            </div>
+            <div class="field">
+              <label>Link</label>
+              <input v-model="ctaUrl" class="form-input" placeholder="https://secretshopgg.com" />
+            </div>
+          </div>
+        </template>
 
         <div v-if="kind === 'FEED'" class="field">
           <label>Legenda</label>
@@ -93,10 +112,15 @@
 
         <p v-if="composerError" class="error-msg">{{ composerError }}</p>
 
-        <button class="btn-primary" :disabled="!canCreate || creating" @click="createPost">
-          <Icon icon="mdi:creation" width="16" /> {{ creating ? 'Enviando...' : 'Gerar imagem' }}
+        <button v-if="mode === 'COMPOSE'" class="btn-primary" :disabled="!canCompose || creating" @click="composePost">
+          <Icon icon="mdi:layers-outline" width="16" /> {{ creating ? 'Montando...' : 'Montar arte' }}
         </button>
-        <p class="field-hint">Prompt mestre v3 decide template e composição. Leva 1–2 min; o rascunho aparece ao lado quando a arte ficar pronta.</p>
+        <template v-else>
+          <button class="btn-primary" :disabled="!canCreate || creating" @click="createPost">
+            <Icon icon="mdi:creation" width="16" /> {{ creating ? 'Enviando...' : 'Gerar imagem' }}
+          </button>
+          <p class="field-hint">Prompt mestre v3 decide template e composição. Leva 1–2 min; o rascunho aparece ao lado quando a arte ficar pronta.</p>
+        </template>
       </section>
 
       <section class="posts">
@@ -105,7 +129,7 @@
 
         <article v-for="p in posts" :key="p.id" class="post-card">
           <div class="post-card__image" :class="p.kind === 'STORY' ? 'ratio-story' : 'ratio-feed'">
-            <img v-if="p.image_url" :src="mediaUrl(p.image_url)" alt="" />
+            <img v-if="p.image_url" referrerpolicy="no-referrer" :src="mediaUrl(p.image_url)" alt="" />
             <div v-else class="post-card__placeholder">
               <Icon v-if="p.status === 'GENERATING'" icon="mdi:loading" width="28" class="spin" />
               <Icon v-else icon="mdi:image-off-outline" width="28" />
@@ -204,16 +228,16 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, shallowRef } from 'vue'
+import { mediaUrl } from '@/utils/mediaUrl'
 import { Icon } from '@iconify/vue'
 import { toast } from 'vue3-toastify'
 import dayjs from 'dayjs'
 import { adminService } from '@/services/admin/admin.service'
+import ArtPicker from './ArtPicker.vue'
 
 type Kind = 'FEED' | 'STORY'
-
-const API_URL = import.meta.env.VITE_API_URL?.trim() || ''
-const mediaUrl = (path: string) => `${API_URL}${path}`
+type Mode = 'AI' | 'COMPOSE'
 
 const BUSY_STATUSES = ['GENERATING', 'PUBLISHING']
 const POLL_MS = 4000
@@ -303,6 +327,7 @@ const resetPrompt = async () => {
 }
 
 // ── Composer ──────────────────────────────────────────────────────────────────
+const mode = ref<Mode>('AI')
 const kind = ref<Kind>('FEED')
 const subject = ref('')
 const priceBrl = ref('')
@@ -319,7 +344,9 @@ const skinQuery = ref('')
 const skinResults = ref<any[]>([])
 const searchingSkins = ref(false)
 let skinTimer: ReturnType<typeof setTimeout> | null = null
-let pickedUnit: any = null
+const pickedUnit = shallowRef<any>(null)
+const composeMedia = ref<string | null>(null)
+const composeBackground = ref<string | null>(null)
 
 const skinThumb = (icon?: string | null): string | null =>
   icon ? `https://steamcommunity-a.akamaihd.net/economy/image/${icon}/62fx62f` : null
@@ -338,6 +365,7 @@ const setKind = (k: Kind) => { kind.value = k }
 
 // Precisa de algo pra peça dizer: produto, cupom ou mensagem.
 const canCreate = computed(() => !!subject.value || !!couponCode.value.trim() || !!message.value.trim())
+const canCompose = computed(() => !!pickedUnit.value && !!composeMedia.value && !!composeBackground.value)
 
 const searchSkins = async () => {
   const search = skinQuery.value.trim()
@@ -359,7 +387,7 @@ const onSkinQuery = () => {
 }
 
 const pickSkin = (unit: any) => {
-  pickedUnit = unit
+  pickedUnit.value = unit
   subject.value = unit.skins?.name ?? ''
   priceBrl.value = unit.price != null ? (unit.price / 100).toFixed(2) : ''
   caption.value = captionFor(unit)
@@ -368,7 +396,7 @@ const pickSkin = (unit: any) => {
 }
 
 const clearSubject = () => {
-  pickedUnit = null
+  pickedUnit.value = null
   subject.value = ''
 }
 
@@ -379,7 +407,7 @@ const createPost = async () => {
   try {
     const res = await adminService.createInstagramPost({
       kind: kind.value,
-      skin_uuid: pickedUnit?.skins?.id || undefined,
+      skin_uuid: pickedUnit.value?.skins?.id || undefined,
       price_brl: priceBrl.value ? Number(priceBrl.value) : undefined,
       coupon_code: couponCode.value.trim() || undefined,
       coupon_rule: couponRule.value.trim() || undefined,
@@ -393,6 +421,28 @@ const createPost = async () => {
     toast.info('Gerando imagem...')
   } catch (err: any) {
     composerError.value = err.response?.data?.message ?? 'Não deu pra criar o post.'
+  } finally {
+    creating.value = false
+  }
+}
+
+// Sem IA: responde na hora com o rascunho pronto, sem poll.
+const composePost = async () => {
+  if (creating.value) return
+  creating.value = true
+  composerError.value = ''
+  try {
+    const res = await adminService.composeInstagramPost({
+      kind: kind.value,
+      skin_uuid: pickedUnit.value.skins.id,
+      media_uuid: composeMedia.value!,
+      background_uuid: composeBackground.value!,
+      price_brl: priceBrl.value ? Number(priceBrl.value) : undefined,
+      caption: kind.value === 'FEED' ? caption.value.trim() || undefined : undefined,
+    })
+    posts.value = [res.data, ...posts.value]
+  } catch (err: any) {
+    composerError.value = err.response?.data?.message ?? 'Não deu pra montar a arte.'
   } finally {
     creating.value = false
   }
@@ -581,6 +631,10 @@ onBeforeUnmount(() => {
 
 .tab
   flex 1
+  display inline-flex
+  align-items center
+  justify-content center
+  gap 6px
   padding 6px
   background transparent
   border none

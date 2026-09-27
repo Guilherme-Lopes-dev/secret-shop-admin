@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, onMounted } from 'vue'
+import { mediaUrl } from '@/utils/mediaUrl'
 import { useRoute, useRouter } from 'vue-router'
 import { adminService } from '@/services/admin/admin.service'
 import { formatCurrency } from '@/utils/formatCurrency'
@@ -9,8 +10,6 @@ import { Icon } from '@iconify/vue'
 const route  = useRoute()
 const router = useRouter()
 
-const API_URL = import.meta.env.VITE_API_URL?.trim() || ''
-const mediaUrl = (path: string) => `${API_URL}${path}`
 
 const order   = ref<any>(null)
 const loading = ref(true)
@@ -240,6 +239,7 @@ onMounted(fetchOrder)
                                 <img
                                     v-if="sl.physical_products?.media?.[0]"
                                     :src="mediaUrl(sl.physical_products.media[0].url)"
+                                    referrerpolicy="no-referrer"
                                     class="item-img"
                                     :alt="sl.physical_products?.name"
                                 />

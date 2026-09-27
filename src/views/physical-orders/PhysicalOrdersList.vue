@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { mediaUrl } from '@/utils/mediaUrl'
 import { useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import { toast } from 'vue3-toastify'
@@ -10,7 +11,6 @@ import { persistedRef } from '@/utils/persistedRef'
 const router = useRouter()
 const goToDetail = (uuid: string) => router.push(`/physical-orders/${uuid}`)
 
-const API_URL = import.meta.env.VITE_API_URL?.trim() || ''
 
 const orders = ref<any[]>([])
 const loading = ref(true)
@@ -24,7 +24,6 @@ const filterPayment = persistedRef('physical-orders:payment', '')
 const filterDelivery = persistedRef('physical-orders:delivery', '')
 let searchTimer: ReturnType<typeof setTimeout> | null = null
 
-const mediaUrl = (path: string) => `${API_URL}${path}`
 
 const fetchOrders = async (page: number) => {
     loading.value = true
@@ -160,7 +159,7 @@ onMounted(() => fetchOrders(1))
                                 <td><span class="order-number">{{ order.order_number }}</span></td>
                                 <td>
                                     <div class="item-cell">
-                                        <img v-if="itemImage(order)" :src="mediaUrl(itemImage(order)!)" class="item-thumb" :alt="itemName(order)" />
+                                        <img v-if="itemImage(order)" referrerpolicy="no-referrer" :src="mediaUrl(itemImage(order)!)" class="item-thumb" :alt="itemName(order)" />
                                         <div v-else class="item-thumb-placeholder"><Icon icon="mdi:package-variant" /></div>
                                         <span class="item-name">{{ itemName(order) }}</span>
                                     </div>

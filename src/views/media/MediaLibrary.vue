@@ -1,12 +1,11 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
+import { mediaUrl } from '@/utils/mediaUrl'
 import { Icon } from '@iconify/vue'
 import { toast } from 'vue3-toastify'
 import { adminService, type MediaAsset, type MediaLink, type MediaTarget } from '@/services/admin/admin.service'
 import { buildSteamImageUrl } from '@/utils/steamImage'
 
-const API_URL = import.meta.env.VITE_API_URL?.trim() || ''
-const mediaUrl = (path: string) => `${API_URL}${path}`
 
 type Level = 1 | 2 | 3 | null
 const ARCANA_LEVELS: Level[] = [null, 1, 2, 3]
@@ -252,7 +251,7 @@ onMounted(async () => {
                 <div v-else class="media-grid">
                     <div v-for="(m, i) in groupOf(level)" :key="m.id" class="media-thumb">
                         <video v-if="m.media_type === 'video'" :src="mediaUrl(m.url)" class="media-preview" muted preload="metadata" />
-                        <img v-else :src="mediaUrl(m.url)" class="media-preview" alt="" />
+                        <img v-else referrerpolicy="no-referrer" :src="mediaUrl(m.url)" class="media-preview" alt="" />
                         <span class="media-name" :title="fileName(m)">{{ fileName(m) }}</span>
                         <span class="media-meta">{{ m.media_type === 'video' ? '▶ ' : '' }}{{ formatSize(m.size) }}</span>
                         <div class="media-actions">
@@ -279,7 +278,7 @@ onMounted(async () => {
             <div v-else class="media-grid">
                 <div v-for="m in orphans" :key="m.id" class="media-thumb media-thumb--wide">
                     <video v-if="m.media_type === 'video'" :src="mediaUrl(m.url)" class="media-preview" muted preload="metadata" />
-                    <img v-else :src="mediaUrl(m.url)" class="media-preview" alt="" />
+                    <img v-else referrerpolicy="no-referrer" :src="mediaUrl(m.url)" class="media-preview" alt="" />
                     <span class="media-name" :title="fileName(m)">{{ fileName(m) }}</span>
                         <span class="media-meta">{{ m.media_type === 'video' ? '▶ ' : '' }}{{ formatSize(m.size) }}</span>
                     <div class="media-actions">
@@ -301,7 +300,7 @@ onMounted(async () => {
             <div class="media-grid">
                 <div v-for="m in ownerGone" :key="m.id" class="media-thumb media-thumb--wide">
                     <video v-if="m.media_type === 'video'" :src="mediaUrl(m.url)" class="media-preview" muted preload="metadata" />
-                    <img v-else :src="mediaUrl(m.url)" class="media-preview" alt="" />
+                    <img v-else referrerpolicy="no-referrer" :src="mediaUrl(m.url)" class="media-preview" alt="" />
                     <span class="media-name" :title="fileName(m)">{{ fileName(m) }}</span>
                     <span class="media-meta" :title="m.market_hash_name ?? ''">{{ m.market_hash_name }}{{ m.level ? ` · N${m.level}` : '' }}</span>
                     <div class="media-actions">

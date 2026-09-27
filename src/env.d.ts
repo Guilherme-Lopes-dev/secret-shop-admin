@@ -6,6 +6,7 @@ import type { formatCurrency } from '@/utils/formatCurrency'
 
 interface ImportMetaEnv {
   readonly VITE_API_URL: string
+  readonly VITE_MEDIA_URL?: string
 }
 
 interface ImportMeta {

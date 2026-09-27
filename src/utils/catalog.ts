@@ -1,3 +1,5 @@
+import { mediaUrl } from './mediaUrl'
+
 // Favoritos, carrinho e itens de pedido listam os mesmos três catálogos.
 export const CATALOG_LABELS = { skin: 'Skin', collector: 'Collector', physical: 'Físico' } as const
 export const CATALOG_ICONS = {
@@ -16,12 +18,11 @@ export interface CatalogItem {
     image: string | null
 }
 
-const API_URL = import.meta.env.VITE_API_URL?.trim() || ''
 
 // A URL sai do `kind`, não do formato do campo.
 export const catalogThumb = (item: CatalogItem): string | null => {
     if (!item.image) return null
-    if (item.kind === 'physical') return `${API_URL}${item.image}`
+    if (item.kind === 'physical') return mediaUrl(item.image)
 
     return `https://steamcommunity-a.akamaihd.net/economy/image/${item.image}/62fx62f`
 }

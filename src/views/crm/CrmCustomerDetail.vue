@@ -320,7 +320,7 @@ onMounted(fetchCustomer)
                                     <td>
                                         <div v-if="order.items.length" class="thumb-strip">
                                             <template v-for="(item, index) in order.items.slice(0, THUMBS_IN_ROW)" :key="index">
-                                                <img v-if="catalogThumb(item)" :src="catalogThumb(item)!" class="thumb" :alt="item.name" :title="item.name" />
+                                                <img v-if="catalogThumb(item)" referrerpolicy="no-referrer" :src="catalogThumb(item)!" class="thumb" :alt="item.name" :title="item.name" />
                                                 <span v-else class="thumb thumb--empty" :title="item.name"><Icon :icon="catalogIcon(item)" /></span>
                                             </template>
                                             <span v-if="order.items.length > THUMBS_IN_ROW" class="thumb-more">+{{ order.items.length - THUMBS_IN_ROW }}</span>

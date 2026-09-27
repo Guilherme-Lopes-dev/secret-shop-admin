@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { mediaUrl } from '@/utils/mediaUrl'
 import { Icon } from '@iconify/vue'
 import { toast } from 'vue3-toastify'
 import { adminService, type MediaAsset } from '@/services/admin/admin.service'
 import { formatCurrency } from '@/utils/formatCurrency'
 
-const API_URL = import.meta.env.VITE_API_URL?.trim() || ''
 
 const products = ref<any[]>([])
 const loading = ref(true)
@@ -28,7 +28,6 @@ const pendingMedia = ref<(MediaAsset & { previewUrl: string })[]>([])
 const editingUuid = ref<string | null>(null)
 const existingMedia = ref<MediaAsset[]>([])
 
-const mediaUrl = (path: string) => `${API_URL}${path}`
 
 const parseIntOrUndefined = (value: string): number | undefined => {
     const n = parseInt(value, 10)
@@ -254,7 +253,7 @@ onMounted(fetchProducts)
                     <div v-if="existingMedia.length" class="media-grid">
                         <div v-for="media in existingMedia" :key="media.id" class="media-thumb">
                             <video v-if="media.media_type === 'video'" :src="mediaUrl(media.url)" class="media-preview" muted />
-                            <img v-else :src="mediaUrl(media.url)" class="media-preview" alt="Mídia" />
+                            <img v-else referrerpolicy="no-referrer" :src="mediaUrl(media.url)" class="media-preview" alt="Mídia" />
                             <button type="button" class="media-remove" @click="removeExistingMedia(media.id)">
                                 <Icon icon="mdi:close" />
                             </button>
@@ -308,7 +307,7 @@ onMounted(fetchProducts)
                         <tbody>
                             <tr v-for="p in products" :key="p.id">
                                 <td>
-                                    <img v-if="p.media?.[0]" :src="mediaUrl(p.media[0].url)" class="item-thumb" alt="" />
+                                    <img v-if="p.media?.[0]" referrerpolicy="no-referrer" :src="mediaUrl(p.media[0].url)" class="item-thumb" alt="" />
                                     <div v-else class="item-thumb-placeholder"><Icon icon="mdi:image-off-outline" /></div>
                                 </td>
                                 <td>{{ p.name }}</td>

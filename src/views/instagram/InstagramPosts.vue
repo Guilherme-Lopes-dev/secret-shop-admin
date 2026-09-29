@@ -137,6 +137,10 @@
             <option value="">Todos os heróis</option>
             <option v-for="hero in heroes" :key="hero" :value="hero">{{ hero }}</option>
           </select>
+          <select v-model="rarityFilter" class="form-input posts-toolbar__rarity">
+            <option value="">Todas as raridades</option>
+            <option v-for="rarity in rarities" :key="rarity" :value="rarity">{{ rarity }}</option>
+          </select>
           <input v-model="skinFilter" class="form-input posts-toolbar__skin" placeholder="Buscar skin..." />
           <button type="button" class="btn-ghost" :disabled="!selectablePosts.length" @click="selectVisible">
             Selecionar rascunhos visíveis ({{ selectablePosts.length }})
@@ -282,7 +286,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch, type Ref } from 'vue'
 import { mediaUrl } from '@/utils/mediaUrl'
 import { Icon } from '@iconify/vue'
 import { toast } from 'vue3-toastify'
@@ -581,18 +585,35 @@ watch(posts, () => {
   stale.forEach((p) => unselect(p.id))
 })
 
-// ── Filtro (herói vem da ORDEM da IA; post sem produto não tem) ─────────────
+// ── Filtro (herói e raridade vêm da ORDEM da IA; post sem produto não tem) ──
 const heroFilter = ref('')
+const rarityFilter = ref('')
 const skinFilter = ref('')
 
-const heroes = computed(() =>
-  [...new Set(posts.value.map((p) => p.hero).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'pt-BR')),
-)
+// Ordem de tier do Dota; raridade fora da lista (ex: Seasonal) vai pro fim.
+const RARITY_ORDER = ['Common', 'Uncommon', 'Rare', 'Mythical', 'Legendary', 'Immortal', 'Arcana']
+const rarityRank = (rarity: string) => {
+  const rank = RARITY_ORDER.indexOf(rarity)
+  return rank === -1 ? RARITY_ORDER.length : rank
+}
 
-// Herói escolhido sumiu da lista (post excluído): volta pra "Todos" em vez de travar vazio.
-watch(heroes, (list) => {
-  if (heroFilter.value && !list.includes(heroFilter.value)) heroFilter.value = ''
-})
+const byName = (a: string, b: string) => a.localeCompare(b, 'pt-BR')
+const byRarity = (a: string, b: string) => rarityRank(a) - rarityRank(b) || byName(a, b)
+
+const distinctValues = (field: 'hero' | 'rarity'): string[] =>
+  [...new Set(posts.value.map((p) => p[field]).filter(Boolean))]
+
+const heroes = computed(() => distinctValues('hero').sort(byName))
+const rarities = computed(() => distinctValues('rarity').sort(byRarity))
+
+// Valor escolhido sumiu da lista (post excluído): volta pra "Todos" em vez de travar vazio.
+const resetWhenGone = (filter: Ref<string>) => (list: string[]) => {
+  if (filter.value && !list.includes(filter.value)) filter.value = ''
+}
+watch(heroes, resetWhenGone(heroFilter))
+watch(rarities, resetWhenGone(rarityFilter))
+
+const matchesField = (wanted: string, actual: string | null) => !wanted || actual === wanted
 
 const matchesSkin = (p: any) => {
   const search = skinFilter.value.trim().toLowerCase()
@@ -600,10 +621,8 @@ const matchesSkin = (p: any) => {
   return (p.subject ?? '').toLowerCase().includes(search)
 }
 
-const matchesFilter = (p: any) => {
-  if (heroFilter.value && p.hero !== heroFilter.value) return false
-  return matchesSkin(p)
-}
+const matchesFilter = (p: any) =>
+  matchesField(heroFilter.value, p.hero) && matchesField(rarityFilter.value, p.rarity) && matchesSkin(p)
 
 const visiblePosts = computed(() => posts.value.filter(matchesFilter))
 const selectablePosts = computed(() => visiblePosts.value.filter(canPublish))
@@ -873,6 +892,7 @@ onBeforeUnmount(() => {
   align-items center
 
 .posts-toolbar__hero
+.posts-toolbar__rarity
   width 200px
 
 .posts-toolbar__skin

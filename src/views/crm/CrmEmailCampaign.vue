@@ -67,6 +67,11 @@ const visibleRecipients = computed(() => {
 const allVisibleSelected = computed(() =>
     visibleRecipients.value.length > 0 && visibleRecipients.value.every((recipient) => selected.value.has(recipient.id)),
 )
+const isFiltering = computed(() => recipientSearch.value.trim() !== '')
+/** Marcados que o filtro de busca esconde — vão receber mesmo sem aparecer. */
+const hiddenSelectedCount = computed(
+    () => selected.value.size - visibleRecipients.value.filter((recipient) => selected.value.has(recipient.id)).length,
+)
 const canSend = computed(() => selected.value.size > 0 && subject.value.trim() !== '' && body.value.trim() !== '')
 
 const displayName = (recipient: CrmEmailRecipient) => nicknames.value[recipient.id] || recipient.username || 'jogador'
@@ -88,7 +93,12 @@ const linkify = (html: string) =>
         const url = match.replace(/[.,;:!?)]+$/, '')
         return `<a href="${url}" target="_blank" rel="noopener">${url}</a>${match.slice(url.length)}`
     })
-const previewRecipient = computed(() => recipients.value.find((recipient) => selected.value.has(recipient.id)) ?? null)
+// Prévia com quem está na tela; só cai pro resto da lista se o filtro esconder todos os marcados.
+const previewRecipient = computed(() => {
+    const isSelected = (recipient: CrmEmailRecipient) => selected.value.has(recipient.id)
+
+    return visibleRecipients.value.find(isSelected) ?? recipients.value.find(isSelected) ?? null
+})
 const previewName = computed(() => (previewRecipient.value ? displayName(previewRecipient.value) : 'jogador'))
 const previewHtml = computed(() =>
     linkify(escapeHtml(body.value))
@@ -110,7 +120,8 @@ const fetchRecipients = async () => {
         if (request !== latestRequest) return
 
         recipients.value = data
-        selected.value = new Set(data.map((recipient) => recipient.id))
+        // Começa vazio: disparo pra base inteira tem que ser escolha explícita.
+        selected.value = new Set()
     } catch (e: any) {
         if (request !== latestRequest) return
 
@@ -131,6 +142,10 @@ const toggleAllVisible = () => {
     const shouldSelect = !allVisibleSelected.value
     visibleRecipients.value.forEach((recipient) => (shouldSelect ? next.add(recipient.id) : next.delete(recipient.id)))
     selected.value = next
+}
+
+const clearSelection = () => {
+    selected.value = new Set()
 }
 
 const send = async () => {
@@ -203,10 +218,16 @@ onMounted(() => {
                 <div class="recipients-toolbar">
                     <label class="check-row">
                         <input type="checkbox" :checked="allVisibleSelected" @change="toggleAllVisible" />
-                        Marcar todos ({{ selected.size }}/{{ recipients.length }})
+                        {{ isFiltering ? `Marcar os filtrados (${visibleRecipients.length})` : 'Marcar todos' }}
                     </label>
+                    <span class="selection-count">{{ selected.size }} de {{ recipients.length }} marcados</span>
+                    <button v-if="selected.size" class="btn-link" @click="clearSelection">Desmarcar todos</button>
                     <input v-model="recipientSearch" type="search" class="search-input" placeholder="Filtrar por nome ou e-mail..." />
                 </div>
+                <p v-if="hiddenSelectedCount > 0" class="hint warn">
+                    {{ hiddenSelectedCount }} marcados estão fora do filtro e também vão receber.
+                    <button class="btn-link" @click="clearSelection">Desmarcar todos</button>
+                </p>
                 <div class="nickname-bulk">
                     <span>Chamar os marcados de</span>
                     <select v-model="bulkNickname" class="filter-select">
@@ -420,6 +441,21 @@ onMounted(() => {
     gap 0.4rem
     font-size 0.85rem
     cursor pointer
+
+.selection-count
+    color #94a3b8
+    font-size 0.8rem
+
+.btn-link
+    background none
+    border none
+    color #818cf8
+    font-size 0.8rem
+    padding 0
+    cursor pointer
+
+    &:hover
+        text-decoration underline
 
 .nickname-bulk
     display flex

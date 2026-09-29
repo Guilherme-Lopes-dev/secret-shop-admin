@@ -42,7 +42,8 @@ export const SIZE_RANGE: Record<ElementKey, { min: number; max: number }> = {
   price: { min: 0.03, max: 0.2 },
 }
 
-export const cloneLayout = (layout: FinishLayout): FinishLayout => structuredClone(layout)
+// JSON e não structuredClone: o layout chega como Proxy reativo do Vue, e structuredClone lança DataCloneError.
+export const cloneLayout = (layout: FinishLayout): FinishLayout => JSON.parse(JSON.stringify(layout))
 
 export const formatBrl = (value: number) =>
   value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })

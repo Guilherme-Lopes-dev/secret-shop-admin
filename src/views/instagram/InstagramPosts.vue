@@ -142,6 +142,12 @@
             <option v-for="rarity in rarities" :key="rarity" :value="rarity">{{ rarity }}</option>
           </select>
           <input v-model="skinFilter" class="form-input posts-toolbar__skin" placeholder="Buscar skin..." />
+          <button v-if="hasFilter" type="button" class="btn-ghost" @click="clearFilters">
+            <Icon icon="mdi:filter-remove-outline" width="14" /> Limpar filtros
+          </button>
+          <button v-if="selectedPosts.length" type="button" class="btn-ghost" @click="clearSelection">
+            <Icon icon="mdi:checkbox-multiple-blank-outline" width="14" /> Desmarcar todos ({{ selectedPosts.length }})
+          </button>
           <button type="button" class="btn-ghost" :disabled="!selectablePosts.length" @click="selectVisible">
             Selecionar rascunhos visíveis ({{ selectablePosts.length }})
           </button>
@@ -149,7 +155,10 @@
 
         <div v-if="loading" class="section empty-state">Carregando...</div>
         <div v-else-if="posts.length === 0" class="section empty-state">Nenhum post ainda. Gera o primeiro ao lado.</div>
-        <div v-else-if="visiblePosts.length === 0" class="section empty-state">Nenhum post com esse filtro.</div>
+        <div v-else-if="visiblePosts.length === 0" class="section empty-state">
+          Nenhum post com esse filtro.
+          <button type="button" class="btn-link" @click="clearFilters">Limpar filtros</button>
+        </div>
 
         <article v-for="p in visiblePosts" :key="p.id" class="post-card">
           <div class="post-card__image" :class="p.kind === 'STORY' ? 'ratio-story' : 'ratio-feed'">
@@ -621,6 +630,14 @@ const matchesSkin = (p: any) => {
   return (p.subject ?? '').toLowerCase().includes(search)
 }
 
+const hasFilter = computed(() => !!(heroFilter.value || rarityFilter.value || skinFilter.value.trim()))
+
+const clearFilters = () => {
+  heroFilter.value = ''
+  rarityFilter.value = ''
+  skinFilter.value = ''
+}
+
 const matchesFilter = (p: any) =>
   matchesField(heroFilter.value, p.hero) && matchesField(rarityFilter.value, p.rarity) && matchesSkin(p)
 
@@ -890,6 +907,10 @@ onBeforeUnmount(() => {
   gap 8px
   flex-wrap wrap
   align-items center
+  .btn-ghost
+    display inline-flex
+    align-items center
+    gap 6px
 
 .posts-toolbar__hero
 .posts-toolbar__rarity

@@ -264,6 +264,8 @@ export const adminService = {
       revenueYesterday: number
       ordersYesterday: number
       pendingPaymentsToday: number
+      onlineUsers: number
+      activeUsersToday: number
     }>('/dashboard/today')
   },
 

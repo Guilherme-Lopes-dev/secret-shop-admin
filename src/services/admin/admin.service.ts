@@ -393,8 +393,10 @@ export const adminService = {
     tierRank?: number,
     friendship?: { friendship?: string; minFriendDays?: number; maxFriendDays?: number },
     runes: string[] = [],
+    lastLoginDays?: number,
   ) {
     const params = new URLSearchParams({ page: String(page), limit: String(limit) })
+    if (lastLoginDays !== undefined) params.append('lastLoginDays', String(lastLoginDays))
     if (runes.length) params.append('runes', runes.join(','))
     if (search) params.append('search', search)
     if (sort) params.append('sort', sort)

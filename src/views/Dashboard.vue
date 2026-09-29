@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { Icon } from '@iconify/vue'
 import Chart from 'chart.js/auto'
 import { formatCurrency } from '@/utils/formatCurrency'
@@ -16,6 +16,8 @@ const today = ref({
     revenueYesterday: 0,
     ordersYesterday: 0,
     pendingPaymentsToday: 0,
+    onlineUsers: 0,
+    activeUsersToday: 0,
 })
 
 const pendings = ref<Record<string, number>>({})
@@ -92,6 +94,14 @@ const todayCards = computed(() => [
         icon: 'mdi:cash-clock',
         color: '#ff9800',
         delta: '',
+        deltaClass: '',
+    },
+    {
+        label: 'Logados agora',
+        value: String(today.value.onlineUsers),
+        icon: 'mdi:account-clock',
+        color: '#00bcd4',
+        delta: `hoje: ${today.value.activeUsersToday}`,
         deltaClass: '',
     },
 ])
@@ -194,7 +204,19 @@ const fetchDashboardData = async () => {
     }
 }
 
-onMounted(fetchDashboardData)
+const TODAY_POLL_MS = 60_000
+let todayPoll: ReturnType<typeof setInterval> | undefined
+
+const refreshToday = async () => {
+    const res = await adminService.getDashboardToday().catch(() => null)
+    if (res?.data) today.value = res.data
+}
+
+onMounted(() => {
+    fetchDashboardData()
+    todayPoll = setInterval(refreshToday, TODAY_POLL_MS)
+})
+onUnmounted(() => clearInterval(todayPoll))
 </script>
 
 <template>

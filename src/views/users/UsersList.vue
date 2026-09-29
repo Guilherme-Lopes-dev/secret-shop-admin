@@ -57,7 +57,16 @@ const sortOptions = [
     { label: 'Mais recente', value: '' },
     { label: 'Mais pedidos', value: 'orders' },
     { label: 'Maior gasto', value: 'spent' },
+    { label: 'Último login', value: 'last_login' },
 ]
+
+const lastLoginOptions = [
+    { label: 'Qualquer login', value: '' },
+    { label: 'Logou nas últimas 24h', value: '1' },
+    { label: 'Logou nos últimos 7 dias', value: '7' },
+    { label: 'Logou nos últimos 30 dias', value: '30' },
+]
+const lastLoginFilter = persistedRef('users:last-login', '')
 
 const fetchUsers = async (page: number) => {
     loading.value = true
@@ -85,6 +94,7 @@ const fetchUsers = async (page: number) => {
                 maxFriendDays: duration.max,
             },
             runeFilter.value,
+            lastLoginFilter.value ? parseInt(lastLoginFilter.value) : undefined,
         )
         if (response.data) {
             users.value = response.data.data
@@ -169,6 +179,9 @@ onMounted(() => fetchUsers(1))
                     {{ preset.label }}
                 </option>
             </select>
+            <select v-model="lastLoginFilter" @change="onFilterChange" class="filter-select">
+                <option v-for="opt in lastLoginOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+            </select>
             <div class="rune-filter" title="Filtra quem pegou qualquer runa marcada">
                 <button
                     v-for="rune in RUNE_TYPES"
@@ -240,6 +253,7 @@ onMounted(() => fetchUsers(1))
                             <th>Role</th>
                             <th>Trade</th>
                             <th>Cadastro</th>
+                            <th>Último login</th>
                             <th>Ações</th>
                         </tr>
                     </thead>
@@ -261,6 +275,9 @@ onMounted(() => fetchUsers(1))
                                 <td><div class="skeleton skeleton-line" style="width: 90px" /></td>
                                 <td><div class="skeleton skeleton-line" style="width: 70px" /></td>
                                 <td><div class="skeleton skeleton-line" style="width: 50px" /></td>
+                                <td><div class="skeleton skeleton-line" style="width: 80px" /></td>
+                                <td><div class="skeleton skeleton-line" style="width: 90px" /></td>
+                                <td><div class="skeleton skeleton-line" style="width: 70px" /></td>
                                 <td><div class="skeleton skeleton-line" style="width: 80px" /></td>
                                 <td><div class="skeleton skeleton-line" style="width: 90px" /></td>
                                 <td><div class="skeleton skeleton-line" style="width: 40px" /></td>
@@ -329,12 +346,13 @@ onMounted(() => fetchUsers(1))
                                     </button>
                                 </td>
                                 <td>{{ $dayjs(user.created_at).format('DD/MM/YYYY') }}</td>
+                                <td>{{ user.last_login_at ? $dayjs(user.last_login_at).format('DD/MM/YY HH:mm') : '—' }}</td>
                                 <td>
                                     <button class="btn-view" @click.stop="router.push(`/users/${user.id}`)">Ver</button>
                                 </td>
                             </tr>
                             <tr v-if="users.length === 0">
-                                <td colspan="11" class="empty-state">Nenhum usuário encontrado.</td>
+                                <td colspan="13" class="empty-state">Nenhum usuário encontrado.</td>
                             </tr>
                         </template>
                     </tbody>

@@ -131,6 +131,42 @@ export interface CrmEmailRecipient {
   campaign: CrmCampaign | null
 }
 
+export type EmailSendStatus = 'QUEUED' | 'SENT' | 'FAILED' | 'SKIPPED'
+
+/** Um disparo de campanha por e-mail. `uuid` chega como `id`. */
+export interface EmailBlast {
+  id: string
+  subject: string
+  body: string
+  coupon_code: string | null
+  campaign: CrmCampaign | null
+  /** Marcados que o banco barrou (descadastrados, sem e-mail). */
+  skipped_count: number
+  created_at: string
+  counts: Record<EmailSendStatus, number>
+}
+
+export interface EmailBlastListResponse {
+  data: EmailBlast[]
+  total: number
+  page: number
+  pages: number
+}
+
+export interface EmailSend {
+  id: string
+  user_uuid: string
+  email: string
+  display_name: string | null
+  status: EmailSendStatus
+  error: string | null
+  sent_at: string | null
+}
+
+export interface EmailBlastDetail extends Omit<EmailBlast, 'counts'> {
+  sends: EmailSend[]
+}
+
 export interface CrmCustomerDetail extends CrmCustomer {
   purchased_heroes: Array<{ hero: string; items: number; spent: number }>
   orders: CrmOrder[]
@@ -1469,8 +1505,18 @@ export const adminService = {
     couponUuid: string | null
     /** id do cliente → alcunha que substitui o nome em `{nome}`. */
     nicknames: Record<string, string>
+    /** Campanha usada como público — só pro histórico. */
+    campaign: CrmCampaign | null
   }) {
     return api.post<{ queued: number; alreadySentToday: number; skipped: number }>('/admin/crm/email', data)
+  },
+
+  async getEmailBlasts(page = 1) {
+    return api.get<EmailBlastListResponse>(`/admin/crm/email/blasts?page=${page}`)
+  },
+
+  async getEmailBlast(id: string) {
+    return api.get<EmailBlastDetail>(`/admin/crm/email/blasts/${id}`)
   },
 
   async importWixCustomers(file: File) {

@@ -56,6 +56,7 @@ const navGroups: NavGroup[] = [
         items: [
             { label: 'Clientes & Campanhas', icon: 'mdi:bullseye-arrow', to: '/crm', name: 'crm' },
             { label: 'Campanha por e-mail', icon: 'mdi:email-fast-outline', to: '/crm/email', name: 'crm-email' },
+            { label: 'Histórico de e-mails', icon: 'mdi:email-check-outline', to: '/crm/email/history', name: 'crm-email-history' },
         ],
     },
     {

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import { toast } from 'vue3-toastify'
 import ConfirmActionModal from '@/components/common/ConfirmActionModal.vue'
@@ -22,6 +23,8 @@ interface Coupon {
 
 /** Espelha MAX_EMAIL_RECIPIENTS do backend (crm.service.ts). */
 const MAX_RECIPIENTS = 1000
+
+const router = useRouter()
 /** Entram no lugar do nome em `{nome}` pra quem tiver uma escolhida. */
 const NICKNAMES = ['Dom', 'Padrim', 'Patrão', 'Chefe', 'Mestre', 'Lenda', 'Craque']
 
@@ -157,12 +160,16 @@ const send = async () => {
             body: body.value,
             couponUuid: couponId.value || null,
             nicknames: Object.fromEntries(Object.entries(nicknames.value).filter(([id]) => selected.value.has(id))),
+            campaign: campaign.value || null,
         })
         const notes = [
             data.alreadySentToday && `${data.alreadySentToday} já receberam campanha hoje`,
             data.skipped && `${data.skipped} descadastrados ou sem e-mail`,
         ].filter(Boolean)
-        toast.success(`${data.queued} e-mails na fila.${notes.length ? ` Ignorados: ${notes.join(', ')}.` : ''}`)
+        toast.success(
+            `${data.queued} e-mails na fila.${notes.length ? ` Ignorados: ${notes.join(', ')}.` : ''} Clique pra ver o histórico.`,
+            { onClick: () => router.push('/crm/email/history') },
+        )
         confirmOpen.value = false
     } catch (e: any) {
         toast.error(e?.response?.data?.message || 'Erro ao enviar.')
@@ -191,9 +198,12 @@ onMounted(() => {
                 <h1 class="page-title">Campanha por e-mail</h1>
                 <p class="page-subtitle">Escolha o público, escreva o texto e, se quiser, anexe um cupom.</p>
             </div>
-            <button class="btn-send" :disabled="!canSend" @click="confirmOpen = true">
-                <Icon icon="mdi:send" /> Enviar para {{ selected.size }}
-            </button>
+            <div class="header-actions">
+                <router-link to="/crm/email/history" class="btn-history"><Icon icon="mdi:history" /> Histórico</router-link>
+                <button class="btn-send" :disabled="!canSend" @click="confirmOpen = true">
+                    <Icon icon="mdi:send" /> Enviar para {{ selected.size }}
+                </button>
+            </div>
         </header>
 
         <div class="grid">
@@ -333,6 +343,26 @@ onMounted(() => {
     gap 1rem
     flex-wrap wrap
     margin-bottom 1.5rem
+
+.header-actions
+    display flex
+    align-items center
+    gap 0.75rem
+
+.btn-history
+    display inline-flex
+    align-items center
+    gap 0.4rem
+    background #2a2a30
+    color #fff
+    border 1px solid rgba(255,255,255,0.1)
+    padding 0.55rem 1rem
+    border-radius 8px
+    font-size 0.875rem
+    text-decoration none
+
+    &:hover
+        background #3a3a42
 
 .back-link
     display inline-flex

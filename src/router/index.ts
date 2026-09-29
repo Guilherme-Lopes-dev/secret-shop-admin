@@ -293,6 +293,11 @@ const routes = [
         component: () => import('@/views/crm/CrmEmailCampaign.vue'),
       },
       {
+        path: 'crm/email/history',
+        name: 'crm-email-history',
+        component: () => import('@/views/crm/CrmEmailHistory.vue'),
+      },
+      {
         path: 'crm/:uuid',
         name: 'crm-customer',
         component: () => import('@/views/crm/CrmCustomerDetail.vue'),

@@ -112,7 +112,7 @@
             <button type="button" class="icon-btn" title="Tirar da seleção" @click="toggleSelect(p)"><Icon icon="mdi:close" width="16" /></button>
           </li>
         </ul>
-        <p class="field-hint">Preço vem do item mais barato disponível no estoque; troca à mão se quiser. <Icon icon="mdi:cursor-move" width="12" /> arrasta os elementos na arte; o último posicionamento vira o padrão do lote.</p>
+        <p class="field-hint">Preço vem do item mais barato disponível no estoque; troca à mão se quiser. <Icon icon="mdi:cursor-move" width="12" /> abre o editor: ajusta uma arte só ou salva a posição como padrão. "Aplicar em N" usa sempre o padrão de cada formato.</p>
 
         <button class="btn-primary" :disabled="finishing" @click="finishSelected">
           <Icon icon="mdi:layers-outline" width="16" /> {{ finishing ? 'Aplicando...' : `Aplicar em ${selectedPosts.length}` }}
@@ -222,9 +222,11 @@
       :price="priceOf(editing)"
       :note="finishNote.trim() || null"
       :initial-layout="layoutOf(editing)"
+      :default-layout="defaultLayouts[editing.kind as Kind]"
       :applying="applyingEditor"
       @close="editing = null"
       @apply="applyFromEditor"
+      @save-default="saveDefaultFromEditor"
     />
 
     <div v-if="deleteTarget" class="modal-overlay" @click.self="deleteTarget = null">
@@ -249,14 +251,13 @@ import { toast } from 'vue3-toastify'
 import dayjs from 'dayjs'
 import { adminService } from '@/services/admin/admin.service'
 import FinishEditor from './FinishEditor.vue'
-import { DEFAULT_LAYOUT, cloneLayout, type FinishLayout } from './finishCanvas'
+import { KIND_LABEL, readSavedLayout, saveLayout, type FinishLayout } from './finishCanvas'
 
 type Kind = 'FEED' | 'STORY'
 
 const BUSY_STATUSES = ['GENERATING', 'PUBLISHING']
 const POLL_MS = 4000
 const NOTE_KEY = 'instagram.finishNote'
-const LAYOUT_KEY = 'instagram.finishLayout'
 // Opcional: apagar o campo tira a frase da arte (e fica lembrado vazio).
 const DEFAULT_NOTE = 'Preço sujeito a mudança'
 
@@ -553,31 +554,23 @@ const toggleSelect = (p: any) => {
   selected.value = { ...selected.value, [p.id]: stockPrice(p) }
 }
 
-// Layout do post > último aplicado nesse formato > padrão.
-const readDefaultLayout = (kind: Kind): FinishLayout => {
-  try {
-    const saved = localStorage.getItem(`${LAYOUT_KEY}.${kind}`)
-    if (saved) return JSON.parse(saved)
-  } catch {}
-  return cloneLayout(DEFAULT_LAYOUT[kind])
-}
+// Reativo: "Voltar ao padrão" no editor enxerga um padrão salvo na mesma sessão.
+const defaultLayouts = ref<Record<Kind, FinishLayout>>({
+  FEED: readSavedLayout('FEED'),
+  STORY: readSavedLayout('STORY'),
+})
 
-const saveDefaultLayout = (kind: Kind, layout: FinishLayout) => {
-  try {
-    localStorage.setItem(`${LAYOUT_KEY}.${kind}`, JSON.stringify(layout))
-  } catch {}
-}
-
-const layoutOf = (p: any): FinishLayout => p.finish_layout ?? readDefaultLayout(p.kind)
+// Layout do post > padrão salvo do formato > padrão de fábrica.
+const layoutOf = (p: any): FinishLayout => p.finish_layout ?? defaultLayouts.value[p.kind as Kind]
 
 // Troca pelo id: o poll pode ter substituído o objeto enquanto a request rodava.
 const replacePost = (updated: any) => {
   posts.value = posts.value.map((p) => (p.id === updated.id ? { ...p, ...updated } : p))
 }
 
-const finishOne = async (p: any) => {
+const finishOne = async (p: any, layout: FinishLayout) => {
   const res = await adminService.finishInstagramPost(p.id, {
-    layout: layoutOf(p),
+    layout,
     price_brl: priceOf(p) ?? undefined,
     note: finishNote.value.trim() || undefined,
   })
@@ -589,14 +582,19 @@ const finishOne = async (p: any) => {
 const editing = ref<any>(null)
 const applyingEditor = ref(false)
 
-// Layout aplicado vira o padrão do formato: posiciona uma, aplica nas outras em lote.
+const saveDefaultFromEditor = (layout: FinishLayout) => {
+  const kind: Kind = editing.value.kind
+  saveLayout(kind, layout)
+  defaultLayouts.value = { ...defaultLayouts.value, [kind]: layout }
+  toast.success(`Padrão do ${KIND_LABEL[kind]} salvo. "Aplicar em N" usa ele.`)
+}
+
+// Ajuste só desta arte; o padrão só muda pelo botão "Salvar como padrão".
 const applyFromEditor = async (layout: FinishLayout) => {
   const p = editing.value
   applyingEditor.value = true
-  p.finish_layout = layout
-  saveDefaultLayout(p.kind, layout)
   try {
-    await finishOne(p)
+    await finishOne(p, layout)
     editing.value = null
     toast.success('Arte finalizada.')
   } catch (err: any) {
@@ -606,11 +604,13 @@ const applyFromEditor = async (layout: FinishLayout) => {
   }
 }
 
-// As que falharem continuam marcadas pra tentar de novo.
+// Lote sempre no padrão do formato (sobrescreve ajuste individual). Falhas continuam marcadas.
 const finishSelected = async () => {
   if (finishing.value) return
   finishing.value = true
-  const results = await Promise.allSettled(selectedPosts.value.map(finishOne))
+  const results = await Promise.allSettled(
+    selectedPosts.value.map((p) => finishOne(p, defaultLayouts.value[p.kind as Kind])),
+  )
   finishing.value = false
   const failed = results.filter((r) => r.status === 'rejected').length
   if (failed) return toast.error(`${failed} arte(s) não finalizaram.`)

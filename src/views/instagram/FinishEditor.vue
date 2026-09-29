@@ -45,6 +45,9 @@
 
           <span class="panel__spacer" />
           <button type="button" class="btn-ghost" @click="resetLayout">Voltar ao padrão</button>
+          <button type="button" class="btn-ghost" @click="emit('saveDefault', cloneLayout(layout))">
+            Salvar como padrão do {{ KIND_LABEL[kind] }}
+          </button>
           <button type="button" class="btn-ghost" @click="emit('close')">Cancelar</button>
           <button type="button" class="btn-primary" :disabled="applying" @click="emit('apply', cloneLayout(layout))">
             {{ applying ? 'Aplicando...' : 'Aplicar nesta arte' }}
@@ -59,7 +62,7 @@
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import logoUrl from '@/assets/instagram/logo.png'
 import {
-  DEFAULT_LAYOUT,
+  KIND_LABEL,
   SIZE_RANGE,
   cloneLayout,
   drawFinish,
@@ -78,9 +81,11 @@ const props = defineProps<{
   price: number | null
   note: string | null
   initialLayout: FinishLayout
+  /** Padrão salvo do formato (ou o de fábrica); "Voltar ao padrão" usa ele. */
+  defaultLayout: FinishLayout
   applying: boolean
 }>()
-const emit = defineEmits<{ close: []; apply: [layout: FinishLayout] }>()
+const emit = defineEmits<{ close: []; apply: [layout: FinishLayout]; saveDefault: [layout: FinishLayout] }>()
 
 const LABEL: Record<ElementKey, string> = { logo: 'Logo', note: 'Frase', price: 'Preço' }
 const NUDGE = 0.002
@@ -211,7 +216,7 @@ const setActive = (key: ElementKey) => {
 }
 
 const resetLayout = () => {
-  Object.assign(layout, cloneLayout(DEFAULT_LAYOUT[props.kind]))
+  Object.assign(layout, cloneLayout(props.defaultLayout))
 }
 
 const loadImage = (image: HTMLImageElement, src: string) =>

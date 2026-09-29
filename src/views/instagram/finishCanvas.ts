@@ -42,6 +42,32 @@ export const SIZE_RANGE: Record<ElementKey, { min: number; max: number }> = {
   price: { min: 0.03, max: 0.2 },
 }
 
+export const KIND_LABEL: Record<Kind, string> = { FEED: 'feed', STORY: 'story' }
+
+// Padrão salvo por formato: só neste navegador.
+const LAYOUT_KEY = 'instagram.finishLayout'
+
+const isBox = (box: any, sizeKey: 'w' | 'size') =>
+  typeof box?.x === 'number' && typeof box?.y === 'number' && typeof box?.[sizeKey] === 'number'
+
+// Layout salvo de versão antiga ou corrompido faria o backend recusar o lote inteiro (400).
+const isLayout = (value: any): value is FinishLayout =>
+  isBox(value?.logo, 'w') && isBox(value?.note, 'size') && isBox(value?.price, 'size')
+
+export const readSavedLayout = (kind: Kind): FinishLayout => {
+  try {
+    const saved = JSON.parse(localStorage.getItem(`${LAYOUT_KEY}.${kind}`) ?? 'null')
+    if (isLayout(saved)) return saved
+  } catch {}
+  return cloneLayout(DEFAULT_LAYOUT[kind])
+}
+
+export const saveLayout = (kind: Kind, layout: FinishLayout) => {
+  try {
+    localStorage.setItem(`${LAYOUT_KEY}.${kind}`, JSON.stringify(layout))
+  } catch {}
+}
+
 // JSON e não structuredClone: o layout chega como Proxy reativo do Vue, e structuredClone lança DataCloneError.
 export const cloneLayout = (layout: FinishLayout): FinishLayout => JSON.parse(JSON.stringify(layout))
 

@@ -95,8 +95,11 @@
       </section>
 
       <section v-if="selectedPosts.length" class="section composer finish">
-        <h2 class="section-title">Finalizar arte ({{ selectedPosts.length }})</h2>
-        <p class="field-hint">Logo no topo; preço e frase numa faixa escura embaixo. Sempre refaz em cima da arte original da IA, então dá pra aplicar de novo com outro preço.</p>
+        <div class="selection-head">
+          <h2 class="section-title">Selecionadas ({{ selectedPosts.length }})</h2>
+          <button type="button" class="btn-link" @click="clearSelection">Limpar</button>
+        </div>
+        <p class="field-hint">Acabamento põe logo, frase e preço na posição do padrão. Sempre refaz em cima da arte original da IA, então dá pra aplicar de novo com outro preço.</p>
 
         <div class="field">
           <label>Frase <span class="text-muted">(opcional, vale pra todas)</span></label>
@@ -106,7 +109,10 @@
         <ul class="finish-list">
           <li v-for="p in selectedPosts" :key="p.id" class="finish-item">
             <img referrerpolicy="no-referrer" :src="mediaUrl(p.base_image_url ?? p.image_url)" class="finish-item__thumb" alt="" />
-            <span class="finish-item__name">{{ p.subject ?? 'Sem produto' }}</span>
+            <span class="finish-item__name">
+              {{ p.subject ?? 'Sem produto' }}
+              <small v-if="!p.base_image_url" class="text-warn">sem acabamento</small>
+            </span>
             <input v-model="selected[p.id]" type="number" min="0" step="0.01" class="form-input finish-item__price" placeholder="sem preço" />
             <button type="button" class="icon-btn" title="Posicionar" @click="editing = p"><Icon icon="mdi:cursor-move" width="16" /></button>
             <button type="button" class="icon-btn" title="Tirar da seleção" @click="toggleSelect(p)"><Icon icon="mdi:close" width="16" /></button>
@@ -114,21 +120,38 @@
         </ul>
         <p class="field-hint">Preço vem do item mais barato disponível no estoque; troca à mão se quiser. <Icon icon="mdi:cursor-move" width="12" /> abre o editor: ajusta uma arte só ou salva a posição como padrão. "Aplicar em N" usa sempre o padrão de cada formato.</p>
 
-        <button class="btn-primary" :disabled="finishing" @click="finishSelected">
-          <Icon icon="mdi:layers-outline" width="16" /> {{ finishing ? 'Aplicando...' : `Aplicar em ${selectedPosts.length}` }}
-        </button>
+        <div class="selection-actions">
+          <button class="btn-ghost" :disabled="finishing || publishingBulk" @click="finishSelected">
+            <Icon icon="mdi:layers-outline" width="16" /> {{ finishing ? 'Aplicando...' : `Aplicar acabamento em ${selectedPosts.length}` }}
+          </button>
+          <button class="btn-primary" :disabled="finishing || publishingBulk || !account" @click="publishConfirm = true">
+            <Icon icon="mdi:send" width="16" /> Publicar {{ selectedPosts.length }}
+          </button>
+        </div>
       </section>
       </div>
 
       <section class="posts">
+        <div v-if="posts.length" class="posts-toolbar">
+          <select v-model="heroFilter" class="form-input posts-toolbar__hero">
+            <option value="">Todos os heróis</option>
+            <option v-for="hero in heroes" :key="hero" :value="hero">{{ hero }}</option>
+          </select>
+          <input v-model="skinFilter" class="form-input posts-toolbar__skin" placeholder="Buscar skin..." />
+          <button type="button" class="btn-ghost" :disabled="!selectablePosts.length" @click="selectVisible">
+            Selecionar rascunhos visíveis ({{ selectablePosts.length }})
+          </button>
+        </div>
+
         <div v-if="loading" class="section empty-state">Carregando...</div>
         <div v-else-if="posts.length === 0" class="section empty-state">Nenhum post ainda. Gera o primeiro ao lado.</div>
+        <div v-else-if="visiblePosts.length === 0" class="section empty-state">Nenhum post com esse filtro.</div>
 
-        <article v-for="p in posts" :key="p.id" class="post-card">
+        <article v-for="p in visiblePosts" :key="p.id" class="post-card">
           <div class="post-card__image" :class="p.kind === 'STORY' ? 'ratio-story' : 'ratio-feed'">
             <label v-if="canPublish(p)" class="post-card__select" :class="{ 'post-card__select--on': p.id in selected }">
               <input type="checkbox" :checked="p.id in selected" @change="toggleSelect(p)" />
-              {{ p.base_image_url ? 'Refazer acabamento' : 'Finalizar' }}
+              Selecionar
             </label>
             <img v-if="p.image_url" referrerpolicy="no-referrer" :src="mediaUrl(p.image_url)" alt="" />
             <div v-else class="post-card__placeholder">
@@ -228,6 +251,21 @@
       @apply="applyFromEditor"
       @save-default="saveDefaultFromEditor"
     />
+
+    <div v-if="publishConfirm" class="modal-overlay" @click.self="publishConfirm = false">
+      <div class="modal">
+        <h3>Publicar {{ selectedPosts.length }} post(s) no Instagram</h3>
+        <p>Vai direto pra @{{ account?.username }}. Não dá pra desfazer daqui; apagar só pelo app do Instagram.</p>
+        <p v-if="unfinishedCount" class="text-warn">{{ unfinishedCount }} ainda sem acabamento (sem logo e preço).</p>
+        <p class="modal-hint">Cada post publica em segundo plano; se algum falhar, o card mostra o erro e dá pra tentar de novo.</p>
+        <div class="modal-actions">
+          <button class="btn-ghost" @click="publishConfirm = false">Cancelar</button>
+          <button class="btn-primary" :disabled="publishingBulk" @click="publishSelected">
+            {{ publishingBulk ? 'Enviando...' : `Publicar ${selectedPosts.length}` }}
+          </button>
+        </div>
+      </div>
+    </div>
 
     <div v-if="deleteTarget" class="modal-overlay" @click.self="deleteTarget = null">
       <div class="modal">
@@ -536,6 +574,50 @@ watch(finishNote, (note) => {
 
 const selectedPosts = computed(() => posts.value.filter((p) => p.id in selected.value))
 
+// Post que saiu de rascunho (publicado pelo card, poll trouxe PUBLISHING) sai da seleção:
+// senão infla o "Publicar N" e fica marcado com o checkbox escondido.
+watch(posts, () => {
+  const stale = selectedPosts.value.filter((p) => !canPublish(p))
+  stale.forEach((p) => unselect(p.id))
+})
+
+// ── Filtro (herói vem da ORDEM da IA; post sem produto não tem) ─────────────
+const heroFilter = ref('')
+const skinFilter = ref('')
+
+const heroes = computed(() =>
+  [...new Set(posts.value.map((p) => p.hero).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'pt-BR')),
+)
+
+// Herói escolhido sumiu da lista (post excluído): volta pra "Todos" em vez de travar vazio.
+watch(heroes, (list) => {
+  if (heroFilter.value && !list.includes(heroFilter.value)) heroFilter.value = ''
+})
+
+const matchesSkin = (p: any) => {
+  const search = skinFilter.value.trim().toLowerCase()
+  if (!search) return true
+  return (p.subject ?? '').toLowerCase().includes(search)
+}
+
+const matchesFilter = (p: any) => {
+  if (heroFilter.value && p.hero !== heroFilter.value) return false
+  return matchesSkin(p)
+}
+
+const visiblePosts = computed(() => posts.value.filter(matchesFilter))
+const selectablePosts = computed(() => visiblePosts.value.filter(canPublish))
+
+// Mantém o preço já digitado de quem já estava marcado.
+const selectVisible = () => {
+  const added = selectablePosts.value.filter((p) => !(p.id in selected.value)).map((p) => [p.id, stockPrice(p)])
+  selected.value = { ...selected.value, ...Object.fromEntries(added) }
+}
+
+const clearSelection = () => {
+  selected.value = {}
+}
+
 const unselect = (id: string) => {
   const { [id]: _, ...rest } = selected.value
   selected.value = rest
@@ -615,6 +697,44 @@ const finishSelected = async () => {
   const failed = results.filter((r) => r.status === 'rejected').length
   if (failed) return toast.error(`${failed} arte(s) não finalizaram.`)
   toast.success('Arte finalizada.')
+}
+
+// ── Publicação em lote ────────────────────────────────────────────────────────
+const publishConfirm = ref(false)
+const publishingBulk = ref(false)
+
+const unfinishedCount = computed(() => selectedPosts.value.filter((p) => !p.base_image_url).length)
+
+const requestPublish = async (p: any) => {
+  const res = await adminService.publishInstagramPost(p.id)
+  replacePost(res.data)
+  unselect(p.id)
+}
+
+// Em sequência: N jobs disparados juntos batem na Graph API ao mesmo tempo e caem juntos no rate limit.
+// Resolve com quantas falharam; as recusadas continuam marcadas.
+const publishInSequence = (list: any[]) =>
+  list.reduce<Promise<number>>(
+    async (previous, p) => {
+      const failed = await previous
+      return requestPublish(p).then(
+        () => failed,
+        () => failed + 1,
+      )
+    },
+    Promise.resolve(0),
+  )
+
+// Cada request só dispara o job em background; o poll acompanha até PUBLISHED/FAILED.
+const publishSelected = async () => {
+  if (publishingBulk.value) return
+  publishingBulk.value = true
+  const failed = await publishInSequence([...selectedPosts.value])
+  publishingBulk.value = false
+  publishConfirm.value = false
+  schedulePoll()
+  if (failed) return toast.error(`${failed} não começaram a publicar; continuam selecionadas.`)
+  toast.info('Publicando...')
 }
 
 const doDelete = async () => {
@@ -721,6 +841,44 @@ onBeforeUnmount(() => {
 .finish
   border-color rgba(251,191,36,0.3)
 
+.selection-head
+  display flex
+  align-items center
+  justify-content space-between
+
+.selection-actions
+  display grid
+  grid-template-columns 1fr 1fr
+  gap 8px
+  .btn-ghost
+    display inline-flex
+    align-items center
+    justify-content center
+    gap 6px
+
+.btn-link
+  background none
+  border none
+  color rgba(255,255,255,0.5)
+  font-size 0.8rem
+  cursor pointer
+  &:hover
+    color #fff
+
+.posts-toolbar
+  grid-column 1 / -1
+  display flex
+  gap 8px
+  flex-wrap wrap
+  align-items center
+
+.posts-toolbar__hero
+  width 200px
+
+.posts-toolbar__skin
+  flex 1
+  min-width 180px
+
 .finish-list
   list-style none
   margin 0
@@ -749,6 +907,9 @@ onBeforeUnmount(() => {
   white-space nowrap
   overflow hidden
   text-overflow ellipsis
+  small
+    display block
+    font-size 0.7rem
 
 .finish-item__price
   width 110px

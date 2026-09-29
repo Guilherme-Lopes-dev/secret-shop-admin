@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, nextTick, onMounted, onUnmounted } from 'vue'
 import { persistedRef } from '@/utils/persistedRef'
+import FilterField from '@/components/common/FilterField.vue'
 import { useRouter } from 'vue-router'
 import { adminService, type InventoryFilters } from '@/services/admin/admin.service'
 import { formatCurrency } from '@/utils/formatCurrency'
@@ -206,7 +207,7 @@ const sortOptions = [
 
 const marginFilter = persistedRef('inventory:margin', '')
 const marginOptions = [
-    { label: 'Margem: todas', value: '' },
+    { label: 'Todas', value: '' },
     { label: 'Só prejuízo', value: 'loss' },
     { label: 'Só lucro', value: 'profit' },
     { label: 'Empatadas', value: 'breakeven' },
@@ -269,14 +270,14 @@ const unitsLabel = (item: any) => {
 
 const rewardFilter = persistedRef('inventory:reward', '')
 const rewardOptions = [
-    { label: 'Brinde: todas', value: '' },
-    { label: 'Brinde: liberadas', value: 'false' },
-    { label: 'Brinde: vetadas', value: 'true' },
+    { label: 'Todas', value: '' },
+    { label: 'Liberadas', value: 'false' },
+    { label: 'Vetadas', value: 'true' },
 ]
 
 const marketplaceFilter = persistedRef('inventory:marketplace', '')
 const marketplaceOptions = [
-    { label: 'Todos os marketplaces', value: '' },
+    { label: 'Todos', value: '' },
     { label: 'Buff163', value: 'buff' },
     { label: 'SkinBaron', value: 'skinbaron' },
     { label: 'Skinport', value: 'skinport' },
@@ -431,13 +432,6 @@ onUnmounted(() => observer?.disconnect())
                     <Icon :icon="groupBySkin ? 'mdi:layers' : 'mdi:layers-off-outline'" />
                     {{ groupBySkin ? 'Agrupado por skin' : 'Unidade por unidade' }}
                 </button>
-                <select v-model="botFilter" @change="onFilterChange" class="filter-select">
-                    <option value="">Todos os bots</option>
-                    <option v-for="bot in bots" :key="bot.id" :value="bot.id">{{ bot.name }}</option>
-                </select>
-                <select v-model="statusFilter" @change="onFilterChange" class="filter-select">
-                    <option v-for="opt in statusOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-                </select>
                 <button class="btn-sync" :disabled="syncing" @click="triggerSync">
                     <Icon :icon="syncing ? 'mdi:loading' : 'mdi:cloud-sync-outline'" :class="{ spinning: syncing }" />
                     {{ syncing ? 'Sincronizando...' : 'Sincronizar' }}
@@ -449,47 +443,75 @@ onUnmounted(() => observer?.disconnect())
         </header>
 
         <div class="filters-row">
-            <div class="search-wrap">
-                <Icon icon="mdi:magnify" class="search-icon" />
-                <input
-                    v-model="searchQuery"
-                    @input="onSearchInput"
-                    type="search"
-                    placeholder="Buscar por nome..."
-                    class="search-input"
-                />
-            </div>
-            <select v-model="sortFilter" @change="onFilterChange" class="filter-select">
-                <option v-for="opt in sortOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-            </select>
-            <select v-model="marketplaceFilter" @change="onFilterChange" class="filter-select">
-                <option v-for="opt in marketplaceOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-            </select>
-            <select v-model="rewardFilter" @change="onFilterChange" class="filter-select">
-                <option v-for="opt in rewardOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-            </select>
-            <select v-model="marginFilter" @change="onFilterChange" class="filter-select">
-                <option v-for="opt in marginOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-            </select>
-            <div class="price-range">
-                <input
-                    v-model="minPriceInput"
-                    @change="onFilterChange"
-                    type="number"
-                    min="0"
-                    placeholder="Preço mín (R$)"
-                    class="price-input"
-                />
-                <span class="price-sep">—</span>
-                <input
-                    v-model="maxPriceInput"
-                    @change="onFilterChange"
-                    type="number"
-                    min="0"
-                    placeholder="Preço máx (R$)"
-                    class="price-input"
-                />
-            </div>
+            <FilterField label="Buscar" class="search-field">
+                <div class="search-wrap">
+                    <Icon icon="mdi:magnify" class="search-icon" />
+                    <input
+                        v-model="searchQuery"
+                        @input="onSearchInput"
+                        type="search"
+                        placeholder="Nome da skin..."
+                        class="search-input"
+                    />
+                </div>
+            </FilterField>
+            <FilterField label="Ordenar por">
+                <select v-model="sortFilter" @change="onFilterChange" class="filter-select">
+                    <option v-for="opt in sortOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+                </select>
+            </FilterField>
+        </div>
+
+        <div class="filters-row">
+            <FilterField label="Bot">
+                <select v-model="botFilter" @change="onFilterChange" class="filter-select">
+                    <option value="">Todos</option>
+                    <option v-for="bot in bots" :key="bot.id" :value="bot.id">{{ bot.name }}</option>
+                </select>
+            </FilterField>
+            <FilterField label="Status">
+                <select v-model="statusFilter" @change="onFilterChange" class="filter-select">
+                    <option v-for="opt in statusOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+                </select>
+            </FilterField>
+            <FilterField label="Marketplace">
+                <select v-model="marketplaceFilter" @change="onFilterChange" class="filter-select">
+                    <option v-for="opt in marketplaceOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+                </select>
+            </FilterField>
+            <FilterField label="Margem">
+                <select v-model="marginFilter" @change="onFilterChange" class="filter-select">
+                    <option v-for="opt in marginOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+                </select>
+            </FilterField>
+            <FilterField label="Brinde">
+                <select v-model="rewardFilter" @change="onFilterChange" class="filter-select">
+                    <option v-for="opt in rewardOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+                </select>
+            </FilterField>
+            <FilterField label="Preço (R$)">
+                <div class="price-range">
+                    <input
+                        v-model="minPriceInput"
+                        @change="onFilterChange"
+                        type="number"
+                        min="0"
+                        placeholder="Mín"
+                        aria-label="Preço mínimo"
+                        class="price-input"
+                    />
+                    <span class="price-sep">—</span>
+                    <input
+                        v-model="maxPriceInput"
+                        @change="onFilterChange"
+                        type="number"
+                        min="0"
+                        placeholder="Máx"
+                        aria-label="Preço máximo"
+                        class="price-input"
+                    />
+                </div>
+            </FilterField>
         </div>
 
         <div class="section">
@@ -716,15 +738,17 @@ onUnmounted(() => observer?.disconnect())
 
 .filters-row
     display flex
-    align-items center
-    gap 0.75rem
+    align-items flex-end
+    gap 0.75rem 1rem
     flex-wrap wrap
     margin-bottom 1.25rem
 
+.search-field
+    flex 1
+    min-width 240px
+
 .search-wrap
     position relative
-    flex 1
-    min-width 200px
 
 .search-icon
     position absolute
@@ -758,7 +782,7 @@ onUnmounted(() => observer?.disconnect())
     gap 0.4rem
 
 .price-input
-    width 130px
+    width 90px
     background #1a1a1e
     border 1px solid rgba(255,255,255,0.08)
     border-radius 8px

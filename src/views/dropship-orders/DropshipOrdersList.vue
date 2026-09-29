@@ -12,6 +12,7 @@ import type {
 import { formatCurrency } from '@/utils/formatCurrency'
 import ConfirmActionModal from '@/components/common/ConfirmActionModal.vue'
 import { persistedRef } from '@/utils/persistedRef'
+import FilterField from '@/components/common/FilterField.vue'
 
 interface QueueStatus {
     cls: string
@@ -214,22 +215,26 @@ onMounted(() => fetchQueue())
         </section>
 
         <div class="filters-bar">
-            <div class="search-wrap">
-                <Icon icon="mdi:magnify" class="search-icon" />
-                <input
-                    v-model="search"
-                    type="search"
-                    class="search-input"
-                    placeholder="Filtrar nesta página por produto, pedido, cliente ou Steam ID..."
-                />
-            </div>
+            <FilterField label="Buscar nesta página" class="search-field">
+                <div class="search-wrap">
+                    <Icon icon="mdi:magnify" class="search-icon" />
+                    <input
+                        v-model="search"
+                        type="search"
+                        class="search-input"
+                        placeholder="Produto, pedido, cliente ou Steam ID..."
+                    />
+                </div>
+            </FilterField>
 
-            <select v-model="queueFilter" class="filter-select" @change="onFilterChange">
-                <option value="pending">Pendentes (todos)</option>
-                <option value="to_buy">Falta comprar</option>
-                <option value="purchased">Comprado · falta enviar</option>
-                <option value="all">Todos os registros</option>
-            </select>
+            <FilterField label="Etapa">
+                <select v-model="queueFilter" class="filter-select" @change="onFilterChange">
+                    <option value="pending">Pendentes (todos)</option>
+                    <option value="to_buy">Falta comprar</option>
+                    <option value="purchased">Comprado · falta enviar</option>
+                    <option value="all">Todos os registros</option>
+                </select>
+            </FilterField>
 
             <button class="refresh-btn" :disabled="loading" @click="fetchQueue(currentPage)">
                 <Icon :icon="loading ? 'mdi:loading' : 'mdi:refresh'" :class="{ spin: loading }" />
@@ -503,14 +508,17 @@ onMounted(() => fetchQueue())
 
 .filters-bar
     display flex
+    align-items flex-end
     gap 0.75rem
     margin-bottom 1rem
     flex-wrap wrap
 
-.search-wrap
-    position relative
+.search-field
     min-width 280px
     flex 1
+
+.search-wrap
+    position relative
 
 .search-icon
     position absolute
@@ -851,7 +859,7 @@ table
     .metric-card
         flex 1
 
-    .search-wrap
+    .search-field
         min-width 100%
 
     .filter-select,

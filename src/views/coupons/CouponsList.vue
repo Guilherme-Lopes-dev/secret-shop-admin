@@ -11,21 +11,25 @@
     </header>
 
     <div class="filters-row">
-      <div class="search-wrap">
-        <Icon icon="mdi:magnify" class="search-icon" />
-        <input
-          v-model="search"
-          type="search"
-          placeholder="Buscar por código ou descrição..."
-          class="search-input"
-        />
-      </div>
-      <select v-model="filterStatus" class="filter-select">
-        <option value="">Todos</option>
-        <option value="active">Ativos</option>
-        <option value="inactive">Inativos</option>
-        <option value="expired">Expirados</option>
-      </select>
+      <FilterField label="Buscar" class="search-field">
+        <div class="search-wrap">
+          <Icon icon="mdi:magnify" class="search-icon" />
+          <input
+            v-model="search"
+            type="search"
+            placeholder="Código ou descrição..."
+            class="search-input"
+          />
+        </div>
+      </FilterField>
+      <FilterField label="Status">
+        <select v-model="filterStatus" class="filter-select">
+          <option value="">Todos</option>
+          <option value="active">Ativos</option>
+          <option value="inactive">Inativos</option>
+          <option value="expired">Expirados</option>
+        </select>
+      </FilterField>
     </div>
 
     <div class="section">
@@ -131,6 +135,7 @@ import { Icon } from '@iconify/vue'
 import { adminService } from '@/services/admin/admin.service'
 import { formatCurrency } from '@/utils/formatCurrency'
 import { persistedRef } from '@/utils/persistedRef'
+import FilterField from '@/components/common/FilterField.vue'
 
 const router = useRouter()
 const coupons = ref<any[]>([])
@@ -241,15 +246,17 @@ onMounted(fetchCoupons)
 
 .filters-row
   display flex
-  align-items center
+  align-items flex-end
   gap 0.75rem
   flex-wrap wrap
   margin-bottom 1.25rem
 
-.search-wrap
-  position relative
+.search-field
   flex 1
   min-width 220px
+
+.search-wrap
+  position relative
 
 .search-icon
   position absolute

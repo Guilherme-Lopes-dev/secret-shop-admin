@@ -27,20 +27,26 @@
     </div>
 
     <div class="filters">
-      <select v-model="handledFilter" class="filter-input" @change="reload">
-        <option value="pending">Pendentes</option>
-        <option value="handled">Tratados</option>
-        <option value="all">Todos</option>
-      </select>
-      <select v-model="visibleFilter" class="filter-input" @change="reload">
-        <option value="all">Visíveis e escondidos</option>
-        <option value="visible">Só visíveis na home</option>
-        <option value="hidden">Só escondidos</option>
-      </select>
-      <select v-model="ratingFilter" class="filter-input" @change="reload">
-        <option value="">Todas as notas</option>
-        <option v-for="n in 5" :key="n" :value="String(n)">{{ n }} estrela{{ n > 1 ? 's' : '' }}</option>
-      </select>
+      <FilterField label="Tratamento">
+        <select v-model="handledFilter" class="filter-input" @change="reload">
+          <option value="pending">Pendentes</option>
+          <option value="handled">Tratados</option>
+          <option value="all">Todos</option>
+        </select>
+      </FilterField>
+      <FilterField label="Na home">
+        <select v-model="visibleFilter" class="filter-input" @change="reload">
+          <option value="all">Todos</option>
+          <option value="visible">Visíveis</option>
+          <option value="hidden">Escondidos</option>
+        </select>
+      </FilterField>
+      <FilterField label="Nota">
+        <select v-model="ratingFilter" class="filter-input" @change="reload">
+          <option value="">Todas</option>
+          <option v-for="n in 5" :key="n" :value="String(n)">{{ n }} estrela{{ n > 1 ? 's' : '' }}</option>
+        </select>
+      </FilterField>
     </div>
 
     <div class="section">
@@ -186,6 +192,7 @@ import { useRouter } from 'vue-router'
 import { toast } from 'vue3-toastify'
 import { adminService } from '@/services/admin/admin.service'
 import { persistedRef } from '@/utils/persistedRef'
+import FilterField from '@/components/common/FilterField.vue'
 
 const ORDER_TYPE_LABELS: Record<string, string> = {
   sale: 'Skins',
@@ -424,7 +431,8 @@ onMounted(fetchFeedbacks)
 
 .filters
   display flex
-  gap 8px
+  align-items flex-end
+  gap 0.75rem
   margin-bottom 1rem
   flex-wrap wrap
 

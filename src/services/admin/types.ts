@@ -68,6 +68,8 @@ export interface CollectorTask {
   action: CollectorTaskAction
   friendship_age_days: number | null
   unlocks_in_days: number | null
+  /** Conta collector que decide o status (a mais travada do pedido). */
+  blocking_account?: string | null
 }
 
 export interface DropshipTask {

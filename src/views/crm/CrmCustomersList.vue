@@ -2,6 +2,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
+import FilterField from '@/components/common/FilterField.vue'
 import { toast } from 'vue3-toastify'
 import { adminService, type CrmCampaign, type CrmCustomer, type CrmSort, type CrmSource } from '@/services/admin/admin.service'
 import { formatCurrency } from '@/utils/formatCurrency'
@@ -180,31 +181,41 @@ onMounted(() => {
         </div>
 
         <div class="filters-row">
-            <div class="search-wrap">
-                <Icon icon="mdi:magnify" class="search-icon" />
-                <input
-                    v-model="search"
-                    @input="onSearchInput"
-                    type="search"
-                    placeholder="Buscar por nome, e-mail ou Steam ID..."
-                    class="search-input"
-                />
-            </div>
-            <select v-model="sourceFilter" @change="onFilterChange" class="filter-select">
-                <option value="">Todos os clientes</option>
-                <option v-for="opt in SOURCE_OPTIONS" :key="opt.value" :value="opt.value">{{ sourceLabel(opt) }}</option>
-            </select>
-            <select v-model="campaignFilter" @change="onFilterChange" class="filter-select">
-                <option value="">Todas as campanhas</option>
-                <option v-for="opt in CAMPAIGN_OPTIONS" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-            </select>
-            <select v-model="heroFilter" @change="onFilterChange" class="filter-select">
-                <option value="">Todos os heróis</option>
-                <option v-for="hero in heroes" :key="hero.name" :value="hero.name">{{ hero.name }}</option>
-            </select>
-            <select v-model="sortFilter" @change="onFilterChange" class="filter-select">
-                <option v-for="opt in sortOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-            </select>
+            <FilterField label="Buscar" class="search-field">
+                <div class="search-wrap">
+                    <Icon icon="mdi:magnify" class="search-icon" />
+                    <input
+                        v-model="search"
+                        @input="onSearchInput"
+                        type="search"
+                        placeholder="Nome, e-mail ou Steam ID..."
+                        class="search-input"
+                    />
+                </div>
+            </FilterField>
+            <FilterField label="Origem">
+                <select v-model="sourceFilter" @change="onFilterChange" class="filter-select">
+                    <option value="">Todas</option>
+                    <option v-for="opt in SOURCE_OPTIONS" :key="opt.value" :value="opt.value">{{ sourceLabel(opt) }}</option>
+                </select>
+            </FilterField>
+            <FilterField label="Campanha">
+                <select v-model="campaignFilter" @change="onFilterChange" class="filter-select">
+                    <option value="">Todas</option>
+                    <option v-for="opt in CAMPAIGN_OPTIONS" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+                </select>
+            </FilterField>
+            <FilterField label="Herói">
+                <select v-model="heroFilter" @change="onFilterChange" class="filter-select">
+                    <option value="">Todos</option>
+                    <option v-for="hero in heroes" :key="hero.name" :value="hero.name">{{ hero.name }}</option>
+                </select>
+            </FilterField>
+            <FilterField label="Ordenar por">
+                <select v-model="sortFilter" @change="onFilterChange" class="filter-select">
+                    <option v-for="opt in sortOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+                </select>
+            </FilterField>
         </div>
 
         <div class="section">
@@ -450,15 +461,17 @@ onMounted(() => {
 
 .filters-row
     display flex
-    align-items center
+    align-items flex-end
     gap 0.75rem
     flex-wrap wrap
     margin-bottom 1.25rem
 
-.search-wrap
-    position relative
+.search-field
     flex 1
     min-width 220px
+
+.search-wrap
+    position relative
 
 .search-icon
     position absolute

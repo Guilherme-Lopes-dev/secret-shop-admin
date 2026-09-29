@@ -4,6 +4,7 @@ import { Icon } from '@iconify/vue'
 import { adminService } from '@/services/admin/admin.service'
 import { toast } from 'vue3-toastify'
 import { persistedRef } from '@/utils/persistedRef'
+import FilterField from '@/components/common/FilterField.vue'
 
 type TradeItem = {
     assetId: string
@@ -325,27 +326,35 @@ function itemsLabel(items: TradeItem[]) {
 
         <div v-if="trades.length > 0" class="section">
             <div class="filters-row">
-                <input
-                    v-model="searchItem"
-                    type="search"
-                    class="filter-input"
-                    placeholder="Filtrar por nome do item..."
-                />
-                <input
-                    v-model="searchTradeId"
-                    type="search"
-                    class="filter-input filter-input--id"
-                    placeholder="Trade ID ou Offer ID..."
-                    spellcheck="false"
-                />
-                <select v-model="directionFilter" class="filter-select">
-                    <option value="all">Todos</option>
-                    <option value="received">Recebidos</option>
-                    <option value="given">Enviados</option>
-                </select>
-                <select v-model="statusFilter" class="filter-select">
-                    <option v-for="opt in statusOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-                </select>
+                <FilterField label="Item">
+                    <input
+                        v-model="searchItem"
+                        type="search"
+                        class="filter-input"
+                        placeholder="Nome do item..."
+                    />
+                </FilterField>
+                <FilterField label="Trade / Offer ID">
+                    <input
+                        v-model="searchTradeId"
+                        type="search"
+                        class="filter-input filter-input--id"
+                        placeholder="ID..."
+                        spellcheck="false"
+                    />
+                </FilterField>
+                <FilterField label="Direção">
+                    <select v-model="directionFilter" class="filter-select">
+                        <option value="all">Todos</option>
+                        <option value="received">Recebidos</option>
+                        <option value="given">Enviados</option>
+                    </select>
+                </FilterField>
+                <FilterField label="Status">
+                    <select v-model="statusFilter" class="filter-select">
+                        <option v-for="opt in statusOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+                    </select>
+                </FilterField>
                 <span class="results-count">{{ filteredTrades.length }} resultados</span>
             </div>
 
@@ -651,7 +660,7 @@ function itemsLabel(items: TradeItem[]) {
 .filters-row
     display flex
     gap 0.75rem
-    align-items center
+    align-items flex-end
     flex-wrap wrap
     margin-bottom 1.25rem
 
@@ -693,6 +702,7 @@ function itemsLabel(items: TradeItem[]) {
     color #64748b
     font-size 0.8rem
     margin-left auto
+    padding-bottom 0.55rem
 
 .table-wrapper
     overflow-x auto

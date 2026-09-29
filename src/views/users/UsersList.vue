@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { adminService } from '@/services/admin/admin.service'
 import { formatCurrency } from '@/utils/formatCurrency'
 import { Icon } from '@iconify/vue'
 import { toast } from 'vue3-toastify'
 import { persistedRef } from '@/utils/persistedRef'
 import RefreshFriendshipButton from '@/components/common/RefreshFriendshipButton.vue'
+import FilterField from '@/components/common/FilterField.vue'
+import { ONLINE_NOW_MINUTES } from '@/utils/onlineNow'
 import {
     FRIENDSHIP_DURATION_PRESETS,
     friendshipDurationRange,
@@ -18,6 +20,7 @@ import {
 import { RUNE_TYPES, runeInfo } from '@/utils/runes'
 
 const router = useRouter()
+const route = useRoute()
 const users = ref<any[]>([])
 const loading = ref(true)
 const currentPage = ref(1)
@@ -60,13 +63,35 @@ const sortOptions = [
     { label: 'Último login', value: 'last_login' },
 ]
 
+// Em minutos. "Agora" = mesma janela do card "Logados agora" do dashboard.
 const lastLoginOptions = [
-    { label: 'Qualquer login', value: '' },
-    { label: 'Logou nas últimas 24h', value: '1' },
-    { label: 'Logou nos últimos 7 dias', value: '7' },
-    { label: 'Logou nos últimos 30 dias', value: '30' },
+    { label: 'Qualquer', value: '' },
+    { label: 'Agora (20 min)', value: ONLINE_NOW_MINUTES },
+    { label: 'Últimas 24h', value: '1440' },
+    { label: 'Últimos 7 dias', value: '10080' },
+    { label: 'Últimos 30 dias', value: '43200' },
 ]
-const lastLoginFilter = persistedRef('users:last-login', '')
+// chave nova: a antiga guardava dias ("7"), que aqui viraria 7 minutos
+const lastLoginFilter = persistedRef('users:last-login-min', '')
+try { localStorage.removeItem('users:last-login') } catch { /* storage bloqueado: nada a limpar */ }
+
+/** Link do card "Logados agora": filtros salvos escondiriam gente online, então zera o resto. */
+const applyOnlineNowLink = () => {
+    if (route.query.lastLogin !== ONLINE_NOW_MINUTES) return
+    search.value = ''
+    tierRankFilter.value = ''
+    minOrdersInput.value = ''
+    maxOrdersInput.value = ''
+    minSpentInput.value = ''
+    maxSpentInput.value = ''
+    friendshipFilter.value = ''
+    friendDurationIndex.value = '0'
+    runeFilter.value = []
+    lastLoginFilter.value = ONLINE_NOW_MINUTES
+    sortFilter.value = 'last_login'
+    const { lastLogin: _consumed, ...rest } = route.query
+    router.replace({ query: rest })
+}
 
 const fetchUsers = async (page: number) => {
     loading.value = true
@@ -140,7 +165,10 @@ const toggleSwap = async (user: any) => {
 const nextPage = () => { if (currentPage.value < totalPages.value) fetchUsers(currentPage.value + 1) }
 const prevPage = () => { if (currentPage.value > 1) fetchUsers(currentPage.value - 1) }
 
-onMounted(() => fetchUsers(1))
+onMounted(() => {
+    applyOnlineNowLink()
+    fetchUsers(1)
+})
 </script>
 
 <template>
@@ -154,87 +182,111 @@ onMounted(() => fetchUsers(1))
         </header>
 
         <div class="filters-row">
-            <div class="search-wrap">
-                <Icon icon="mdi:magnify" class="search-icon" />
-                <input
-                    v-model="search"
-                    @input="onSearchInput"
-                    type="search"
-                    placeholder="Buscar por nome, e-mail ou Steam ID..."
-                    class="search-input"
-                />
-            </div>
-            <select v-model="sortFilter" @change="onFilterChange" class="filter-select">
-                <option v-for="opt in sortOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-            </select>
-            <select v-model="tierRankFilter" @change="onFilterChange" class="filter-select">
-                <option value="">Todos os tiers</option>
-                <option v-for="t in TIERS" :key="t.rank" :value="t.rank">{{ t.name }}</option>
-            </select>
-            <select v-model="friendshipFilter" @change="onFilterChange" class="filter-select">
-                <option v-for="opt in FRIENDSHIP_FILTER_OPTIONS" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-            </select>
-            <select v-model="friendDurationIndex" @change="onFilterChange" class="filter-select">
-                <option v-for="(preset, index) in FRIENDSHIP_DURATION_PRESETS" :key="preset.label" :value="String(index)">
-                    {{ preset.label }}
-                </option>
-            </select>
-            <select v-model="lastLoginFilter" @change="onFilterChange" class="filter-select">
-                <option v-for="opt in lastLoginOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-            </select>
-            <div class="rune-filter" title="Filtra quem pegou qualquer runa marcada">
-                <button
-                    v-for="rune in RUNE_TYPES"
-                    :key="rune.value"
-                    type="button"
-                    class="rune-filter__chip"
-                    :class="{ 'rune-filter__chip--on': runeFilter.includes(rune.value) }"
-                    :title="rune.label"
-                    @click="toggleRune(rune.value)"
-                >
-                    <img :src="rune.image" :alt="rune.label" />
-                </button>
-            </div>
-            <div class="range-group">
-                <span class="range-label">Pedidos</span>
-                <input
-                    v-model="minOrdersInput"
-                    @input="onFilterInput"
-                    type="number"
-                    min="0"
-                    placeholder="Mín"
-                    class="range-input"
-                />
-                <span class="range-sep">—</span>
-                <input
-                    v-model="maxOrdersInput"
-                    @input="onFilterInput"
-                    type="number"
-                    min="0"
-                    placeholder="Máx"
-                    class="range-input"
-                />
-            </div>
-            <div class="range-group">
-                <span class="range-label">Gasto (R$)</span>
-                <input
-                    v-model="minSpentInput"
-                    @input="onFilterInput"
-                    type="number"
-                    min="0"
-                    placeholder="Mín"
-                    class="range-input"
-                />
-                <span class="range-sep">—</span>
-                <input
-                    v-model="maxSpentInput"
-                    @input="onFilterInput"
-                    type="number"
-                    min="0"
-                    placeholder="Máx"
-                    class="range-input"
-                />
-            </div>
+            <FilterField label="Buscar" class="search-field">
+                <div class="search-wrap">
+                    <Icon icon="mdi:magnify" class="search-icon" />
+                    <input
+                        v-model="search"
+                        @input="onSearchInput"
+                        type="search"
+                        placeholder="Nome, e-mail ou Steam ID..."
+                        class="search-input"
+                    />
+                </div>
+            </FilterField>
+            <FilterField label="Ordenar por">
+                <select v-model="sortFilter" @change="onFilterChange" class="filter-select">
+                    <option v-for="opt in sortOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+                </select>
+            </FilterField>
+        </div>
+
+        <div class="filters-row">
+            <FilterField label="Tier">
+                <select v-model="tierRankFilter" @change="onFilterChange" class="filter-select">
+                    <option value="">Todos</option>
+                    <option v-for="t in TIERS" :key="t.rank" :value="t.rank">{{ t.name }}</option>
+                </select>
+            </FilterField>
+            <FilterField label="Amizade collector">
+                <select v-model="friendshipFilter" @change="onFilterChange" class="filter-select">
+                    <option v-for="opt in FRIENDSHIP_FILTER_OPTIONS" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+                </select>
+            </FilterField>
+            <FilterField label="Tempo de amizade">
+                <select v-model="friendDurationIndex" @change="onFilterChange" class="filter-select">
+                    <option v-for="(preset, index) in FRIENDSHIP_DURATION_PRESETS" :key="preset.label" :value="String(index)">
+                        {{ preset.label }}
+                    </option>
+                </select>
+            </FilterField>
+            <FilterField label="Último login">
+                <select v-model="lastLoginFilter" @change="onFilterChange" class="filter-select">
+                    <option v-for="opt in lastLoginOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+                </select>
+            </FilterField>
+            <FilterField label="Pedidos">
+                <div class="range-group">
+                    <input
+                        v-model="minOrdersInput"
+                        @input="onFilterInput"
+                        type="number"
+                        min="0"
+                        placeholder="Mín"
+                        aria-label="Pedidos mínimo"
+                        class="range-input"
+                    />
+                    <span class="range-sep">—</span>
+                    <input
+                        v-model="maxOrdersInput"
+                        @input="onFilterInput"
+                        type="number"
+                        min="0"
+                        placeholder="Máx"
+                        aria-label="Pedidos máximo"
+                        class="range-input"
+                    />
+                </div>
+            </FilterField>
+            <FilterField label="Gasto (R$)">
+                <div class="range-group">
+                    <input
+                        v-model="minSpentInput"
+                        @input="onFilterInput"
+                        type="number"
+                        min="0"
+                        placeholder="Mín"
+                        aria-label="Gasto mínimo"
+                        class="range-input"
+                    />
+                    <span class="range-sep">—</span>
+                    <input
+                        v-model="maxSpentInput"
+                        @input="onFilterInput"
+                        type="number"
+                        min="0"
+                        placeholder="Máx"
+                        aria-label="Gasto máximo"
+                        class="range-input"
+                    />
+                </div>
+            </FilterField>
+            <FilterField label="Pegou runa">
+                <div class="rune-filter" title="Filtra quem pegou qualquer runa marcada">
+                    <button
+                        v-for="rune in RUNE_TYPES"
+                        :key="rune.value"
+                        type="button"
+                        class="rune-filter__chip"
+                        :class="{ 'rune-filter__chip--on': runeFilter.includes(rune.value) }"
+                        :title="rune.label"
+                        :aria-pressed="runeFilter.includes(rune.value)"
+                        @click="toggleRune(rune.value)"
+                    >
+                        <img :src="rune.image" :alt="rune.label" />
+                    </button>
+                </div>
+            </FilterField>
         </div>
 
         <div class="section">
@@ -394,15 +446,17 @@ onMounted(() => fetchUsers(1))
 
 .filters-row
     display flex
-    align-items center
-    gap 0.75rem
+    align-items flex-end
+    gap 0.75rem 1rem
     flex-wrap wrap
     margin-bottom 1.25rem
 
+.search-field
+    flex 1
+    min-width 240px
+
 .search-wrap
     position relative
-    flex 1
-    min-width 200px
 
 .search-icon
     position absolute
@@ -447,11 +501,6 @@ onMounted(() => fetchUsers(1))
     display flex
     align-items center
     gap 0.4rem
-
-.range-label
-    color #64748b
-    font-size 0.78rem
-    white-space nowrap
 
 .range-input
     width 90px

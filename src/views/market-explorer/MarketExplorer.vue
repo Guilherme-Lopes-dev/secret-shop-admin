@@ -5,6 +5,7 @@ import { adminService, type MarketExplorerItem } from '@/services/admin/admin.se
 import { formatCurrency } from '@/utils/formatCurrency'
 import { toCents } from '@/utils/toCents'
 import { Icon } from '@iconify/vue'
+import FilterField from '@/components/common/FilterField.vue'
 import { toast } from 'vue3-toastify'
 import {
   source, allItems, heroes, types, slots, rarities, qualities, hasFetched, fetchedAt,
@@ -327,37 +328,56 @@ const toggleLock = (item: MarketExplorerItem) => applyLock(item, !item.priceLock
     </header>
 
     <div class="filters-row" v-if="hasFetched">
-      <div class="search-wrap">
-        <Icon icon="mdi:magnify" class="search-icon" />
-        <input v-model="searchQuery" @input="onSearchInput" type="search" placeholder="Buscar por nome..." class="search-input" />
-      </div>
-      <select v-model="heroFilter" @change="onFilterChange" class="filter-select">
-        <option value="">Todos os heróis</option>
-        <option v-for="h in heroes" :key="h" :value="h">{{ h }}</option>
-      </select>
-      <select v-model="typeFilter" @change="onFilterChange" class="filter-select">
-        <option value="">Todos os tipos</option>
-        <option v-for="t in types" :key="t" :value="t">{{ t }}</option>
-      </select>
-      <select v-model="slotFilter" @change="onFilterChange" class="filter-select">
-        <option value="">Todos os slots</option>
-        <option v-for="s in slots" :key="s" :value="s">{{ s }}</option>
-      </select>
-      <select v-model="rarityFilter" @change="onFilterChange" class="filter-select">
-        <option value="">Todas raridades</option>
-        <option v-for="r in rarities" :key="r" :value="r">{{ r }}</option>
-      </select>
-      <select v-model="priceFilter" @change="onFilterChange" class="filter-select">
-        <option v-for="opt in priceOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-      </select>
-      <div class="price-range">
-        <input v-model="priceMin" @change="onFilterChange" type="number" min="0" step="0.01" placeholder="R$ mín" class="price-input" />
-        <span class="price-sep">—</span>
-        <input v-model="priceMax" @change="onFilterChange" type="number" min="0" step="0.01" placeholder="R$ máx" class="price-input" />
-      </div>
-      <select v-model="sortValue" @change="onFilterChange" class="filter-select">
-        <option v-for="opt in sortOptions" :key="`${opt.by}:${opt.dir}`" :value="`${opt.by}:${opt.dir}`">{{ opt.label }}</option>
-      </select>
+      <FilterField label="Buscar" class="search-field">
+        <div class="search-wrap">
+          <Icon icon="mdi:magnify" class="search-icon" />
+          <input v-model="searchQuery" @input="onSearchInput" type="search" placeholder="Nome do item..." class="search-input" />
+        </div>
+      </FilterField>
+      <FilterField label="Ordenar por">
+        <select v-model="sortValue" @change="onFilterChange" class="filter-select">
+          <option v-for="opt in sortOptions" :key="`${opt.by}:${opt.dir}`" :value="`${opt.by}:${opt.dir}`">{{ opt.label }}</option>
+        </select>
+      </FilterField>
+    </div>
+
+    <div class="filters-row" v-if="hasFetched">
+      <FilterField label="Herói">
+        <select v-model="heroFilter" @change="onFilterChange" class="filter-select">
+          <option value="">Todos</option>
+          <option v-for="h in heroes" :key="h" :value="h">{{ h }}</option>
+        </select>
+      </FilterField>
+      <FilterField label="Tipo">
+        <select v-model="typeFilter" @change="onFilterChange" class="filter-select">
+          <option value="">Todos</option>
+          <option v-for="t in types" :key="t" :value="t">{{ t }}</option>
+        </select>
+      </FilterField>
+      <FilterField label="Slot">
+        <select v-model="slotFilter" @change="onFilterChange" class="filter-select">
+          <option value="">Todos</option>
+          <option v-for="s in slots" :key="s" :value="s">{{ s }}</option>
+        </select>
+      </FilterField>
+      <FilterField label="Raridade">
+        <select v-model="rarityFilter" @change="onFilterChange" class="filter-select">
+          <option value="">Todas</option>
+          <option v-for="r in rarities" :key="r" :value="r">{{ r }}</option>
+        </select>
+      </FilterField>
+      <FilterField label="Preço cadastrado">
+        <select v-model="priceFilter" @change="onFilterChange" class="filter-select">
+          <option v-for="opt in priceOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+        </select>
+      </FilterField>
+      <FilterField label="Faixa de preço (R$)">
+        <div class="price-range">
+          <input v-model="priceMin" @change="onFilterChange" type="number" min="0" step="0.01" placeholder="Mín" aria-label="Preço mínimo" class="price-input" />
+          <span class="price-sep">—</span>
+          <input v-model="priceMax" @change="onFilterChange" type="number" min="0" step="0.01" placeholder="Máx" aria-label="Preço máximo" class="price-input" />
+        </div>
+      </FilterField>
       <button class="chip chip-preset" @click="onlySkins">Só skins</button>
       <button class="chip chip-clear" @click="clearAllFilters">Limpar filtros</button>
       <button class="chip chip-copy" @click="copyFilters">
@@ -562,15 +582,17 @@ const toggleLock = (item: MarketExplorerItem) => applyLock(item, !item.priceLock
 
 .filters-row
     display flex
-    align-items center
-    gap 0.75rem
+    align-items flex-end
+    gap 0.75rem 1rem
     flex-wrap wrap
     margin-bottom 1.25rem
 
+.search-field
+    flex 1
+    min-width 240px
+
 .search-wrap
     position relative
-    flex 1
-    min-width 200px
 
 .search-icon
     position absolute

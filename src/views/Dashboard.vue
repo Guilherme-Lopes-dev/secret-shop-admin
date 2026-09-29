@@ -5,6 +5,7 @@ import Chart from 'chart.js/auto'
 import { formatCurrency } from '@/utils/formatCurrency'
 import { adminService } from '@/services/admin/admin.service'
 import TodayTasks from '@/components/dashboard/TodayTasks.vue'
+import { ONLINE_NOW_USERS_LINK } from '@/utils/onlineNow'
 
 const salesChart = ref<HTMLCanvasElement | null>(null)
 const chartInstance = ref<Chart | null>(null)
@@ -103,6 +104,7 @@ const todayCards = computed(() => [
         color: '#00bcd4',
         delta: `hoje: ${today.value.activeUsersToday}`,
         deltaClass: '',
+        to: ONLINE_NOW_USERS_LINK,
     },
 ])
 
@@ -228,7 +230,14 @@ onUnmounted(() => clearInterval(todayPoll))
 
         <!-- Hoje -->
         <div class="stats-grid">
-            <div v-for="card in todayCards" :key="card.label" class="stat-card">
+            <component
+                :is="card.to ? 'router-link' : 'div'"
+                v-for="card in todayCards"
+                :key="card.label"
+                :to="card.to"
+                class="stat-card"
+                :class="{ 'stat-card--link': card.to }"
+            >
                 <div class="stat-icon" :style="{ backgroundColor: card.color + '20', color: card.color }">
                     <Icon :icon="card.icon" width="24" />
                 </div>
@@ -237,7 +246,7 @@ onUnmounted(() => clearInterval(todayPoll))
                     <span class="stat-value">{{ card.value }}</span>
                     <span v-if="card.delta" class="stat-delta" :class="card.deltaClass">{{ card.delta }}</span>
                 </div>
-            </div>
+            </component>
         </div>
 
         <!-- Pendências -->
@@ -380,6 +389,13 @@ onUnmounted(() => clearInterval(todayPoll))
     align-items center
     gap 1rem
     border 1px solid rgba(255,255,255,0.05)
+
+.stat-card--link
+    color inherit
+    text-decoration none
+    transition border-color 0.15s
+    &:hover
+        border-color rgba(99,102,241,0.5)
 
 .stat-icon
     width 48px

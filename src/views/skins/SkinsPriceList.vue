@@ -6,6 +6,7 @@ import { formatCurrency } from '@/utils/formatCurrency'
 import { toCents } from '@/utils/toCents'
 import { Icon } from '@iconify/vue'
 import { persistedRef } from '@/utils/persistedRef'
+import FilterField from '@/components/common/FilterField.vue'
 
 const router = useRouter()
 const items = ref<SkinPriceCatalogItem[]>([])
@@ -133,9 +134,9 @@ const priceOptions = [
     { label: 'Sem preço', value: 'without' },
 ]
 const stockOptions = [
-    { label: 'Temos e não temos', value: 'all' },
-    { label: 'Só as que temos', value: 'in' },
-    { label: 'Só as que não temos', value: 'out' },
+    { label: 'Todas', value: 'all' },
+    { label: 'Temos', value: 'in' },
+    { label: 'Não temos', value: 'out' },
 ]
 const sortOptions = [
     { label: 'Última atualização', value: 'update:desc' },
@@ -200,47 +201,68 @@ onUnmounted(() => observer?.disconnect())
         </header>
 
         <div class="filters-row">
-            <div class="search-wrap">
-                <Icon icon="mdi:magnify" class="search-icon" />
-                <input
-                    v-model="searchQuery"
-                    @input="onSearchInput"
-                    type="search"
-                    placeholder="Buscar por nome..."
-                    class="search-input"
-                />
-            </div>
-            <select v-model="heroFilter" @change="onFilterChange" class="filter-select">
-                <option value="">Todos os heróis</option>
-                <option v-for="h in facets.heroes" :key="h" :value="h">{{ h }}</option>
-            </select>
-            <select v-model="typeFilter" @change="onFilterChange" class="filter-select">
-                <option value="">Todos os tipos</option>
-                <option v-for="t in facets.types" :key="t" :value="t">{{ t }}</option>
-            </select>
-            <select v-model="slotFilter" @change="onFilterChange" class="filter-select">
-                <option value="">Todos os slots</option>
-                <option v-for="s in facets.slots" :key="s" :value="s">{{ s }}</option>
-            </select>
-            <select v-model="rarityFilter" @change="onFilterChange" class="filter-select">
-                <option value="">Todas raridades</option>
-                <option v-for="r in facets.rarities" :key="r" :value="r">{{ r }}</option>
-            </select>
-            <select v-model="stockFilter" @change="onFilterChange" class="filter-select">
-                <option v-for="opt in stockOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-            </select>
-            <select v-model="priceFilter" @change="onFilterChange" class="filter-select">
-                <option v-for="opt in priceOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-            </select>
-            <div class="price-range">
-                <input v-model="priceMin" @change="onFilterChange" type="number" min="0" step="0.01" placeholder="R$ mín" class="price-input" />
-                <span class="price-sep">—</span>
-                <input v-model="priceMax" @change="onFilterChange" type="number" min="0" step="0.01" placeholder="R$ máx" class="price-input" />
-            </div>
-            <select v-model="sortValue" @change="onFilterChange" class="filter-select">
-                <option v-for="opt in sortOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-            </select>
+            <FilterField label="Buscar" class="search-field">
+                <div class="search-wrap">
+                    <Icon icon="mdi:magnify" class="search-icon" />
+                    <input
+                        v-model="searchQuery"
+                        @input="onSearchInput"
+                        type="search"
+                        placeholder="Nome da skin..."
+                        class="search-input"
+                    />
+                </div>
+            </FilterField>
+            <FilterField label="Ordenar por">
+                <select v-model="sortValue" @change="onFilterChange" class="filter-select">
+                    <option v-for="opt in sortOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+                </select>
+            </FilterField>
             <button class="chip chip-clear" @click="clearAllFilters">Limpar filtros</button>
+        </div>
+
+        <div class="filters-row">
+            <FilterField label="Herói">
+                <select v-model="heroFilter" @change="onFilterChange" class="filter-select">
+                    <option value="">Todos</option>
+                    <option v-for="h in facets.heroes" :key="h" :value="h">{{ h }}</option>
+                </select>
+            </FilterField>
+            <FilterField label="Tipo">
+                <select v-model="typeFilter" @change="onFilterChange" class="filter-select">
+                    <option value="">Todos</option>
+                    <option v-for="t in facets.types" :key="t" :value="t">{{ t }}</option>
+                </select>
+            </FilterField>
+            <FilterField label="Slot">
+                <select v-model="slotFilter" @change="onFilterChange" class="filter-select">
+                    <option value="">Todos</option>
+                    <option v-for="s in facets.slots" :key="s" :value="s">{{ s }}</option>
+                </select>
+            </FilterField>
+            <FilterField label="Raridade">
+                <select v-model="rarityFilter" @change="onFilterChange" class="filter-select">
+                    <option value="">Todas</option>
+                    <option v-for="r in facets.rarities" :key="r" :value="r">{{ r }}</option>
+                </select>
+            </FilterField>
+            <FilterField label="Estoque">
+                <select v-model="stockFilter" @change="onFilterChange" class="filter-select">
+                    <option v-for="opt in stockOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+                </select>
+            </FilterField>
+            <FilterField label="Preço cadastrado">
+                <select v-model="priceFilter" @change="onFilterChange" class="filter-select">
+                    <option v-for="opt in priceOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+                </select>
+            </FilterField>
+            <FilterField label="Faixa de preço (R$)">
+                <div class="price-range">
+                    <input v-model="priceMin" @change="onFilterChange" type="number" min="0" step="0.01" placeholder="Mín" aria-label="Preço mínimo" class="price-input" />
+                    <span class="price-sep">—</span>
+                    <input v-model="priceMax" @change="onFilterChange" type="number" min="0" step="0.01" placeholder="Máx" aria-label="Preço máximo" class="price-input" />
+                </div>
+            </FilterField>
         </div>
 
         <div class="quality-row" v-if="facets.qualities.length">
@@ -368,15 +390,17 @@ onUnmounted(() => observer?.disconnect())
 
 .filters-row
     display flex
-    align-items center
-    gap 0.75rem
+    align-items flex-end
+    gap 0.75rem 1rem
     flex-wrap wrap
     margin-bottom 1.25rem
 
+.search-field
+    flex 1
+    min-width 240px
+
 .search-wrap
     position relative
-    flex 1
-    min-width 200px
 
 .search-icon
     position absolute

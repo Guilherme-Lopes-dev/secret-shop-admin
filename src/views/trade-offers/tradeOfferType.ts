@@ -13,7 +13,7 @@ export const typeBadge = (type: TradeOfferType | null | undefined) =>
   (type && labels[type]) || unknownType
 
 export const typeOptions = [
-  { label: 'Todos os tipos', value: '' },
+  { label: 'Todos', value: '' },
   { label: 'Compra', value: 'purchase' },
   { label: 'Brinde', value: 'gift' },
   { label: 'Swap', value: 'swap' },

@@ -8,16 +8,18 @@
     </header>
 
     <div class="filters-row">
-      <div class="search-wrap">
-        <Icon icon="mdi:magnify" class="search-icon" />
-        <input
-          v-model="search"
-          type="search"
-          placeholder="Buscar por herói ou usuário..."
-          class="search-input"
-          @input="onSearchInput"
-        />
-      </div>
+      <FilterField label="Buscar" class="search-field">
+        <div class="search-wrap">
+          <Icon icon="mdi:magnify" class="search-icon" />
+          <input
+            v-model="search"
+            type="search"
+            placeholder="Herói ou usuário..."
+            class="search-input"
+            @input="onSearchInput"
+          />
+        </div>
+      </FilterField>
     </div>
 
     <div class="section">
@@ -96,6 +98,7 @@ import { ref, onMounted } from 'vue'
 import { Icon } from '@iconify/vue'
 import { adminService } from '@/services/admin/admin.service'
 import { persistedRef } from '@/utils/persistedRef'
+import FilterField from '@/components/common/FilterField.vue'
 
 const rows = ref<any[]>([])
 const loading = ref(true)
@@ -166,10 +169,12 @@ onMounted(loadData)
   flex-wrap wrap
   margin-bottom 1.25rem
 
-.search-wrap
-  position relative
+.search-field
   flex 1
   min-width 220px
+
+.search-wrap
+  position relative
 
 .search-icon
   position absolute

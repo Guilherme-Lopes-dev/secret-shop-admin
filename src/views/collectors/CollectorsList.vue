@@ -2,6 +2,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
+import FilterField from '@/components/common/FilterField.vue'
 import { toast } from 'vue3-toastify'
 import { adminService } from '@/services/admin/admin.service'
 import {
@@ -487,40 +488,48 @@ watch([itemSearch, selectedRarity, onlyMythicalBundles, onlyMythicalWearables, o
         </section>
 
         <div v-if="inventory" class="filters-row">
-            <div class="search-wrap search-wrap--filter">
-                <Icon icon="mdi:magnify" class="search-icon" />
-                <input
-                    v-model="itemSearch"
-                    type="search"
-                    placeholder="Filtrar itens carregados por nome, asset ou market hash"
-                    class="search-input"
-                />
-            </div>
+            <FilterField label="Filtrar itens carregados" class="search-field">
+                <div class="search-wrap search-wrap--filter">
+                    <Icon icon="mdi:magnify" class="search-icon" />
+                    <input
+                        v-model="itemSearch"
+                        type="search"
+                        placeholder="Nome, asset ou market hash..."
+                        class="search-input"
+                    />
+                </div>
+            </FilterField>
 
-            <select v-model="selectedRarity" class="filter-select">
-                <option value="">Todas raridades</option>
-                <option v-for="rarity in DOTA2_RARITIES" :key="rarity" :value="rarity">
-                    {{ rarity }}
-                </option>
-            </select>
+            <FilterField label="Raridade">
+                <select v-model="selectedRarity" class="filter-select">
+                    <option value="">Todas</option>
+                    <option v-for="rarity in DOTA2_RARITIES" :key="rarity" :value="rarity">
+                        {{ rarity }}
+                    </option>
+                </select>
+            </FilterField>
 
-            <label class="filter-toggle" :class="{ 'filter-toggle--active': onlyMythicalBundles }">
-                <input v-model="onlyMythicalBundles" type="checkbox" class="filter-toggle-checkbox" />
-                <Icon icon="mdi:package-variant-closed" />
-                Mythical Bundle
-            </label>
+            <FilterField label="Mostrar só">
+                <div class="filter-toggles">
+                    <label class="filter-toggle" :class="{ 'filter-toggle--active': onlyMythicalBundles }">
+                        <input v-model="onlyMythicalBundles" type="checkbox" class="filter-toggle-checkbox" />
+                        <Icon icon="mdi:package-variant-closed" />
+                        Mythical Bundle
+                    </label>
 
-            <label class="filter-toggle" :class="{ 'filter-toggle--active': onlyMythicalWearables }">
-                <input v-model="onlyMythicalWearables" type="checkbox" class="filter-toggle-checkbox" />
-                <Icon icon="mdi:tshirt-crew-outline" />
-                Mythical Wearable
-            </label>
+                    <label class="filter-toggle" :class="{ 'filter-toggle--active': onlyMythicalWearables }">
+                        <input v-model="onlyMythicalWearables" type="checkbox" class="filter-toggle-checkbox" />
+                        <Icon icon="mdi:tshirt-crew-outline" />
+                        Mythical Wearable
+                    </label>
 
-            <label class="filter-toggle" :class="{ 'filter-toggle--active': onlyNotTradable }">
-                <input v-model="onlyNotTradable" type="checkbox" class="filter-toggle-checkbox" />
-                <Icon icon="mdi:lock-outline" />
-                Not Tradable
-            </label>
+                    <label class="filter-toggle" :class="{ 'filter-toggle--active': onlyNotTradable }">
+                        <input v-model="onlyNotTradable" type="checkbox" class="filter-toggle-checkbox" />
+                        <Icon icon="mdi:lock-outline" />
+                        Not Tradable
+                    </label>
+                </div>
+            </FilterField>
 
         </div>
 
@@ -734,7 +743,16 @@ watch([itemSearch, selectedRarity, onlyMythicalBundles, onlyMythicalWearables, o
         border-color rgba(248,113,113,0.5)
 
     &--filter
-        min-width 240px
+        min-width 0
+
+.search-field
+    flex 1
+    min-width 240px
+
+.filter-toggles
+    display flex
+    flex-wrap wrap
+    gap 0.5rem
 
 .search-icon
     position absolute
@@ -843,7 +861,7 @@ watch([itemSearch, selectedRarity, onlyMythicalBundles, onlyMythicalWearables, o
 
 .filters-row
     display flex
-    align-items center
+    align-items flex-end
     gap 0.75rem
     flex-wrap wrap
     margin-bottom 1.25rem

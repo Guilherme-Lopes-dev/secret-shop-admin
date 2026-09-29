@@ -78,11 +78,18 @@ const days = (count: number | null) => {
     return `${count} ${count === 1 ? 'dia' : 'dias'}`
 }
 
-const friendshipText: Record<CollectorTaskAction, (task: CollectorTask) => string> = {
+const statusText: Record<CollectorTaskAction, (task: CollectorTask) => string> = {
     ready: task => `amigos há ${days(task.friendship_age_days)}`,
     waiting: task => `libera em ${days(task.unlocks_in_days)}`,
     add_friend: () => 'não amigos',
     check_friendship: () => 'sem dados da Steam',
+}
+
+// Nome da conta explica por que difere da lista de usuários (lá vale qualquer conta collector).
+const friendshipText = (task: CollectorTask) => {
+    const status = statusText[task.action](task)
+    if (!task.blocking_account) return status
+    return `${status} · ${task.blocking_account}`
 }
 
 const generatedAt = computed(() => {
@@ -131,7 +138,7 @@ onMounted(fetchTasks)
                 <span class="task-user">{{ task.user_name }}</span>
                 <span class="task-items" :title="task.items.join(', ')">{{ task.items.join(', ') }}</span>
                 <span class="task-meta">
-                    <span class="badge" :class="`badge--${section.tone}`">{{ friendshipText[task.action](task) }}</span>
+                    <span class="badge" :class="`badge--${section.tone}`">{{ friendshipText(task) }}</span>
                     <span class="badge" :class="task.overdue ? 'badge--critical' : 'badge--muted'">
                         pago há {{ days(task.paid_days_ago) }}{{ task.overdue ? ' — atrasado' : '' }}
                     </span>

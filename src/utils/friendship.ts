@@ -22,15 +22,15 @@ export interface FriendshipSummary {
 export type FriendshipStatus = 'friends' | 'not_friends' | 'unknown'
 
 export const FRIENDSHIP_FILTER_OPTIONS: Array<{ label: string; value: '' | FriendshipStatus }> = [
-    { label: 'Amizade: todas', value: '' },
-    { label: 'Amigos das contas collector', value: 'friends' },
+    { label: 'Todas', value: '' },
+    { label: 'Amigos', value: 'friends' },
     { label: 'Não amigos', value: 'not_friends' },
     { label: 'Sem dados (lista privada)', value: 'unknown' },
 ]
 
 /** Atalhos de duração — o admin quase sempre quer uma dessas faixas. */
 export const FRIENDSHIP_DURATION_PRESETS: Array<{ label: string; min?: number; max?: number }> = [
-    { label: 'Qualquer duração' },
+    { label: 'Qualquer' },
     { label: 'Menos de 7 dias', max: 7 },
     { label: 'Menos de 30 dias', max: 30 },
     { label: '30 a 180 dias', min: 30, max: 180 },

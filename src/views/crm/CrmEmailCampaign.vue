@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { Icon } from '@iconify/vue'
 import { toast } from 'vue3-toastify'
 import ConfirmActionModal from '@/components/common/ConfirmActionModal.vue'
+import FilterField from '@/components/common/FilterField.vue'
 import { adminService, type CrmCampaign, type CrmEmailRecipient } from '@/services/admin/admin.service'
 import { CAMPAIGN_OPTIONS, campaignMeta } from '@/utils/campaigns'
 import { formatCurrency } from '@/utils/formatCurrency'
@@ -184,14 +185,18 @@ onMounted(() => {
             <section class="section">
                 <h2 class="section-title">1. Público</h2>
                 <div class="filters-row">
-                    <select v-model="campaign" class="filter-select" @change="fetchRecipients">
-                        <option value="">Todos (sem campanha)</option>
-                        <option v-for="opt in CAMPAIGN_OPTIONS" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-                    </select>
-                    <select v-model="hero" class="filter-select" @change="fetchRecipients">
-                        <option value="">Todos os heróis</option>
-                        <option v-for="option in heroes" :key="option.name" :value="option.name">{{ option.name }}</option>
-                    </select>
+                    <FilterField label="Campanha">
+                        <select v-model="campaign" class="filter-select" @change="fetchRecipients">
+                            <option value="">Todos (sem campanha)</option>
+                            <option v-for="opt in CAMPAIGN_OPTIONS" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+                        </select>
+                    </FilterField>
+                    <FilterField label="Herói">
+                        <select v-model="hero" class="filter-select" @change="fetchRecipients">
+                            <option value="">Todos</option>
+                            <option v-for="option in heroes" :key="option.name" :value="option.name">{{ option.name }}</option>
+                        </select>
+                    </FilterField>
                 </div>
                 <p v-if="campaign" class="hint">{{ campaignMeta(campaign).hint }}</p>
 
@@ -364,6 +369,7 @@ onMounted(() => {
 
 .filters-row
     display flex
+    align-items flex-end
     gap 0.75rem
     flex-wrap wrap
 

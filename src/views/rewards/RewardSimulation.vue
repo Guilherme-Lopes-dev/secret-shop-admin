@@ -6,6 +6,7 @@ import { toast } from 'vue3-toastify'
 import { adminService, type RewardSimulationRow } from '@/services/admin/admin.service'
 import { formatCurrency } from '@/utils/formatCurrency'
 import { persistedRef } from '@/utils/persistedRef'
+import FilterField from '@/components/common/FilterField.vue'
 
 const router = useRouter()
 
@@ -131,10 +132,12 @@ onMounted(() => fetchSimulation(1))
         </div>
       </div>
       <div class="header-actions">
-        <select v-model="tierFilter" @change="onFilterChange" class="filter-select">
-          <option value="">Próximo baú de cada um</option>
-          <option v-for="tier in tierOptions" :key="tier" :value="String(tier)">Forçar baú {{ tier }}</option>
-        </select>
+        <FilterField label="Baú sorteado">
+          <select v-model="tierFilter" @change="onFilterChange" class="filter-select">
+            <option value="">Próximo de cada um</option>
+            <option v-for="tier in tierOptions" :key="tier" :value="String(tier)">Forçar baú {{ tier }}</option>
+          </select>
+        </FilterField>
         <button class="btn-roll" :disabled="loading" @click="reroll">
           <Icon :icon="loading ? 'mdi:loading' : 'mdi:dice-multiple-outline'" :class="{ spinning: loading }" />
           Sortear de novo
@@ -143,24 +146,28 @@ onMounted(() => fetchSimulation(1))
     </header>
 
     <div class="filters-row">
-      <div class="search-wrap">
-        <Icon icon="mdi:magnify" class="search-icon" />
-        <input
-          v-model="searchQuery"
-          @input="onSearchInput"
-          type="search"
-          placeholder="Buscar por usuário..."
-          class="search-input"
-        />
-      </div>
+      <FilterField label="Buscar" class="search-field">
+        <div class="search-wrap">
+          <Icon icon="mdi:magnify" class="search-icon" />
+          <input
+            v-model="searchQuery"
+            @input="onSearchInput"
+            type="search"
+            placeholder="Usuário..."
+            class="search-input"
+          />
+        </div>
+      </FilterField>
 
-      <select v-model="sortBy" class="filter-select" title="Ordena só a página atual">
-        <option value="">Ordem de cadastro</option>
-        <option value="spent">Maior gasto</option>
-        <option value="item">Brinde mais caro</option>
-        <option value="tier">Maior nível</option>
-        <option value="stock">Menor estoque</option>
-      </select>
+      <FilterField label="Ordenar página por">
+        <select v-model="sortBy" class="filter-select">
+          <option value="">Ordem de cadastro</option>
+          <option value="spent">Maior gasto</option>
+          <option value="item">Brinde mais caro</option>
+          <option value="tier">Maior nível</option>
+          <option value="stock">Menor estoque</option>
+        </select>
+      </FilterField>
     </div>
 
     <div class="section">
@@ -280,7 +287,7 @@ onMounted(() => fetchSimulation(1))
 .header-actions
     display flex
     gap 0.75rem
-    align-items center
+    align-items flex-end
     flex-wrap wrap
 
 .filter-select
@@ -318,15 +325,17 @@ onMounted(() => fetchSimulation(1))
 
 .filters-row
     display flex
-    align-items center
+    align-items flex-end
     gap 0.75rem
     flex-wrap wrap
     margin-bottom 1.25rem
 
-.search-wrap
-    position relative
+.search-field
     flex 1
     min-width 200px
+
+.search-wrap
+    position relative
 
 .search-icon
     position absolute

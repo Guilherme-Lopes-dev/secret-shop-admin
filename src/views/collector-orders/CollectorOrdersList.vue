@@ -6,6 +6,7 @@ import { formatCurrency } from '@/utils/formatCurrency'
 import { toast } from 'vue3-toastify'
 import { Icon } from '@iconify/vue'
 import { persistedRef } from '@/utils/persistedRef'
+import FilterField from '@/components/common/FilterField.vue'
 import RefreshFriendshipButton from '@/components/common/RefreshFriendshipButton.vue'
 import {
     FRIENDSHIP_DURATION_PRESETS,
@@ -191,40 +192,50 @@ watch([filterPayment, filterDelivery], persistFilters)
         </header>
 
         <div class="filters-bar">
-            <div class="search-wrap">
-                <Icon icon="mdi:magnify" class="search-icon" />
-                <input
-                    v-model="search"
-                    type="search"
-                    class="search-input"
-                    placeholder="Buscar por nº pedido ou item..."
-                    @input="onSearchInput"
-                />
-            </div>
-            <select v-model="filterPayment" class="filter-select" @change="onFilterChange">
-                <option value="">Todos pagamentos</option>
-                <option value="PENDING">Pendente</option>
-                <option value="AWAITING_PAYMENT">Aguardando</option>
-                <option value="PAID">Pago</option>
-                <option value="EXPIRED">Expirado</option>
-                <option value="CANCELLED">Cancelado</option>
-                <option value="REFUNDED">Reembolsado</option>
-            </select>
-            <select v-model="filterDelivery" class="filter-select" @change="onFilterChange">
-                <option value="">Todas entregas</option>
-                <option value="PENDING">Pendentes (a tratar)</option>
-                <option value="AWAITING_SHIPPING">Aguard. Envio</option>
-                <option value="SHIPPED">Enviado</option>
-                <option value="DELIVERED">Entregue</option>
-            </select>
-            <select v-model="filterFriendship" class="filter-select" @change="onFilterChange">
-                <option v-for="opt in FRIENDSHIP_FILTER_OPTIONS" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-            </select>
-            <select v-model="friendDurationIndex" class="filter-select" @change="onFilterChange">
-                <option v-for="(preset, index) in FRIENDSHIP_DURATION_PRESETS" :key="preset.label" :value="String(index)">
-                    {{ preset.label }}
-                </option>
-            </select>
+            <FilterField label="Buscar" class="search-field">
+                <div class="search-wrap">
+                    <Icon icon="mdi:magnify" class="search-icon" />
+                    <input
+                        v-model="search"
+                        type="search"
+                        class="search-input"
+                        placeholder="Nº pedido ou item..."
+                        @input="onSearchInput"
+                    />
+                </div>
+            </FilterField>
+            <FilterField label="Pagamento">
+                <select v-model="filterPayment" class="filter-select" @change="onFilterChange">
+                    <option value="">Todos</option>
+                    <option value="PENDING">Pendente</option>
+                    <option value="AWAITING_PAYMENT">Aguardando</option>
+                    <option value="PAID">Pago</option>
+                    <option value="EXPIRED">Expirado</option>
+                    <option value="CANCELLED">Cancelado</option>
+                    <option value="REFUNDED">Reembolsado</option>
+                </select>
+            </FilterField>
+            <FilterField label="Entrega">
+                <select v-model="filterDelivery" class="filter-select" @change="onFilterChange">
+                    <option value="">Todas</option>
+                    <option value="PENDING">Pendentes (a tratar)</option>
+                    <option value="AWAITING_SHIPPING">Aguard. envio</option>
+                    <option value="SHIPPED">Enviado</option>
+                    <option value="DELIVERED">Entregue</option>
+                </select>
+            </FilterField>
+            <FilterField label="Amizade collector">
+                <select v-model="filterFriendship" class="filter-select" @change="onFilterChange">
+                    <option v-for="opt in FRIENDSHIP_FILTER_OPTIONS" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+                </select>
+            </FilterField>
+            <FilterField label="Tempo de amizade">
+                <select v-model="friendDurationIndex" class="filter-select" @change="onFilterChange">
+                    <option v-for="(preset, index) in FRIENDSHIP_DURATION_PRESETS" :key="preset.label" :value="String(index)">
+                        {{ preset.label }}
+                    </option>
+                </select>
+            </FilterField>
 
             <button
                 class="shortcut-btn"
@@ -378,14 +389,17 @@ watch([filterPayment, filterDelivery], persistFilters)
 
 .filters-bar
     display flex
+    align-items flex-end
     gap 0.75rem
     flex-wrap wrap
     margin-bottom 1.25rem
 
-.search-wrap
-    position relative
+.search-field
     flex 1
     min-width 200px
+
+.search-wrap
+    position relative
 
 .search-icon
     position absolute

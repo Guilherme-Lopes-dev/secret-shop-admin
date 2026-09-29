@@ -10,6 +10,7 @@ import { typeBadge, typeOptions } from './tradeOfferType'
 import { Icon } from '@iconify/vue'
 import { toast } from 'vue3-toastify'
 import { persistedRef } from '@/utils/persistedRef'
+import FilterField from '@/components/common/FilterField.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -127,18 +128,24 @@ onMounted(() => fetchOffers(1))
                 <p class="page-subtitle">{{ totalItems }} ofertas no sistema</p>
             </div>
             <div class="filters-row">
-                <input
-                    v-model="saleSearch"
-                    type="search"
-                    class="filter-input"
-                    placeholder="Buscar por pedido ou Trade ID..."
-                />
-                <select v-model="typeFilter" @change="onFilterChange" class="filter-select">
-                    <option v-for="opt in typeOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-                </select>
-                <select v-model="statusFilter" @change="onFilterChange" class="filter-select">
-                    <option v-for="opt in statusOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-                </select>
+                <FilterField label="Buscar">
+                    <input
+                        v-model="saleSearch"
+                        type="search"
+                        class="filter-input"
+                        placeholder="Pedido ou Trade ID..."
+                    />
+                </FilterField>
+                <FilterField label="Tipo">
+                    <select v-model="typeFilter" @change="onFilterChange" class="filter-select">
+                        <option v-for="opt in typeOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+                    </select>
+                </FilterField>
+                <FilterField label="Status">
+                    <select v-model="statusFilter" @change="onFilterChange" class="filter-select">
+                        <option v-for="opt in statusOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+                    </select>
+                </FilterField>
             </div>
         </header>
 
@@ -253,7 +260,7 @@ onMounted(() => fetchOffers(1))
 .filters-row
     display flex
     gap 0.75rem
-    align-items center
+    align-items flex-end
     flex-wrap wrap
 
 .filter-input

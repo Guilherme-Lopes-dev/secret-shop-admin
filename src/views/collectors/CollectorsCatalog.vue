@@ -2,6 +2,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { Icon } from '@iconify/vue'
+import FilterField from '@/components/common/FilterField.vue'
 import { toast } from 'vue3-toastify'
 import { adminService } from '@/services/admin/admin.service'
 import { formatCurrency } from '@/utils/formatCurrency'
@@ -134,64 +135,80 @@ onMounted(load)
 
         <section class="filters-section">
             <div class="filters-row">
-                <div class="search-wrap">
-                    <Icon icon="mdi:magnify" class="search-icon" />
-                    <input
-                        v-model="search"
-                        type="search"
-                        placeholder="Buscar por nome ou market hash"
-                        class="search-input"
-                        @keyup.enter="applyFilters"
-                    />
-                </div>
+                <FilterField label="Buscar" class="search-field">
+                    <div class="search-wrap">
+                        <Icon icon="mdi:magnify" class="search-icon" />
+                        <input
+                            v-model="search"
+                            type="search"
+                            placeholder="Nome ou market hash..."
+                            class="search-input"
+                            @keyup.enter="applyFilters"
+                        />
+                    </div>
+                </FilterField>
 
-                <div class="search-wrap search-wrap--sm">
-                    <Icon icon="mdi:steam" class="search-icon" />
-                    <input
-                        v-model="steamIdFilter"
-                        type="search"
-                        inputmode="numeric"
-                        placeholder="SteamID64"
-                        class="search-input"
-                        @keyup.enter="applyFilters"
-                    />
-                </div>
+                <FilterField label="Conta collector">
+                    <div class="search-wrap search-wrap--sm">
+                        <Icon icon="mdi:steam" class="search-icon" />
+                        <input
+                            v-model="steamIdFilter"
+                            type="search"
+                            inputmode="numeric"
+                            placeholder="SteamID64"
+                            class="search-input"
+                            @keyup.enter="applyFilters"
+                        />
+                    </div>
+                </FilterField>
 
-                <input
-                    v-model="minPriceInput"
-                    type="number"
-                    min="0"
-                    placeholder="Preço mín (centavos)"
-                    class="price-input"
-                    @keyup.enter="applyFilters"
-                />
-                <input
-                    v-model="maxPriceInput"
-                    type="number"
-                    min="0"
-                    placeholder="Preço máx (centavos)"
-                    class="price-input"
-                    @keyup.enter="applyFilters"
-                />
+                <FilterField label="Preço (centavos)">
+                    <div class="price-range">
+                        <input
+                            v-model="minPriceInput"
+                            type="number"
+                            min="0"
+                            placeholder="Mín"
+                            aria-label="Preço mínimo em centavos"
+                            class="price-input"
+                            @keyup.enter="applyFilters"
+                        />
+                        <span class="price-sep">—</span>
+                        <input
+                            v-model="maxPriceInput"
+                            type="number"
+                            min="0"
+                            placeholder="Máx"
+                            aria-label="Preço máximo em centavos"
+                            class="price-input"
+                            @keyup.enter="applyFilters"
+                        />
+                    </div>
+                </FilterField>
+
+                <FilterField label="Mostrar só">
+                    <div class="checkbox-group">
+                        <label class="filter-checkbox">
+                            <input type="checkbox" v-model="noPriceOnly" @change="applyFilters" />
+                            Sem preço
+                        </label>
+                        <label class="filter-checkbox">
+                            <input type="checkbox" v-model="noHeroOnly" @change="applyFilters" />
+                            Sem hero
+                        </label>
+                    </div>
+                </FilterField>
+
+                <FilterField label="Por página">
+                    <select v-model.number="limit" class="filter-select">
+                        <option v-for="s in pageSizeOptions" :key="s" :value="s">{{ s }}</option>
+                    </select>
+                </FilterField>
 
                 <button class="btn-primary" :disabled="loading" @click="applyFilters">
                     <Icon :icon="loading ? 'mdi:loading' : 'mdi:filter-outline'" :class="{ spinning: loading }" />
                     Filtrar
                 </button>
-
-                <label class="filter-checkbox">
-                    <input type="checkbox" v-model="noPriceOnly" @change="applyFilters" />
-                    Sem preço
-                </label>
-
-                <label class="filter-checkbox">
-                    <input type="checkbox" v-model="noHeroOnly" @change="applyFilters" />
-                    Sem hero
-                </label>
-
-                <select v-model.number="limit" class="filter-select">
-                    <option v-for="s in pageSizeOptions" :key="s" :value="s">{{ s }} por página</option>
-                </select>
             </div>
 
             <div class="bulk-price-row">
@@ -355,17 +372,32 @@ onMounted(load)
 .filters-row
     display flex
     flex-wrap wrap
-    gap 0.75rem
-    align-items center
+    gap 0.75rem 1rem
+    align-items flex-end
 
-.search-wrap
-    position relative
+.search-field
     flex 1
     min-width 220px
 
+.search-wrap
+    position relative
+
     &--sm
-        flex 0 0 auto
-        min-width 200px
+        width 200px
+
+.price-range
+    display flex
+    align-items center
+    gap 0.4rem
+
+.price-sep
+    color #64748b
+
+.checkbox-group
+    display flex
+    align-items center
+    gap 1rem
+    min-height 2.6rem
 
 .search-icon
     position absolute
@@ -394,7 +426,7 @@ onMounted(load)
         border-color rgba(99,102,241,0.45)
 
 .price-input
-    width 180px
+    width 110px
     background #121214
     border 1px solid rgba(255,255,255,0.08)
     border-radius 10px

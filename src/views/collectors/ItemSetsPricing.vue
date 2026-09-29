@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { Icon } from '@iconify/vue'
+import FilterField from '@/components/common/FilterField.vue'
 import { toast } from 'vue3-toastify'
 import { adminService } from '@/services/admin/admin.service'
 import { formatCurrency } from '@/utils/formatCurrency'
@@ -275,45 +276,58 @@ onMounted(loadSets)
 
         <section class="filters-section">
             <div class="filters-row">
-                <div class="search-wrap">
-                    <Icon icon="mdi:magnify" class="search-icon" />
-                    <input
-                        v-model="search"
-                        type="search"
-                        placeholder="Buscar por set, herói ou baú"
-                        class="search-input"
-                    />
-                </div>
+                <FilterField label="Buscar" class="search-field">
+                    <div class="search-wrap">
+                        <Icon icon="mdi:magnify" class="search-icon" />
+                        <input
+                            v-model="search"
+                            type="search"
+                            placeholder="Set, herói ou baú..."
+                            class="search-input"
+                        />
+                    </div>
+                </FilterField>
 
-                <select v-model="cacheFilter" class="filter-select">
-                    <option value="">Todos os baús</option>
-                    <option v-for="c in caches" :key="c.id" :value="c.id">{{ c.name }}</option>
-                </select>
+                <FilterField label="Baú">
+                    <select v-model="cacheFilter" class="filter-select">
+                        <option value="">Todos</option>
+                        <option v-for="c in caches" :key="c.id" :value="c.id">{{ c.name }}</option>
+                    </select>
+                </FilterField>
 
-                <select v-model="heroFilter" class="filter-select filter-select--sm">
-                    <option value="">Todos os heróis</option>
-                    <option v-for="h in heroOptions" :key="h" :value="h">{{ h }}</option>
-                </select>
+                <FilterField label="Herói">
+                    <select v-model="heroFilter" class="filter-select filter-select--sm">
+                        <option value="">Todos</option>
+                        <option v-for="h in heroOptions" :key="h" :value="h">{{ h }}</option>
+                    </select>
+                </FilterField>
 
-                <select v-model="rarityFilter" class="filter-select filter-select--sm">
-                    <option value="">Todas as raridades</option>
-                    <option v-for="r in rarityOptions" :key="r" :value="r">{{ r }}</option>
-                </select>
+                <FilterField label="Raridade">
+                    <select v-model="rarityFilter" class="filter-select filter-select--sm">
+                        <option value="">Todas</option>
+                        <option v-for="r in rarityOptions" :key="r" :value="r">{{ r }}</option>
+                    </select>
+                </FilterField>
 
-                <select v-model="typeFilter" class="filter-select filter-select--sm">
-                    <option value="">Todos os tipos</option>
-                    <option v-for="t in typeOptions" :key="t" :value="t">{{ t }}</option>
-                </select>
+                <FilterField label="Tipo">
+                    <select v-model="typeFilter" class="filter-select filter-select--sm">
+                        <option value="">Todos</option>
+                        <option v-for="t in typeOptions" :key="t" :value="t">{{ t }}</option>
+                    </select>
+                </FilterField>
 
-                <label class="filter-checkbox">
-                    <input type="checkbox" v-model="onlyInStock" />
-                    Só com estoque
-                </label>
-
-                <label class="filter-checkbox">
-                    <input type="checkbox" v-model="onlyWithoutPrice" />
-                    Só sem preço
-                </label>
+                <FilterField label="Mostrar só">
+                    <div class="checkbox-group">
+                        <label class="filter-checkbox">
+                            <input type="checkbox" v-model="onlyInStock" />
+                            Com estoque
+                        </label>
+                        <label class="filter-checkbox">
+                            <input type="checkbox" v-model="onlyWithoutPrice" />
+                            Sem preço
+                        </label>
+                    </div>
+                </FilterField>
 
                 <button v-if="hasActiveFilters" class="page-btn" @click="clearFilters">
                     <Icon icon="mdi:filter-remove-outline" />
@@ -554,13 +568,21 @@ onMounted(loadSets)
 .filters-row
     display flex
     flex-wrap wrap
-    gap 0.75rem
-    align-items center
+    gap 0.75rem 1rem
+    align-items flex-end
+
+.search-field
+    flex 1
+    min-width 240px
 
 .search-wrap
     position relative
-    flex 1
-    min-width 240px
+
+.checkbox-group
+    display flex
+    align-items center
+    gap 1rem
+    min-height 2.6rem
 
 .search-icon
     position absolute

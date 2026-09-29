@@ -108,10 +108,11 @@
             <img referrerpolicy="no-referrer" :src="mediaUrl(p.base_image_url ?? p.image_url)" class="finish-item__thumb" alt="" />
             <span class="finish-item__name">{{ p.subject ?? 'Sem produto' }}</span>
             <input v-model="selected[p.id]" type="number" min="0" step="0.01" class="form-input finish-item__price" placeholder="sem preço" />
-            <button type="button" class="subject-chip__clear" @click="toggleSelect(p)"><Icon icon="mdi:close" width="14" /></button>
+            <button type="button" class="icon-btn" title="Posicionar" @click="editing = p"><Icon icon="mdi:cursor-move" width="16" /></button>
+            <button type="button" class="icon-btn" title="Tirar da seleção" @click="toggleSelect(p)"><Icon icon="mdi:close" width="16" /></button>
           </li>
         </ul>
-        <p class="field-hint">Preço vem do item mais barato disponível no estoque; troca à mão se quiser.</p>
+        <p class="field-hint">Preço vem do item mais barato disponível no estoque; troca à mão se quiser. <Icon icon="mdi:cursor-move" width="12" /> arrasta os elementos na arte; o último posicionamento vira o padrão do lote.</p>
 
         <button class="btn-primary" :disabled="finishing" @click="finishSelected">
           <Icon icon="mdi:layers-outline" width="16" /> {{ finishing ? 'Aplicando...' : `Aplicar em ${selectedPosts.length}` }}
@@ -213,6 +214,19 @@
       </div>
     </div>
 
+    <FinishEditor
+      v-if="editing"
+      :kind="editing.kind"
+      :base-url="mediaUrl(editing.base_image_url ?? editing.image_url)"
+      :subject="editing.subject"
+      :price="priceOf(editing)"
+      :note="finishNote.trim() || null"
+      :initial-layout="layoutOf(editing)"
+      :applying="applyingEditor"
+      @close="editing = null"
+      @apply="applyFromEditor"
+    />
+
     <div v-if="deleteTarget" class="modal-overlay" @click.self="deleteTarget = null">
       <div class="modal">
         <h3>Excluir post</h3>
@@ -234,12 +248,15 @@ import { Icon } from '@iconify/vue'
 import { toast } from 'vue3-toastify'
 import dayjs from 'dayjs'
 import { adminService } from '@/services/admin/admin.service'
+import FinishEditor from './FinishEditor.vue'
+import { DEFAULT_LAYOUT, cloneLayout, type FinishLayout } from './finishCanvas'
 
 type Kind = 'FEED' | 'STORY'
 
 const BUSY_STATUSES = ['GENERATING', 'PUBLISHING']
 const POLL_MS = 4000
 const NOTE_KEY = 'instagram.finishNote'
+const LAYOUT_KEY = 'instagram.finishLayout'
 // Opcional: apagar o campo tira a frase da arte (e fica lembrado vazio).
 const DEFAULT_NOTE = 'Preço sujeito a mudança'
 
@@ -496,8 +513,8 @@ const publish = async (p: any) => {
 }
 
 // ── Acabamento (logo + preço + frase) ─────────────────────────────────────────
-// id do post -> preço digitado (string do input; vazio = sem preço).
-const selected = ref<Record<string, string>>({})
+// id do post -> preço digitado (input number: number, ou vazio = sem preço).
+const selected = ref<Record<string, number | ''>>({})
 const finishing = ref(false)
 
 const readNote = () => {
@@ -523,21 +540,70 @@ const unselect = (id: string) => {
   selected.value = rest
 }
 
-const stockPrice = (p: any) => (p.stock_price_brl != null ? p.stock_price_brl.toFixed(2) : '')
+const stockPrice = (p: any): number | '' => (p.stock_price_brl != null ? Number(p.stock_price_brl.toFixed(2)) : '')
+
+// Input number devolve number (ou '' vazio); 0 é preço válido.
+const priceOf = (p: any): number | null => {
+  const price = selected.value[p.id]
+  return price === '' || price == null ? null : Number(price)
+}
 
 const toggleSelect = (p: any) => {
   if (p.id in selected.value) return unselect(p.id)
   selected.value = { ...selected.value, [p.id]: stockPrice(p) }
 }
 
+// Layout do post > último aplicado nesse formato > padrão.
+const readDefaultLayout = (kind: Kind): FinishLayout => {
+  try {
+    const saved = localStorage.getItem(`${LAYOUT_KEY}.${kind}`)
+    if (saved) return JSON.parse(saved)
+  } catch {}
+  return cloneLayout(DEFAULT_LAYOUT[kind])
+}
+
+const saveDefaultLayout = (kind: Kind, layout: FinishLayout) => {
+  try {
+    localStorage.setItem(`${LAYOUT_KEY}.${kind}`, JSON.stringify(layout))
+  } catch {}
+}
+
+const layoutOf = (p: any): FinishLayout => p.finish_layout ?? readDefaultLayout(p.kind)
+
+// Troca pelo id: o poll pode ter substituído o objeto enquanto a request rodava.
+const replacePost = (updated: any) => {
+  posts.value = posts.value.map((p) => (p.id === updated.id ? { ...p, ...updated } : p))
+}
+
 const finishOne = async (p: any) => {
-  const price = selected.value[p.id]
   const res = await adminService.finishInstagramPost(p.id, {
-    price_brl: price ? Number(price) : undefined,
+    layout: layoutOf(p),
+    price_brl: priceOf(p) ?? undefined,
     note: finishNote.value.trim() || undefined,
   })
-  Object.assign(p, res.data)
+  replacePost(res.data)
   unselect(p.id)
+}
+
+// ── Editor de posição ─────────────────────────────────────────────────────────
+const editing = ref<any>(null)
+const applyingEditor = ref(false)
+
+// Layout aplicado vira o padrão do formato: posiciona uma, aplica nas outras em lote.
+const applyFromEditor = async (layout: FinishLayout) => {
+  const p = editing.value
+  applyingEditor.value = true
+  p.finish_layout = layout
+  saveDefaultLayout(p.kind, layout)
+  try {
+    await finishOne(p)
+    editing.value = null
+    toast.success('Arte finalizada.')
+  } catch (err: any) {
+    toast.error(err.response?.data?.message ?? 'Não deu pra finalizar.')
+  } finally {
+    applyingEditor.value = false
+  }
 }
 
 // As que falharem continuam marcadas pra tentar de novo.
@@ -686,6 +752,18 @@ onBeforeUnmount(() => {
 
 .finish-item__price
   width 110px
+
+.icon-btn
+  display inline-flex
+  padding 4px
+  background transparent
+  border none
+  border-radius 6px
+  color rgba(255,255,255,0.6)
+  cursor pointer
+  &:hover
+    color #fff
+    background rgba(255,255,255,0.08)
 
 .section-title
   font-size 1rem

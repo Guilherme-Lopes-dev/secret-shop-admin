@@ -1,5 +1,6 @@
 import { api } from '@/lib/api/api'
 import type { CatalogItem } from '@/utils/catalog'
+import type { FinishLayout } from '@/views/instagram/finishCanvas'
 import type {
   DiscordAssignRolePayload,
   DiscordBotChannelDto,
@@ -1393,7 +1394,7 @@ export const adminService = {
   },
 
   /** Logo + preço + frase por cima da arte da IA. Refaz sempre da arte crua; volta o post atualizado. */
-  async finishInstagramPost(uuid: string, data: { price_brl?: number; note?: string }) {
+  async finishInstagramPost(uuid: string, data: { layout: FinishLayout; price_brl?: number; note?: string }) {
     return api.post(`/instagram/posts/${uuid}/finish`, data)
   },
 

@@ -1356,9 +1356,9 @@ export const adminService = {
     return api.delete(`/instagram/posts/${uuid}`)
   },
 
-  /** Arte sem IA: fundo (imagem solta da Mídia) + foto da galeria da skin + nome + preço. Já volta DRAFT. */
-  async composeInstagramPost(data: InstagramComposeOrder) {
-    return api.post('/instagram/posts/compose', data)
+  /** Logo + preço + frase por cima da arte da IA. Refaz sempre da arte crua; volta o post atualizado. */
+  async finishInstagramPost(uuid: string, data: { price_brl?: number; note?: string }) {
+    return api.post(`/instagram/posts/${uuid}/finish`, data)
   },
 
   // ── Sorteios ────────────────────────────────────────────────────────────────
@@ -1665,22 +1665,11 @@ export type GiftSource = 'reward' | 'rune'
 export type InstagramPostOrder = {
   kind: 'FEED' | 'STORY'
   skin_uuid?: string
-  price_brl?: number
   coupon_code?: string
   coupon_rule?: string
   message?: string
   cta?: string
   cta_url?: string
-  caption?: string
-}
-
-export type InstagramComposeOrder = {
-  kind: 'FEED' | 'STORY'
-  skin_uuid: string
-  media_uuid: string
-  /** Imagem solta (órfã) da Mídia. */
-  background_uuid: string
-  price_brl?: number
   caption?: string
 }
 

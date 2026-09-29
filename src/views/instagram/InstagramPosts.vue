@@ -3,7 +3,7 @@
     <header class="page-header">
       <div>
         <h1 class="page-title">Instagram</h1>
-        <p class="page-subtitle">Gera a arte com IA, revisa e publica na conta da loja</p>
+        <p class="page-subtitle">Gera a arte com IA, aplica logo e preço e publica na conta da loja</p>
       </div>
       <div class="account">
         <button class="btn-ghost" @click="openPrompt">
@@ -23,17 +23,9 @@
     </header>
 
     <div class="layout">
+      <div class="side">
       <section class="section composer">
         <h2 class="section-title">Novo post</h2>
-
-        <div class="kind-tabs">
-          <button type="button" class="tab" :class="{ 'tab--on': mode === 'AI' }" @click="mode = 'AI'">
-            <Icon icon="mdi:creation" width="14" /> Gerar com IA
-          </button>
-          <button type="button" class="tab" :class="{ 'tab--on': mode === 'COMPOSE' }" @click="mode = 'COMPOSE'">
-            <Icon icon="mdi:layers-outline" width="14" /> Montar com fundo
-          </button>
-        </div>
 
         <div class="kind-tabs">
           <button type="button" class="tab" :class="{ 'tab--on': kind === 'FEED' }" @click="setKind('FEED')">Feed</button>
@@ -41,8 +33,7 @@
         </div>
 
         <div class="field">
-          <label v-if="mode === 'COMPOSE'">Skin</label>
-          <label v-else>Produto <span class="text-muted">(opcional; vira PRODUCT_LOCKED na arte)</span></label>
+          <label>Produto <span class="text-muted">(opcional; vira PRODUCT_LOCKED na arte)</span></label>
           <div v-if="subject" class="subject-chip">
             <Icon icon="mdi:sword" width="14" /> {{ subject }}
             <button type="button" class="subject-chip__clear" @click="clearSubject"><Icon icon="mdi:close" width="14" /></button>
@@ -63,46 +54,31 @@
           </ul>
         </div>
 
-        <ArtPicker
-          v-if="mode === 'COMPOSE'"
-          v-model:media="composeMedia"
-          v-model:background="composeBackground"
-          :market-hash-name="pickedUnit?.skins?.market_hash_name ?? null"
-        />
+        <div class="field">
+          <label>Cupom</label>
+          <input v-model="couponCode" class="form-input" placeholder="ex: RUNA10" />
+        </div>
+
+        <div v-if="couponCode.trim()" class="field">
+          <label>Regra do cupom</label>
+          <input v-model="couponRule" class="form-input" placeholder="ex: 10% em qualquer skin até domingo" />
+        </div>
+
+        <div class="field">
+          <label>Mensagem <span class="text-muted">(o que a arte precisa dizer)</span></label>
+          <textarea v-model="message" class="form-input" rows="3" placeholder="ex: chegou no estoque, poucas unidades confirmadas" />
+        </div>
 
         <div class="field-row">
           <div class="field">
-            <label>Preço (R$)</label>
-            <input v-model="priceBrl" type="number" min="0" step="0.01" class="form-input" placeholder="sem preço" />
+            <label>CTA</label>
+            <input v-model="cta" class="form-input" placeholder="VER NO SITE" />
           </div>
-          <div v-if="mode === 'AI'" class="field">
-            <label>Cupom</label>
-            <input v-model="couponCode" class="form-input" placeholder="ex: RUNA10" />
+          <div class="field">
+            <label>Link</label>
+            <input v-model="ctaUrl" class="form-input" placeholder="https://secretshopgg.com" />
           </div>
         </div>
-
-        <template v-if="mode === 'AI'">
-          <div v-if="couponCode.trim()" class="field">
-            <label>Regra do cupom</label>
-            <input v-model="couponRule" class="form-input" placeholder="ex: 10% em qualquer skin até domingo" />
-          </div>
-
-          <div class="field">
-            <label>Mensagem <span class="text-muted">(o que a arte precisa dizer)</span></label>
-            <textarea v-model="message" class="form-input" rows="3" placeholder="ex: chegou no estoque, poucas unidades confirmadas" />
-          </div>
-
-          <div class="field-row">
-            <div class="field">
-              <label>CTA</label>
-              <input v-model="cta" class="form-input" placeholder="VER NO SITE" />
-            </div>
-            <div class="field">
-              <label>Link</label>
-              <input v-model="ctaUrl" class="form-input" placeholder="https://secretshopgg.com" />
-            </div>
-          </div>
-        </template>
 
         <div v-if="kind === 'FEED'" class="field">
           <label>Legenda</label>
@@ -112,16 +88,36 @@
 
         <p v-if="composerError" class="error-msg">{{ composerError }}</p>
 
-        <button v-if="mode === 'COMPOSE'" class="btn-primary" :disabled="!canCompose || creating" @click="composePost">
-          <Icon icon="mdi:layers-outline" width="16" /> {{ creating ? 'Montando...' : 'Montar arte' }}
+        <button class="btn-primary" :disabled="!canCreate || creating" @click="createPost">
+          <Icon icon="mdi:creation" width="16" /> {{ creating ? 'Enviando...' : 'Gerar imagem' }}
         </button>
-        <template v-else>
-          <button class="btn-primary" :disabled="!canCreate || creating" @click="createPost">
-            <Icon icon="mdi:creation" width="16" /> {{ creating ? 'Enviando...' : 'Gerar imagem' }}
-          </button>
-          <p class="field-hint">Prompt mestre v3 decide template e composição. Leva 1–2 min; o rascunho aparece ao lado quando a arte ficar pronta.</p>
-        </template>
+        <p class="field-hint">Prompt mestre v3 decide template e composição. Leva 1–2 min; depois marca a arte ao lado pra aplicar logo, preço e frase.</p>
       </section>
+
+      <section v-if="selectedPosts.length" class="section composer finish">
+        <h2 class="section-title">Finalizar arte ({{ selectedPosts.length }})</h2>
+        <p class="field-hint">Logo no topo; preço e frase numa faixa escura embaixo. Sempre refaz em cima da arte original da IA, então dá pra aplicar de novo com outro preço.</p>
+
+        <div class="field">
+          <label>Frase <span class="text-muted">(opcional, vale pra todas)</span></label>
+          <input v-model="finishNote" class="form-input" maxlength="120" placeholder="sem frase" />
+        </div>
+
+        <ul class="finish-list">
+          <li v-for="p in selectedPosts" :key="p.id" class="finish-item">
+            <img referrerpolicy="no-referrer" :src="mediaUrl(p.base_image_url ?? p.image_url)" class="finish-item__thumb" alt="" />
+            <span class="finish-item__name">{{ p.subject ?? 'Sem produto' }}</span>
+            <input v-model="selected[p.id]" type="number" min="0" step="0.01" class="form-input finish-item__price" placeholder="sem preço" />
+            <button type="button" class="subject-chip__clear" @click="toggleSelect(p)"><Icon icon="mdi:close" width="14" /></button>
+          </li>
+        </ul>
+        <p class="field-hint">Preço vem do item mais barato disponível no estoque; troca à mão se quiser.</p>
+
+        <button class="btn-primary" :disabled="finishing" @click="finishSelected">
+          <Icon icon="mdi:layers-outline" width="16" /> {{ finishing ? 'Aplicando...' : `Aplicar em ${selectedPosts.length}` }}
+        </button>
+      </section>
+      </div>
 
       <section class="posts">
         <div v-if="loading" class="section empty-state">Carregando...</div>
@@ -129,6 +125,10 @@
 
         <article v-for="p in posts" :key="p.id" class="post-card">
           <div class="post-card__image" :class="p.kind === 'STORY' ? 'ratio-story' : 'ratio-feed'">
+            <label v-if="canPublish(p)" class="post-card__select" :class="{ 'post-card__select--on': p.id in selected }">
+              <input type="checkbox" :checked="p.id in selected" @change="toggleSelect(p)" />
+              {{ p.base_image_url ? 'Refazer acabamento' : 'Finalizar' }}
+            </label>
             <img v-if="p.image_url" referrerpolicy="no-referrer" :src="mediaUrl(p.image_url)" alt="" />
             <div v-else class="post-card__placeholder">
               <Icon v-if="p.status === 'GENERATING'" icon="mdi:loading" width="28" class="spin" />
@@ -228,19 +228,20 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, shallowRef } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import { mediaUrl } from '@/utils/mediaUrl'
 import { Icon } from '@iconify/vue'
 import { toast } from 'vue3-toastify'
 import dayjs from 'dayjs'
 import { adminService } from '@/services/admin/admin.service'
-import ArtPicker from './ArtPicker.vue'
 
 type Kind = 'FEED' | 'STORY'
-type Mode = 'AI' | 'COMPOSE'
 
 const BUSY_STATUSES = ['GENERATING', 'PUBLISHING']
 const POLL_MS = 4000
+const NOTE_KEY = 'instagram.finishNote'
+// Opcional: apagar o campo tira a frase da arte (e fica lembrado vazio).
+const DEFAULT_NOTE = 'Preço sujeito a mudança'
 
 // ── Conta ─────────────────────────────────────────────────────────────────────
 const account = ref<any>(null)
@@ -327,10 +328,8 @@ const resetPrompt = async () => {
 }
 
 // ── Composer ──────────────────────────────────────────────────────────────────
-const mode = ref<Mode>('AI')
 const kind = ref<Kind>('FEED')
 const subject = ref('')
-const priceBrl = ref('')
 const couponCode = ref('')
 const couponRule = ref('')
 const message = ref('')
@@ -345,8 +344,6 @@ const skinResults = ref<any[]>([])
 const searchingSkins = ref(false)
 let skinTimer: ReturnType<typeof setTimeout> | null = null
 const pickedUnit = shallowRef<any>(null)
-const composeMedia = ref<string | null>(null)
-const composeBackground = ref<string | null>(null)
 
 const skinThumb = (icon?: string | null): string | null =>
   icon ? `https://steamcommunity-a.akamaihd.net/economy/image/${icon}/62fx62f` : null
@@ -355,17 +352,17 @@ const formatPrice = (cents?: number | null) =>
   cents == null ? '—' : (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 
 // A arte vem do prompt mestre no backend; aqui só a legenda tem template.
+// Sem preço: a arte é reutilizada com preços diferentes, preço só no acabamento.
 const captionFor = (unit: any) => {
   const name = unit.skins?.name ?? 'Item'
   const hero = unit.skins?.hero ? ` — ${unit.skins.hero}` : ''
-  return `${name}${hero}\nPor ${formatPrice(unit.price)} na Secret Shop 🔥\nLink na bio.\n\n#dota2 #dota2skins #dota2brasil #secretshop`
+  return `${name}${hero}\nDisponível na Secret Shop 🔥\nLink na bio.\n\n#dota2 #dota2skins #dota2brasil #secretshop`
 }
 
 const setKind = (k: Kind) => { kind.value = k }
 
 // Precisa de algo pra peça dizer: produto, cupom ou mensagem.
 const canCreate = computed(() => !!subject.value || !!couponCode.value.trim() || !!message.value.trim())
-const canCompose = computed(() => !!pickedUnit.value && !!composeMedia.value && !!composeBackground.value)
 
 const searchSkins = async () => {
   const search = skinQuery.value.trim()
@@ -389,7 +386,6 @@ const onSkinQuery = () => {
 const pickSkin = (unit: any) => {
   pickedUnit.value = unit
   subject.value = unit.skins?.name ?? ''
-  priceBrl.value = unit.price != null ? (unit.price / 100).toFixed(2) : ''
   caption.value = captionFor(unit)
   skinQuery.value = ''
   skinResults.value = []
@@ -408,7 +404,6 @@ const createPost = async () => {
     const res = await adminService.createInstagramPost({
       kind: kind.value,
       skin_uuid: pickedUnit.value?.skins?.id || undefined,
-      price_brl: priceBrl.value ? Number(priceBrl.value) : undefined,
       coupon_code: couponCode.value.trim() || undefined,
       coupon_rule: couponRule.value.trim() || undefined,
       message: message.value.trim() || undefined,
@@ -421,28 +416,6 @@ const createPost = async () => {
     toast.info('Gerando imagem...')
   } catch (err: any) {
     composerError.value = err.response?.data?.message ?? 'Não deu pra criar o post.'
-  } finally {
-    creating.value = false
-  }
-}
-
-// Sem IA: responde na hora com o rascunho pronto, sem poll.
-const composePost = async () => {
-  if (creating.value) return
-  creating.value = true
-  composerError.value = ''
-  try {
-    const res = await adminService.composeInstagramPost({
-      kind: kind.value,
-      skin_uuid: pickedUnit.value.skins.id,
-      media_uuid: composeMedia.value!,
-      background_uuid: composeBackground.value!,
-      price_brl: priceBrl.value ? Number(priceBrl.value) : undefined,
-      caption: kind.value === 'FEED' ? caption.value.trim() || undefined : undefined,
-    })
-    posts.value = [res.data, ...posts.value]
-  } catch (err: any) {
-    composerError.value = err.response?.data?.message ?? 'Não deu pra montar a arte.'
   } finally {
     creating.value = false
   }
@@ -522,11 +495,68 @@ const publish = async (p: any) => {
   }
 }
 
+// ── Acabamento (logo + preço + frase) ─────────────────────────────────────────
+// id do post -> preço digitado (string do input; vazio = sem preço).
+const selected = ref<Record<string, string>>({})
+const finishing = ref(false)
+
+const readNote = () => {
+  try {
+    return localStorage.getItem(NOTE_KEY) ?? DEFAULT_NOTE
+  } catch {
+    return DEFAULT_NOTE
+  }
+}
+const finishNote = ref(readNote())
+
+// Sem storage (aba anônima etc.) só não lembra a frase.
+watch(finishNote, (note) => {
+  try {
+    localStorage.setItem(NOTE_KEY, note)
+  } catch {}
+})
+
+const selectedPosts = computed(() => posts.value.filter((p) => p.id in selected.value))
+
+const unselect = (id: string) => {
+  const { [id]: _, ...rest } = selected.value
+  selected.value = rest
+}
+
+const stockPrice = (p: any) => (p.stock_price_brl != null ? p.stock_price_brl.toFixed(2) : '')
+
+const toggleSelect = (p: any) => {
+  if (p.id in selected.value) return unselect(p.id)
+  selected.value = { ...selected.value, [p.id]: stockPrice(p) }
+}
+
+const finishOne = async (p: any) => {
+  const price = selected.value[p.id]
+  const res = await adminService.finishInstagramPost(p.id, {
+    price_brl: price ? Number(price) : undefined,
+    note: finishNote.value.trim() || undefined,
+  })
+  Object.assign(p, res.data)
+  unselect(p.id)
+}
+
+// As que falharem continuam marcadas pra tentar de novo.
+const finishSelected = async () => {
+  if (finishing.value) return
+  finishing.value = true
+  const results = await Promise.allSettled(selectedPosts.value.map(finishOne))
+  finishing.value = false
+  const failed = results.filter((r) => r.status === 'rejected').length
+  if (failed) return toast.error(`${failed} arte(s) não finalizaram.`)
+  toast.success('Arte finalizada.')
+}
+
 const doDelete = async () => {
   if (!deleteTarget.value) return
   deleting.value = true
   try {
     await adminService.deleteInstagramPost(deleteTarget.value.id)
+    unselect(deleteTarget.value.id)
     posts.value = posts.value.filter((p) => p.id !== deleteTarget.value.id)
     deleteTarget.value = null
   } finally {
@@ -609,13 +639,53 @@ onBeforeUnmount(() => {
   border 1px solid rgba(255,255,255,0.06)
   border-radius 12px
 
-.composer
-  padding 1.25rem
+.side
   display flex
   flex-direction column
   gap 1rem
   position sticky
   top 1rem
+
+.composer
+  padding 1.25rem
+  display flex
+  flex-direction column
+  gap 1rem
+
+.finish
+  border-color rgba(251,191,36,0.3)
+
+.finish-list
+  list-style none
+  margin 0
+  padding 0
+  display flex
+  flex-direction column
+  gap 6px
+  max-height 320px
+  overflow-y auto
+
+.finish-item
+  display flex
+  align-items center
+  gap 8px
+
+.finish-item__thumb
+  width 36px
+  height 36px
+  border-radius 6px
+  object-fit cover
+
+.finish-item__name
+  flex 1
+  min-width 0
+  font-size 0.8rem
+  white-space nowrap
+  overflow hidden
+  text-overflow ellipsis
+
+.finish-item__price
+  width 110px
 
 .section-title
   font-size 1rem
@@ -857,7 +927,28 @@ onBeforeUnmount(() => {
   display flex
   flex-direction column
 
+.post-card__select
+  position absolute
+  top 8px
+  left 8px
+  display inline-flex
+  align-items center
+  gap 6px
+  padding 4px 10px
+  border-radius 999px
+  background rgba(0,0,0,0.7)
+  font-size 0.75rem
+  font-weight 600
+  cursor pointer
+  input
+    accent-color #fbbf24
+
+.post-card__select--on
+  background #fbbf24
+  color #000
+
 .post-card__image
+  position relative
   width 100%
   background #0f0f12
   display grid

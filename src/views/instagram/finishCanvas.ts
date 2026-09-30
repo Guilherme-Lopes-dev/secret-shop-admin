@@ -21,17 +21,18 @@ const NOTE_PAD_Y = 0.4
 const SHADOW_SIGMA = 0.06
 const GOLD = '#fbbf24'
 
-// Story: topo fora da barra de perfil e preço acima da barra de resposta do Instagram.
+// Preço na faixa que o prompt mestre deixa limpa: x 8%, y 78–86% no story
+// (acima da barra de resposta do Instagram), 80–92% no feed.
 export const DEFAULT_LAYOUT: Record<Kind, FinishLayout> = {
   FEED: {
     logo: { x: 0.045, y: 0.045, w: 0.12 },
     note: { x: 0.6, y: 0.06, size: 0.034 },
-    price: { x: 0.045, y: 0.86, size: 0.1 },
+    price: { x: 0.08, y: 0.82, size: 0.1 },
   },
   STORY: {
     logo: { x: 0.045, y: 0.075, w: 0.12 },
     note: { x: 0.6, y: 0.088, size: 0.034 },
-    price: { x: 0.045, y: 0.842, size: 0.1 },
+    price: { x: 0.08, y: 0.785, size: 0.1 },
   },
 }
 

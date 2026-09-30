@@ -1236,14 +1236,15 @@ onBeforeUnmount(() => {
   img
     width 100%
     height 100%
-    object-fit contain
+    object-fit cover
     display block
 
 .ratio-feed
   aspect-ratio 1 / 1
 
+// 9:16 com cover: arte 2:3 antiga aparece cortada igual o Instagram vai cortar.
 .ratio-story
-  aspect-ratio 2 / 3
+  aspect-ratio 9 / 16
 
 .post-card__placeholder
   display flex

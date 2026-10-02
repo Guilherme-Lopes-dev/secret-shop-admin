@@ -196,14 +196,31 @@
                 <input v-model.number="template.max_uses_per_user" type="number" min="1" class="form-input" />
               </div>
               <div class="field">
-                <label>Vale por <span class="field-unit">dias</span></label>
-                <input v-model.number="template.valid_days" type="number" min="1" placeholder="Não expira" class="form-input" />
-                <p class="field-hint">Conta do spawn.</p>
+                <label>Total de usos</label>
+                <input v-model.number="template.max_uses" type="number" min="1" placeholder="Sem limite" class="form-input" />
+                <p v-if="usesOk" class="field-hint">Somando todo mundo que pegou o spawn.</p>
+                <p v-else class="field-hint field-hint--warn">Precisa limitar as vagas e o total cobrir todas, senão quem pegar por último leva cupom esgotado.</p>
               </div>
+            </div>
+            <div class="field">
+              <label>Vale por <span class="field-unit">dias</span></label>
+              <input v-model.number="template.valid_days" type="number" min="1" placeholder="Não expira" class="form-input" />
+              <p class="field-hint">Conta do spawn.</p>
             </div>
             <div class="field">
               <label>Descrição</label>
               <input v-model="template.description" type="text" maxlength="255" placeholder="Aparece pro cliente" class="form-input" />
+            </div>
+            <div class="field toggle-row">
+              <label class="toggle-label">
+                <div>
+                  <span>Acumulável com Secret Pass</span>
+                  <p class="field-hint">Ligado: aplica sobre o valor já com desconto do passe. Desligado: o maior desconto vence.</p>
+                </div>
+                <button type="button" class="toggle" :class="{ 'toggle--on': template.stackable_with_pass }" @click="template.stackable_with_pass = !template.stackable_with_pass">
+                  <span class="toggle-knob" />
+                </button>
+              </label>
             </div>
           </div>
 
@@ -243,6 +260,12 @@
           </template>
         </section>
 
+        <section v-if="form.prize_type === 'COUPON'" class="form-section">
+          <h2 class="section-title">Condições do cupom</h2>
+          <p class="section-hint">Todas as condições devem ser satisfeitas (lógica AND).</p>
+          <CouponConditions v-model="template.conditions" />
+        </section>
+
         <div class="form-footer">
           <span v-if="errorMsg" class="error-msg">{{ errorMsg }}</span>
           <div class="form-footer__actions">
@@ -266,6 +289,7 @@ import { adminService } from '@/services/admin/admin.service'
 import dayjs from 'dayjs'
 import { RUNE_PAGES, RUNE_TYPES, WEEKDAYS, runeTypeLabel, type RunePage, type RuneType } from '@/utils/runes'
 import UserPickerModal from '@/components/users/UserPickerModal.vue'
+import CouponConditions from '@/components/coupons/CouponConditions.vue'
 
 type PrizeType = 'COUPON' | 'SKIN'
 
@@ -301,6 +325,9 @@ const template = reactive({
   discount_type: 'PERCENTAGE' as 'PERCENTAGE' | 'FIXED',
   discount_value: 10,
   max_uses_per_user: 1 as number | null,
+  max_uses: null as number | null,
+  stackable_with_pass: true,
+  conditions: [] as any[],
   valid_days: 7 as number | null,
   description: '' as string | null,
 })
@@ -340,7 +367,12 @@ const spawnHint = computed(() => {
   return `Último sorteio: ${when} às ${spawn.spawn_time} · ${runeTypeLabel(spawn)}${removed}`
 })
 
-const canSubmit = computed(() => form.weekdays.length > 0 && windowOk.value)
+// espelha `usesCoverFinders` do backend
+const usesOk = computed(() =>
+  form.prize_type !== 'COUPON' || !template.max_uses || (!!form.max_finders && form.max_finders <= template.max_uses),
+)
+
+const canSubmit = computed(() => form.weekdays.length > 0 && windowOk.value && usesOk.value)
 
 const toggle = <T,>(list: T[], value: T) => (list.includes(value) ? list.filter((item) => item !== value) : [...list, value])
 
@@ -356,6 +388,7 @@ const discountLabel = computed(() =>
 const couponTemplate = () => ({
   ...template,
   max_uses_per_user: template.max_uses_per_user || 1,
+  max_uses: template.max_uses || null,
   valid_days: template.valid_days || null,
   description: template.description || null,
 })

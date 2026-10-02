@@ -195,10 +195,20 @@ const deleteTarget = ref<any>(null)
 const routineToDelete = ref<any>(null)
 const deleting = ref(false)
 
-const templateLabel = (template: any) => {
-  if (!template) return 'sem cupom'
+const discountOf = (template: any) => {
   if (template.discount_type === 'FIXED') return `R$ ${(template.discount_value / 100).toFixed(2)} off`
   return `${template.discount_value}% off`
+}
+
+const conditionsOf = (template: any) => {
+  const count = template.conditions?.length ?? 0
+  if (!count) return ''
+  return count === 1 ? ' · 1 condição' : ` · ${count} condições`
+}
+
+const templateLabel = (template: any) => {
+  if (!template) return 'sem cupom'
+  return discountOf(template) + conditionsOf(template)
 }
 
 // Skin já entregue (ou nunca escolhida) = rotina parada até trocar

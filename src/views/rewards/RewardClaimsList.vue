@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import { toast } from 'vue3-toastify'
 import ConfirmActionModal from '@/components/common/ConfirmActionModal.vue'
+import XpBoostCard from '@/components/profile-progress/XpBoostCard.vue'
 import {
   adminService,
   type BulkReleaseFilters,
@@ -12,6 +13,7 @@ import {
   type RewardClaim,
 } from '@/services/admin/admin.service'
 import BulkReleaseConsole from './BulkReleaseConsole.vue'
+import RewardsMinSpendCard from './RewardsMinSpendCard.vue'
 import { formatCurrency } from '@/utils/formatCurrency'
 import { persistedRef } from '@/utils/persistedRef'
 
@@ -72,9 +74,13 @@ const toggleAll = () => {
 }
 let searchTimeout: ReturnType<typeof setTimeout> | null = null
 
-const toCents = (value: string) => {
-  const parsed = Number(value.replace(',', '.'))
-  if (!value || !Number.isFinite(parsed)) return undefined
+// `v-model` em `type="number"` entrega número (o Vue converte); vazio segue ''.
+// Os dois chegam aqui — e o localStorage devolve o que foi gravado.
+const toCents = (value: string | number) => {
+  if (value === '') return undefined
+
+  const parsed = Number(String(value).replace(',', '.'))
+  if (!Number.isFinite(parsed)) return undefined
 
   return Math.round(parsed * 100)
 }
@@ -206,11 +212,18 @@ const openUser = (claim: RewardClaim) => {
 // A fila daqui continua liberando o que já foi resgatado.
 const systemEnabled = ref(true)
 const togglingSystem = ref(false)
+// Centavos por gema. Mesma rota da chave geral: uma busca só alimenta os dois.
+const minSpendPerTier = ref(0)
+
+const applyConfig = (config: { enabled: boolean; min_spend_per_tier: number }) => {
+  systemEnabled.value = config.enabled
+  minSpendPerTier.value = config.min_spend_per_tier ?? 0
+}
 
 const fetchConfig = () =>
   adminService
     .getRewardsConfig()
-    .then(({ data }) => (systemEnabled.value = data.enabled))
+    .then(({ data }) => applyConfig(data))
     .catch(() => undefined)
 
 const toggleSystem = async () => {
@@ -391,6 +404,9 @@ onMounted(() => {
         </select>
       </div>
     </header>
+
+    <RewardsMinSpendCard v-model:saved-cents="minSpendPerTier" />
+    <XpBoostCard />
 
     <div class="filters-row">
       <div class="search-wrap">

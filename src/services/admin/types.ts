@@ -150,6 +150,17 @@ export interface ProfileProgressDto {
   achievements:    AchievementDto[]
 }
 
+/** Janela de XP multiplicado nas compras. Datas ISO; fim exclusivo. */
+export interface XpBoost {
+  multiplier: number
+  starts_at:  string
+  ends_at:    string
+}
+
+export interface XpBoostResponse {
+  boost: (XpBoost & { active: boolean }) | null
+}
+
 export interface DiscordHealthDto {
   ok: boolean
   enabled: boolean

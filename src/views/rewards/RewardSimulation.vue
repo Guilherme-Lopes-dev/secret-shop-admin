@@ -28,6 +28,7 @@ const REASON: Record<RewardSimulationRow['reason'], { label: string; cls: string
   locked:      { label: 'Nível travado', cls: 'reason-muted' },
   all_claimed: { label: 'Já pegou todos', cls: 'reason-muted' },
   no_stock:    { label: 'Sem estoque',   cls: 'reason-warn' },
+  needs_spend: { label: 'Gasto abaixo do mínimo', cls: 'reason-muted' },
 }
 
 const reasonOf = (row: RewardSimulationRow) => REASON[row.reason] ?? { label: row.reason, cls: '' }

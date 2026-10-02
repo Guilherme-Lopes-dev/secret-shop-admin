@@ -30,6 +30,8 @@ import type {
   ProfileProgressDto,
   SkinSalesRow,
   TodayTasks,
+  XpBoost,
+  XpBoostResponse,
 } from './types'
 
 export type CrmCampaign =
@@ -864,7 +866,15 @@ export const adminService = {
   },
 
   async getRewardsConfig() {
-    return api.get<{ enabled: boolean }>('/admin/rewards/config')
+    return api.get<{ enabled: boolean; min_spend_per_tier: number }>('/admin/rewards/config')
+  },
+
+  /** Centavos por gema, acumulado: gema N pede N × o valor. 0 = sem mínimo. */
+  async setRewardsMinSpend(minSpendPerTier: number) {
+    return api.put<{ enabled: boolean; min_spend_per_tier: number }>(
+      '/admin/rewards/config/min-spend',
+      { min_spend_per_tier: minSpendPerTier },
+    )
   },
 
   /** Chave geral: desligada, ninguém resgata e a escada some da tela do usuário. */
@@ -958,6 +968,18 @@ export const adminService = {
 
   async getUserProfileProgress(uuid: string) {
     return api.get<ProfileProgressDto>(`/admin/profile-progress/users/${uuid}`)
+  },
+
+  async getXpBoost() {
+    return api.get<XpBoostResponse>('/admin/profile-progress/xp-boost')
+  },
+
+  async setXpBoost(boost: XpBoost) {
+    return api.put<XpBoostResponse>('/admin/profile-progress/xp-boost', boost)
+  },
+
+  async clearXpBoost() {
+    return api.delete<XpBoostResponse>('/admin/profile-progress/xp-boost')
   },
 
   // Antifraud — política de país (allowlist / blocklist)
@@ -1841,7 +1863,7 @@ const bulkReleaseParams = (filters: BulkReleaseFilters) => {
 }
 
 /** Por que a linha não tem item — `ok` é a única com brinde sorteado. */
-export type RewardSimulationReason = 'ok' | 'locked' | 'all_claimed' | 'no_stock'
+export type RewardSimulationReason = 'ok' | 'locked' | 'all_claimed' | 'no_stock' | 'needs_spend'
 
 export interface RewardSimulationRow {
   user: {

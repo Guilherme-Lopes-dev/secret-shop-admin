@@ -133,6 +133,10 @@
 
       <section class="posts">
         <div v-if="posts.length" class="posts-toolbar">
+          <select v-model="statusFilter" class="form-input posts-toolbar__status">
+            <option value="">Todos os status</option>
+            <option v-for="(label, status) in STATUS_LABEL" :key="status" :value="status">{{ label }}</option>
+          </select>
           <select v-model="heroFilter" class="form-input posts-toolbar__hero">
             <option value="">Todos os heróis</option>
             <option v-for="hero in heroes" :key="hero" :value="hero">{{ hero }}</option>
@@ -598,6 +602,7 @@ watch(posts, () => {
 })
 
 // ── Filtro (herói e raridade vêm da ORDEM da IA; post sem produto não tem) ──
+const statusFilter = ref('')
 const heroFilter = ref('')
 const rarityFilter = ref('')
 const skinFilter = ref('')
@@ -633,16 +638,20 @@ const matchesSkin = (p: any) => {
   return (p.subject ?? '').toLowerCase().includes(search)
 }
 
-const hasFilter = computed(() => !!(heroFilter.value || rarityFilter.value || skinFilter.value.trim()))
+const hasFilter = computed(() => !!(statusFilter.value || heroFilter.value || rarityFilter.value || skinFilter.value.trim()))
 
 const clearFilters = () => {
+  statusFilter.value = ''
   heroFilter.value = ''
   rarityFilter.value = ''
   skinFilter.value = ''
 }
 
 const matchesFilter = (p: any) =>
-  matchesField(heroFilter.value, p.hero) && matchesField(rarityFilter.value, p.rarity) && matchesSkin(p)
+  matchesField(statusFilter.value, p.status) &&
+  matchesField(heroFilter.value, p.hero) &&
+  matchesField(rarityFilter.value, p.rarity) &&
+  matchesSkin(p)
 
 const visiblePosts = computed(() => posts.value.filter(matchesFilter))
 const selectablePosts = computed(() => visiblePosts.value.filter(canPublish))
@@ -930,6 +939,9 @@ onBeforeUnmount(() => {
     display inline-flex
     align-items center
     gap 6px
+
+.posts-toolbar__status
+  width 170px
 
 .posts-toolbar__hero
 .posts-toolbar__rarity

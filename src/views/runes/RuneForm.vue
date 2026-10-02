@@ -20,24 +20,31 @@
           <h2 class="section-title">Tipo</h2>
           <p class="section-hint">Só muda o visual e a copy no site. O prêmio é o cupom vinculado.</p>
 
-          <div class="rune-picker">
-            <button
-              v-for="r in RUNE_TYPES"
-              :key="r.value"
-              type="button"
-              class="rune-pick"
-              :class="{ 'rune-pick--on': form.type === r.value }"
-              @click="form.type = r.value"
-            >
-              <img :src="r.image" alt="" />
-              <span>{{ r.label }}</span>
-            </button>
+          <!-- gerada por rotina com vários tipos: `type` é ignorado, trocar aqui não teria efeito -->
+          <div v-if="perUserType" class="rune-about">
+            <p><strong>Tipo por usuário:</strong> cada um vê uma das {{ perUserType }} runas marcadas na rotina.</p>
           </div>
 
-          <div class="rune-about">
-            <p><strong>No jogo:</strong> {{ selectedInfo.inGame }}</p>
-            <p><strong>Prêmio sugerido:</strong> {{ selectedInfo.suggested }}</p>
-          </div>
+          <template v-else>
+            <div class="rune-picker">
+              <button
+                v-for="r in RUNE_TYPES"
+                :key="r.value"
+                type="button"
+                class="rune-pick"
+                :class="{ 'rune-pick--on': form.type === r.value }"
+                @click="form.type = r.value"
+              >
+                <img :src="r.image" alt="" />
+                <span>{{ r.label }}</span>
+              </button>
+            </div>
+
+            <div class="rune-about">
+              <p><strong>No jogo:</strong> {{ selectedInfo.inGame }}</p>
+              <p><strong>Prêmio sugerido:</strong> {{ selectedInfo.suggested }}</p>
+            </div>
+          </template>
 
           <div class="field">
             <label>Nome interno</label>
@@ -350,7 +357,7 @@ import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import dayjs from 'dayjs'
 import { adminService } from '@/services/admin/admin.service'
-import { RUNE_PAGES, RUNE_TYPES, runeInfo, type RunePage, type RuneType } from '@/utils/runes'
+import { RUNE_PAGES, RUNE_TYPES, isPerUserType, runeInfo, type RunePage, type RuneType } from '@/utils/runes'
 import UserPickerModal from '@/components/users/UserPickerModal.vue'
 
 type DiscoveryStatus = 'seen' | 'found' | 'redeemed' | 'expired' | 'awaiting_review' | 'released' | 'delivered' | 'action_required' | 'rejected'
@@ -386,6 +393,9 @@ const form = reactive({
 const TIERS = [1, 2, 3, 4, 5, 6, 7]
 
 const selectedInfo = computed(() => runeInfo(form.type))
+
+// Quantos tipos a rotina sorteia por usuário; 0 = runa de tipo único (editável).
+const perUserType = ref(0)
 
 const payload = () => ({
   type: form.type,
@@ -423,6 +433,7 @@ const submit = async () => {
 
 const fillForm = (data: any) => {
   form.type = data.type ?? 'BOUNTY'
+  perUserType.value = isPerUserType(data) ? data.types.length : 0
   form.name = data.name ?? ''
   form.page = data.page ?? 'CATALOG'
   form.spawn_time = data.spawn_time ?? '20:00'

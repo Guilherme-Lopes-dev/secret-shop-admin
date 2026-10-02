@@ -40,8 +40,20 @@ export const RUNE_PAGES: Array<{ value: RunePage; label: string }> = [
   { value: 'ANY',     label: 'Qualquer página (aleatória)' },
 ]
 
-const byValue = Object.fromEntries(RUNE_TYPES.map((r) => [r.value, r])) as Record<RuneType, RuneTypeInfo>
+// Índice = getDay() (0 = domingo), igual ao backend
+export const WEEKDAYS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
+
+export const weekdaysLabel = (days: number[]) =>
+  days.length === 7 ? 'Todo dia' : [...days].sort().map((d) => WEEKDAYS[d]).join(' · ')
+
+const byValue =Object.fromEntries(RUNE_TYPES.map((r) => [r.value, r])) as Record<RuneType, RuneTypeInfo>
 
 export const runeInfo = (type: string): RuneTypeInfo => byValue[type as RuneType] ?? RUNE_TYPES[0]
+
+// Runa de rotina com 2+ tipos: cada usuário vê um diferente, `type` não vale pra todos.
+export const isPerUserType = (rune: { types?: string[] }) => (rune.types?.length ?? 0) > 1
+
+export const runeTypeLabel = (rune: { type: string; types?: string[] }) =>
+  isPerUserType(rune) ? 'Tipo por usuário' : runeInfo(rune.type).label
 
 export const runePageLabel = (page: string) => RUNE_PAGES.find((p) => p.value === page)?.label ?? page

@@ -273,6 +273,16 @@ const routes = [
         component: () => import('@/views/runes/RuneForm.vue'),
       },
       {
+        path: 'runes/routines/new',
+        name: 'rune-routine-new',
+        component: () => import('@/views/runes/RuneRoutineForm.vue'),
+      },
+      {
+        path: 'runes/routines/:uuid/edit',
+        name: 'rune-routine-edit',
+        component: () => import('@/views/runes/RuneRoutineForm.vue'),
+      },
+      {
         path: 'whatsapp/blast',
         name: 'whatsapp-blast',
         component: () => import('@/views/whatsapp/WhatsappBlast.vue'),

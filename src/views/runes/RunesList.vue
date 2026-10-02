@@ -5,10 +5,75 @@
         <h1 class="page-title">Runas</h1>
         <p class="page-subtitle">{{ runes.length }} runas · aparecem na loja no horário, quem clica ganha o cupom</p>
       </div>
-      <button class="btn-primary" @click="router.push('/runes/new')">
-        <Icon icon="mdi:plus" width="16" /> Nova runa
-      </button>
+      <div class="header-actions">
+        <button class="btn-ghost" @click="router.push('/runes/routines/new')">
+          <Icon icon="mdi:calendar-sync" width="16" /> Nova rotina
+        </button>
+        <button class="btn-primary" @click="router.push('/runes/new')">
+          <Icon icon="mdi:plus" width="16" /> Nova runa
+        </button>
+      </div>
     </header>
+
+    <div v-if="routines.length" class="section section--routines">
+      <h2 class="section-heading">
+        <Icon icon="mdi:calendar-sync" width="16" /> Rotinas
+        <span class="section-heading__hint">geram uma runa por dia marcado, horário sorteado, tipo por usuário</span>
+      </h2>
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>Rotina</th>
+              <th>Dias</th>
+              <th>Janela</th>
+              <th>Tipos</th>
+              <th>Prêmio</th>
+              <th>Último spawn</th>
+              <th>Status</th>
+              <th>Ações</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="routine in routines" :key="routine.id">
+              <td class="rune-label">{{ routine.name }}</td>
+              <td>{{ weekdaysLabel(routine.weekdays) }}</td>
+              <td>
+                <span class="mono">{{ routine.window_start }}–{{ routine.window_end }}</span>
+                <p class="row-sub">{{ routine.visible_minutes }} min visível</p>
+              </td>
+              <td>
+                <div v-if="routine.types.length" class="type-icons">
+                  <img v-for="type in routine.types" :key="type" :src="runeInfo(type).image" :title="runeInfo(type).label" alt="" />
+                </div>
+                <span v-else class="text-muted">qualquer uma</span>
+              </td>
+              <td>
+                <span v-if="routine.prize_type === 'SKIN'" class="skin-badge" :class="{ 'skin-badge--sold': routine.inventory?.is_sold }">
+                  <Icon icon="mdi:sword" width="13" /> {{ routine.inventory?.skins?.name ?? 'skin' }}
+                </span>
+                <span v-else class="code-badge">{{ templateLabel(routine.coupon_template) }}</span>
+              </td>
+              <td>
+                <template v-if="routine.runes?.[0]">
+                  <span>{{ day(routine.runes[0].starts_on) }}</span>
+                  <span class="mono"> {{ routine.runes[0].spawn_time }}</span>
+                  <p class="row-sub">{{ runeTypeLabel(routine.runes[0]) }}{{ routine.runes[0].deleted_at ? ' · removida' : '' }}</p>
+                </template>
+                <span v-else class="text-muted">—</span>
+              </td>
+              <td><span class="status-badge" :class="routineStatus(routine).css">{{ routineStatus(routine).label }}</span></td>
+              <td>
+                <div class="action-row">
+                  <button class="btn-view" @click="router.push(`/runes/routines/${routine.id}/edit`)">Abrir</button>
+                  <button class="btn-danger" @click="routineToDelete = routine">Remover</button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
 
     <div class="section">
       <div class="table-wrapper">
@@ -40,10 +105,12 @@
             <tr v-for="r in runes" v-else :key="r.id">
               <td>
                 <div class="rune-cell">
-                  <img :src="runeInfo(r.type).image" class="rune-img" alt="" />
+                  <Icon v-if="isPerUserType(r)" icon="mdi:dice-5-outline" class="rune-img" />
+                  <img v-else :src="runeInfo(r.type).image" class="rune-img" alt="" />
                   <div>
-                    <div class="rune-label">{{ runeInfo(r.type).label }}</div>
-                    <p v-if="r.name" class="row-sub">{{ r.name }}</p>
+                    <div class="rune-label">{{ runeTypeLabel(r) }}</div>
+                    <p v-if="r.routine" class="row-sub routine-tag"><Icon icon="mdi:calendar-sync" width="12" /> {{ r.routine.name }}</p>
+                    <p v-else-if="r.name" class="row-sub">{{ r.name }}</p>
                   </div>
                 </div>
               </td>
@@ -89,11 +156,23 @@
     <div v-if="deleteTarget" class="modal-overlay" @click.self="deleteTarget = null">
       <div class="modal">
         <h3>Remover runa</h3>
-        <p>Remover a runa <strong>{{ runeInfo(deleteTarget.type).label }}</strong>{{ deleteTarget.name ? ` (${deleteTarget.name})` : '' }}?</p>
+        <p>Remover a runa <strong>{{ runeTypeLabel(deleteTarget) }}</strong>{{ deleteTarget.name ? ` (${deleteTarget.name})` : '' }}?</p>
         <p class="modal-hint">Ela some da loja. O cupom vinculado continua existindo.</p>
         <div class="modal-actions">
           <button class="btn-ghost" @click="deleteTarget = null">Cancelar</button>
           <button class="btn-danger" :disabled="deleting" @click="doDelete">{{ deleting ? 'Removendo...' : 'Remover' }}</button>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="routineToDelete" class="modal-overlay" @click.self="routineToDelete = null">
+      <div class="modal">
+        <h3>Remover rotina</h3>
+        <p>Remover a rotina <strong>{{ routineToDelete.name }}</strong>?</p>
+        <p class="modal-hint">Para de gerar runas. As já geradas ficam na lista; skin não entregue volta pro estoque.</p>
+        <div class="modal-actions">
+          <button class="btn-ghost" @click="routineToDelete = null">Cancelar</button>
+          <button class="btn-danger" :disabled="deleting" @click="doDeleteRoutine">{{ deleting ? 'Removendo...' : 'Remover' }}</button>
         </div>
       </div>
     </div>
@@ -106,13 +185,28 @@ import { useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import dayjs from 'dayjs'
 import { adminService } from '@/services/admin/admin.service'
-import { runeInfo, runePageLabel } from '@/utils/runes'
+import { isPerUserType, runeInfo, runePageLabel, runeTypeLabel, weekdaysLabel } from '@/utils/runes'
 
 const router = useRouter()
 const runes = ref<any[]>([])
+const routines = ref<any[]>([])
 const loading = ref(true)
 const deleteTarget = ref<any>(null)
+const routineToDelete = ref<any>(null)
 const deleting = ref(false)
+
+const templateLabel = (template: any) => {
+  if (!template) return 'sem cupom'
+  if (template.discount_type === 'FIXED') return `R$ ${(template.discount_value / 100).toFixed(2)} off`
+  return `${template.discount_value}% off`
+}
+
+// Skin já entregue (ou nunca escolhida) = rotina parada até trocar
+const routineStatus = (routine: any) => {
+  if (!routine.is_active) return { label: 'Inativa', css: 'status-inactive' }
+  if (routine.prize_type === 'SKIN' && (!routine.inventory || routine.inventory.is_sold)) return { label: 'Sem skin', css: 'status-expired' }
+  return { label: 'Ativa', css: 'status-active' }
+}
 
 // DATE vem como meia-noite UTC; ler só o YYYY-MM-DD evita cair no dia anterior em UTC-3
 const day = (d: string) => dayjs(String(d).slice(0, 10)).format('DD/MM/YY')
@@ -146,10 +240,23 @@ const statusClass = (r: any) => {
 const fetchRunes = async () => {
   loading.value = true
   try {
-    const res = await adminService.getRunes()
-    runes.value = res.data
+    const [runesRes, routinesRes] = await Promise.all([adminService.getRunes(), adminService.getRuneRoutines()])
+    runes.value = runesRes.data
+    routines.value = routinesRes.data
   } finally {
     loading.value = false
+  }
+}
+
+const doDeleteRoutine = async () => {
+  if (!routineToDelete.value) return
+  deleting.value = true
+  try {
+    await adminService.deleteRuneRoutine(routineToDelete.value.id)
+    routines.value = routines.value.filter((r) => r.id !== routineToDelete.value.id)
+    routineToDelete.value = null
+  } finally {
+    deleting.value = false
   }
 }
 
@@ -191,11 +298,46 @@ onMounted(fetchRunes)
   color rgba(255,255,255,0.45)
   margin 0
 
+.header-actions
+  display flex
+  gap 8px
+
 .section
   background #16161a
   border 1px solid rgba(255,255,255,0.06)
   border-radius 12px
   overflow hidden
+
+.section--routines
+  margin-bottom 1.5rem
+
+.section-heading
+  display flex
+  align-items center
+  gap 8px
+  margin 0
+  padding 0.9rem 1rem
+  font-size 0.95rem
+  font-weight 700
+  border-bottom 1px solid rgba(255,255,255,0.06)
+
+  &__hint
+    font-size 0.78rem
+    font-weight 400
+    color rgba(255,255,255,0.38)
+
+.type-icons
+  display flex
+  gap 2px
+  img
+    width 22px
+    height 22px
+
+.routine-tag
+  display inline-flex
+  align-items center
+  gap 4px
+  color #a5b4fc
 
 .table-wrapper
   overflow-x auto
@@ -362,6 +504,9 @@ tbody tr:hover td
     cursor not-allowed
 
 .btn-ghost
+  display inline-flex
+  align-items center
+  gap 6px
   padding 4px 12px
   background transparent
   border 1px solid rgba(255,255,255,0.12)

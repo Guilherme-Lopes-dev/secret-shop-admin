@@ -1351,6 +1351,26 @@ export const adminService = {
     return api.post(`/runes/${uuid}/coupon`, data)
   },
 
+  async getRuneRoutines() {
+    return api.get('/rune-routines')
+  },
+
+  async getRuneRoutine(uuid: string) {
+    return api.get(`/rune-routines/${uuid}`)
+  },
+
+  async createRuneRoutine(data: Record<string, unknown>) {
+    return api.post('/rune-routines', data)
+  },
+
+  async updateRuneRoutine(uuid: string, data: Record<string, unknown>) {
+    return api.patch(`/rune-routines/${uuid}`, data)
+  },
+
+  async deleteRuneRoutine(uuid: string) {
+    return api.delete(`/rune-routines/${uuid}`)
+  },
+
   // ── Instagram ───────────────────────────────────────────────────────────────
 
   async getInstagramAccount() {

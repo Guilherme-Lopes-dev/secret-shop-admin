@@ -204,6 +204,9 @@
               <button v-if="canPublish(p)" class="btn-primary btn-sm" :disabled="busy === p.id" @click="publish(p)">
                 <Icon icon="mdi:send" width="14" /> {{ p.status === 'FAILED' ? 'Tentar de novo' : 'Publicar' }}
               </button>
+              <button v-if="p.status === 'PUBLISHED'" class="btn-ghost btn-sm" :disabled="busy === p.id" title="Novo rascunho com a arte original, pra pôr outro preço e publicar de novo" @click="reuse(p)">
+                <Icon icon="mdi:recycle" width="14" /> Reutilizar arte
+              </button>
               <a v-if="p.permalink" :href="p.permalink" target="_blank" rel="noopener" class="btn-view">Ver no Instagram</a>
               <button v-if="!isBusyStatus(p.status)" class="btn-danger" @click="deleteTarget = p">Excluir</button>
             </div>
@@ -733,6 +736,22 @@ const finishSelected = async () => {
   const failed = results.filter((r) => r.status === 'rejected').length
   if (failed) return toast.error(`${failed} arte(s) não finalizaram.`)
   toast.success('Arte finalizada.')
+}
+
+// Cópia herda herói/raridade/preço de estoque do original (mesmo SKU) e já entra na seleção.
+const reuse = async (p: any) => {
+  busy.value = p.id
+  try {
+    const res = await adminService.reuseInstagramPost(p.id)
+    const copy = { ...p, ...res.data }
+    posts.value = [copy, ...posts.value]
+    selected.value = { ...selected.value, [copy.id]: stockPrice(copy) }
+    toast.success('Rascunho criado e selecionado. Ajusta o preço e publica.')
+  } catch (err: any) {
+    toast.error(err.response?.data?.message ?? 'Não deu pra reutilizar.')
+  } finally {
+    busy.value = null
+  }
 }
 
 // ── Publicação em lote ────────────────────────────────────────────────────────
@@ -1326,6 +1345,12 @@ onBeforeUnmount(() => {
   gap 6px
   flex-wrap wrap
   margin-top 4px
+  .btn-ghost
+    display inline-flex
+    align-items center
+    gap 6px
+    padding 4px 12px
+    font-size 0.8rem
 
 .modal-overlay
   position fixed

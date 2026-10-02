@@ -1389,6 +1389,10 @@ export const adminService = {
     return api.post(`/instagram/posts/${uuid}/publish`)
   },
 
+  async reuseInstagramPost(uuid: string) {
+    return api.post(`/instagram/posts/${uuid}/reuse`)
+  }
+
   async deleteInstagramPost(uuid: string) {
     return api.delete(`/instagram/posts/${uuid}`)
   },

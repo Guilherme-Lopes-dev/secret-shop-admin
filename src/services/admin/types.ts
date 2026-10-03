@@ -150,6 +150,16 @@ export interface ProfileProgressDto {
   achievements:    AchievementDto[]
 }
 
+/** Condição de quem vê e pega a runa. Espelha rune-conditions.ts do backend; MIN_SPENT em centavos. */
+export type RuneCondition =
+  | { type: 'HAS_PURCHASED' }
+  | { type: 'HAS_TRADE_LINK' }
+  | { type: 'MIN_ACCOUNT_AGE_DAYS'; days: number }
+  | { type: 'MIN_PASS_TIER'; tier_rank: number }
+  | { type: 'MIN_SPENT'; value: number }
+
+export type RuneConditionType = RuneCondition['type']
+
 /** Janela de XP multiplicado nas compras. Datas ISO; fim exclusivo. */
 export interface XpBoost {
   multiplier: number

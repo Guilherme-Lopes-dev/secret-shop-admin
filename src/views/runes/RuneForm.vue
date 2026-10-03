@@ -154,6 +154,12 @@
               <Icon icon="mdi:close" width="12" />
             </button>
           </div>
+
+          <div class="field">
+            <label>Condições</label>
+            <p class="field-hint">Valem pra cupom e skin, somando com o nível e a lista. Quem não cumpre nem vê a runa.</p>
+          </div>
+          <RuneAudienceConditions v-model="form.audience_conditions" :prize-type="prizeType" />
         </section>
 
         <div class="form-footer">
@@ -359,6 +365,8 @@ import dayjs from 'dayjs'
 import { adminService } from '@/services/admin/admin.service'
 import { RUNE_PAGES, RUNE_TYPES, isPerUserType, runeInfo, type RunePage, type RuneType } from '@/utils/runes'
 import UserPickerModal from '@/components/users/UserPickerModal.vue'
+import RuneAudienceConditions from '@/components/runes/RuneAudienceConditions.vue'
+import type { RuneCondition } from '@/services/admin/types'
 
 type DiscoveryStatus = 'seen' | 'found' | 'redeemed' | 'expired' | 'awaiting_review' | 'released' | 'delivered' | 'action_required' | 'rejected'
 type PrizeType = 'COUPON' | 'SKIN'
@@ -386,6 +394,7 @@ const form = reactive({
   minimap_hint: false,
   min_tier: null as number | null,
   max_tier: null as number | null,
+  audience_conditions: [] as RuneCondition[],
   is_active: true,
 })
 
@@ -410,6 +419,7 @@ const payload = () => ({
   min_tier: form.min_tier,
   max_tier: form.max_tier,
   audience_uuids: audience.value.map((user) => user.id),
+  audience_conditions: form.audience_conditions,
   is_active: form.is_active,
 })
 
@@ -445,6 +455,7 @@ const fillForm = (data: any) => {
   form.min_tier = data.min_tier ?? null
   form.max_tier = data.max_tier ?? null
   audience.value = data.audience ?? []
+  form.audience_conditions = Array.isArray(data.audience_conditions) ? data.audience_conditions : []
   form.is_active = data.is_active ?? true
   coupon.value = data.coupon ?? null
   prizeType.value = data.prize_type ?? 'COUPON'

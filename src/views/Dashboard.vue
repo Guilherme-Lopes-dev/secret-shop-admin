@@ -5,6 +5,7 @@ import Chart from 'chart.js/auto'
 import { formatCurrency } from '@/utils/formatCurrency'
 import { adminService } from '@/services/admin/admin.service'
 import TodayTasks from '@/components/dashboard/TodayTasks.vue'
+import AccessChart from '@/components/dashboard/AccessChart.vue'
 import { ONLINE_NOW_USERS_LINK } from '@/utils/onlineNow'
 
 const salesChart = ref<HTMLCanvasElement | null>(null)
@@ -353,6 +354,8 @@ onUnmounted(() => clearInterval(todayPoll))
                 </div>
             </div>
         </div>
+
+        <AccessChart />
     </div>
 </template>
 

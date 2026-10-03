@@ -43,7 +43,13 @@ export type CrmCampaign =
   | 'second_purchase'
   | 'loyalty'
 
-export type CrmSort = 'spent' | 'orders' | 'recent' | 'inactive' | 'newest'
+export interface DashboardAccess {
+  days: number
+  byDay: { day: string; users: number; visitors: number }[]
+  byHour: { hour: number; users: number; visitors: number }[]
+}
+
+export type CrmSort ='spent' | 'orders' | 'recent' | 'inactive' | 'newest'
 
 /** secret = só conta no Secret; both = conta + compra no Wix; wix = só comprou no Wix (sem conta). */
 export type CrmSource = 'secret' | 'both' | 'wix'
@@ -311,6 +317,10 @@ export const adminService = {
   async getDashboardPendings(pendingFrom?: string) {
     const p = pendingFrom ? `?pending_from=${encodeURIComponent(pendingFrom)}` : ''
     return api.get<Record<string, number>>(`/dashboard/pendings${p}`)
+  },
+
+  async getDashboardAccess(days: number) {
+    return api.get<DashboardAccess>('/dashboard/access', { params: { days } })
   },
 
   async getDashboardTodayTasks() {

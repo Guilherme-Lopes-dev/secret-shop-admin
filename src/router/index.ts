@@ -85,6 +85,11 @@ const routes = [
         component: () => import('@/views/skins/SkinsPriceList.vue'),
       },
       {
+        path: 'market-trends',
+        name: 'market-trends',
+        component: () => import('@/views/market-trends/MarketTrends.vue'),
+      },
+      {
         path: 'skins/prices/:uuid',
         name: 'skin-price-history',
         component: () => import('@/views/skins/SkinPriceHistory.vue'),
@@ -266,6 +271,11 @@ const routes = [
         path: 'instagram',
         name: 'instagram',
         component: () => import('@/views/instagram/InstagramPosts.vue'),
+      },
+      {
+        path: 'instagram/interacoes',
+        name: 'instagram-interactions',
+        component: () => import('@/views/instagram/InstagramInteractions.vue'),
       },
       {
         path: 'runes/:uuid/edit',

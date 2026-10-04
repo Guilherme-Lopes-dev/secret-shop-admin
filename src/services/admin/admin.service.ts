@@ -27,6 +27,7 @@ import type {
   SwapNotificationsResponse,
   PassProgressDto,
   DemandRow,
+  MarketTrendsResponse,
   ProfileProgressDto,
   SkinSalesRow,
   TodayTasks,
@@ -375,6 +376,16 @@ export const adminService = {
     if (filters.from) params.append('from', filters.from)
     if (filters.to) params.append('to', filters.to)
     return api.get<{ data: DemandRow[]; total: number }>(`/admin/demand?${params}`)
+  },
+
+  async getMarketTrends(filters: { day?: string; period: number; minSold7d: number; onlyStock: boolean }) {
+    const params = new URLSearchParams({
+      period: String(filters.period),
+      minSold7d: String(filters.minSold7d),
+      onlyStock: String(filters.onlyStock),
+    })
+    if (filters.day) params.append('day', filters.day)
+    return api.get<MarketTrendsResponse>(`/admin/market-trends?${params}`)
   },
 
   async getBulkAsaasReceipts(filters: { from?: string; to?: string }) {
@@ -1454,6 +1465,38 @@ export const adminService = {
     return api.post(`/instagram/posts/${uuid}/finish`, data)
   },
 
+  /** Perfil + insights da conta (últimos N dias, máx 30). */
+  async getInstagramOverview(days: number) {
+    return api.get<InstagramOverview>('/instagram/overview', { params: { days } })
+  },
+
+  /** 25 posts mais recentes do perfil (feed, reels, carrossel) com métricas ao vivo. */
+  async getInstagramMedia() {
+    return api.get<InstagramMedia[]>('/instagram/media')
+  },
+
+  /** Stories publicados pelo painel (mais recentes primeiro), com o último snapshot de métricas. */
+  async getInstagramStories() {
+    return api.get<InstagramStory[]>('/instagram/stories')
+  },
+
+  /** Roda agora o snapshot de insights dos stories (o cron é de hora em hora). */
+  async refreshInstagramInsights() {
+    return api.post('/instagram/insights/refresh')
+  },
+
+  async getInstagramComments(mediaId: string) {
+    return api.get<InstagramComment[]>(`/instagram/media/${mediaId}/comments`)
+  },
+
+  async replyInstagramComment(commentId: string, message: string) {
+    return api.post(`/instagram/comments/${commentId}/replies`, { message })
+  },
+
+  async setInstagramCommentHidden(commentId: string, hidden: boolean) {
+    return api.patch(`/instagram/comments/${commentId}`, { hidden })
+  },
+
   // ── Sorteios ────────────────────────────────────────────────────────────────
 
   /** Preview ao vivo da tela 2. Não grava nada — o snapshot só nasce no save. */
@@ -1774,6 +1817,60 @@ export type InstagramPostOrder = {
   cta?: string
   cta_url?: string
   caption?: string
+}
+
+/** Métrica da Meta -> valor (reach, views, likes...). */
+export type InstagramMetrics = Record<string, number>
+
+/** Post do perfil. like_count some se a conta esconde curtidas; insights null + insights_error se a Meta recusou. */
+export type InstagramMedia = {
+  id: string
+  caption?: string
+  media_type: 'IMAGE' | 'VIDEO' | 'CAROUSEL_ALBUM'
+  media_product_type?: 'FEED' | 'REELS' | 'AD'
+  permalink: string
+  thumbnail_url?: string
+  media_url?: string
+  timestamp: string
+  like_count?: number
+  comments_count?: number
+  insights: InstagramMetrics | null
+  insights_error: string | null
+}
+
+/** Story publicado pelo painel. insights = último snapshot antes da Meta apagar (24h). */
+export type InstagramStory = {
+  id: string
+  subject: string | null
+  image_url: string | null
+  permalink: string | null
+  published_at: string
+  insights: InstagramMetrics | null
+  insights_at: string | null
+}
+
+/** totals/reach_by_day vazios + insights_error quando o token não tem instagram_business_manage_insights. */
+export type InstagramOverview = {
+  profile: {
+    username: string
+    followers_count: number
+    follows_count: number
+    media_count: number
+    profile_picture_url?: string
+  }
+  reach_by_day: { day: string; value: number }[]
+  totals: InstagramMetrics | null
+  insights_error: string | null
+}
+
+export type InstagramComment = {
+  id: string
+  text: string
+  username: string
+  timestamp: string
+  like_count?: number
+  hidden?: boolean
+  replies?: { data: InstagramComment[] }
 }
 
 export interface RewardClaim {

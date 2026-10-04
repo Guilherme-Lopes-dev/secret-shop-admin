@@ -422,3 +422,97 @@ export interface DemandRow {
   /** Unidades em linha soft-deletada — fora da venda, mas o admin quer saber que existe. */
   stock_deleted: number
 }
+
+/** Item nas listas de Tendências: lado Steam (preço de consenso, volume) + lado site. Preços em centavos. */
+export interface MarketTrendItem {
+  marketHashName: string
+  name: string
+  image: string | null
+  hero: string | null
+  rarity: string | null
+  quality: string | null
+  /** Preço que a vitrine mostra agora; null = não está à venda na loja. */
+  sitePrice: number | null
+  /** Preço de referência por dia, do mais antigo pro mais novo. */
+  history: number[]
+  priceNow: number | null
+  priceBefore: number | null
+  changePct: number | null
+  sold24h: number | null
+  sold7d: number | null
+  /** Vendas 24h ÷ média diária da semana. 2 = o dobro do normal. */
+  volumeSpike: number | null
+  offerVolume: number | null
+  buyOrderPrice: number | null
+  siteSold: number
+  siteRevenue: number
+  favorites: number
+  inCarts: number
+  stock: number
+}
+
+export interface MarketTrendSearch {
+  term: string
+  hits: number
+  zeroHits: number
+}
+
+export interface MarketTrendsResponse {
+  day: string
+  fromDay: string
+  period: 1 | 7 | 30
+  minSold7d: number
+  onlyStock: boolean
+  /** false = não houve sync nesse dia (data futura ou buraco no histórico). */
+  hasSnapshot: boolean
+  /**
+   * Dia de onde vem o filtro de liquidez. null = nenhum volume gravado ainda (listas da
+   * Steam vazias). Diferente de `day` = dia anterior ao registro de volume (pico e giro vazios).
+   */
+  liquidityDay: string | null
+  market: { liquidItems: number; rising: number; falling: number; medianChangePct: number | null }
+  steam: {
+    gainers: MarketTrendItem[]
+    losers: MarketTrendItem[]
+    volumeSpikes: MarketTrendItem[]
+    mostTraded: MarketTrendItem[]
+  }
+  site: {
+    topSold: MarketTrendItem[]
+    mostWanted: MarketTrendItem[]
+    searches: MarketTrendSearch[]
+    missedSearches: MarketTrendSearch[]
+    /** Total real de termos sem resultado — a lista acima vem cortada em 25. */
+    missedTotal: number
+  }
+  /** 5 itens do estoque com maior lucro esperado se um story empurrar a venda. */
+  stories: MarketTrendStoryPick[]
+}
+
+export interface MarketTrendStoryPick {
+  /** uuid da skin — vai como skin_uuid no composer do Instagram. */
+  skinId: string
+  marketHashName: string
+  name: string
+  image: string | null
+  hero: string | null
+  rarity: string | null
+  stock: number
+  sitePrice: number
+  avgCost: number
+  profit: number
+  marginPct: number
+  steamPrice: number | null
+  /** Positivo = loja mais barata que a Steam. */
+  discountVsSteamPct: number | null
+  steamChangePct: number | null
+  favorites: number
+  inCarts: number
+  siteSold: number
+  searchHits: number
+  topSearch: string | null
+  score: number
+  /** Frase pronta pro story. */
+  hook: string
+  reasons: string[]
+}

@@ -303,6 +303,7 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch, type Ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { mediaUrl } from '@/utils/mediaUrl'
 import { Icon } from '@iconify/vue'
 import { toast } from 'vue3-toastify'
@@ -814,9 +815,33 @@ const doDelete = async () => {
   }
 }
 
+// "Criar story" da tela de Tendências chega aqui com ?skin=&name=&hero=&message=.
+// Monta a mesma forma de unidade que a busca devolve, pra pickSkin/createPost não mudarem.
+const route = useRoute()
+const router = useRouter()
+
+const applyStoryDraft = () => {
+  const { skin, name, hero, message: draftMessage } = route.query
+  if (typeof skin !== 'string') return
+
+  pickSkin({ skins: { id: skin, name: typeof name === 'string' ? name : '', hero: typeof hero === 'string' ? hero : null } })
+  setKind('STORY')
+  if (typeof draftMessage === 'string') message.value = draftMessage
+  toast.info('Rascunho do story carregado. Revise e clique em "Gerar imagem".')
+  // Limpa a URL: F5 não reaplica o rascunho por cima do que o admin editou.
+  router.replace({ query: {} }).catch(() => undefined)
+}
+
 onMounted(() => {
+  // Página carrega primeiro: rascunho com problema nunca pode deixar a tela parada.
   loadAccount().catch(() => undefined)
   fetchPosts()
+  try {
+    applyStoryDraft()
+  } catch (error) {
+    console.error('[instagram] rascunho de story vindo de Tendências falhou', error)
+    toast.error('Não deu pra carregar o rascunho do story — escolha o produto manualmente.')
+  }
 })
 
 onBeforeUnmount(() => {

@@ -77,6 +77,7 @@ const navGroups: NavGroup[] = [
         key: 'precificacao',
         items: [
             { label: 'Evolução de Preços', icon: 'mdi:chart-line', to: '/skins/prices', name: 'skins-prices' },
+            { label: 'Tendências', icon: 'mdi:fire', to: '/market-trends', name: 'market-trends' },
             { label: 'Config de Preços', icon: 'mdi:cash-edit', to: '/pricing-config', name: 'pricing-config' },
             { label: 'Market Explorer', icon: 'mdi:cloud-search-outline', to: '/market-explorer', name: 'market-explorer' },
         ],
@@ -121,6 +122,7 @@ const navGroups: NavGroup[] = [
             { label: 'Cupons', icon: 'mdi:ticket-percent-outline', to: '/coupons', name: 'coupons' },
             { label: 'Runas', icon: 'mdi:diamond-stone', to: '/runes', name: 'runes' },
             { label: 'Instagram', icon: 'mdi:instagram', to: '/instagram', name: 'instagram' },
+            { label: 'Interações Instagram', icon: 'mdi:chart-line', to: '/instagram/interacoes', name: 'instagram-interactions' },
             { label: 'Sorteios', icon: 'mdi:ticket-confirmation-outline', to: '/raffles', name: 'raffles' },
             { label: 'Novidades', icon: 'mdi:bullhorn-outline', to: '/news', name: 'news' },
             { label: 'Feedbacks', icon: 'mdi:comment-quote-outline', to: '/feedbacks', name: 'feedbacks' },

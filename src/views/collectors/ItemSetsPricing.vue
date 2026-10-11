@@ -27,7 +27,7 @@ const RARITY_ORDER = ['Regular', 'Rare', 'Very Rare', 'Ultra Rare']
 /** defindex -> preço em centavos digitado. Só entra aqui o que foi editado. */
 const edits = ref<Record<string, string>>({})
 const selected = ref<string[]>([])
-const bulkPriceInput = ref('')
+const bulkPriceInput = ref<string | number>('')
 
 const caches = computed(() => {
     const map = new Map<string, { id: string; name: string; year: number }>()
@@ -97,9 +97,11 @@ const allFilteredSelected = computed(
         filtered.value.every((s) => selected.value.includes(s.defindex)),
 )
 
-const parseCents = (value: string): number | null => {
-    if (!value.trim()) return null
-    const n = parseInt(value, 10)
+// v-model em input type="number" entrega number, não string.
+const parseCents = (value: string | number): number | null => {
+    const text = String(value).trim()
+    if (!text) return null
+    const n = parseInt(text, 10)
     return isNaN(n) || n < 0 ? null : n
 }
 

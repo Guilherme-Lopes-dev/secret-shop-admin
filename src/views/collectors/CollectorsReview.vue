@@ -91,6 +91,7 @@ async function submit() {
         tradable: item.tradable,
         marketable: item.marketable,
         commodity: item.commodity,
+        giftableUntil: item.giftableUntil ?? null,
         price: parseCents(priceInputs.value[getCollectorItemKey(item)] ?? '') ?? null,
         heroSlug: heroSelects.value[getCollectorItemKey(item)] || undefined,
     }))

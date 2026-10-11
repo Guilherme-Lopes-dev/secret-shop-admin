@@ -11,6 +11,8 @@ export type CollectorInventoryItem = {
   commodity: boolean
   iconUrl: string | null
   iconUrlLarge: string | null
+  /** "Giftable until" da Steam (ISO). Ausente em inventário cacheado antes do campo existir. */
+  giftableUntil?: string | null
 }
 
 export type CollectorInventoryPayload = {
@@ -47,6 +49,7 @@ const normalizeCollectorInventoryItem = (item: any): CollectorInventoryItem => (
   commodity: Boolean(item?.commodity),
   iconUrl: item?.iconUrl ? String(item.iconUrl) : null,
   iconUrlLarge: item?.iconUrlLarge ? String(item.iconUrlLarge) : null,
+  giftableUntil: item?.giftableUntil ? String(item.giftableUntil) : null,
 })
 
 export const createNormalizedCollectorItem = normalizeCollectorInventoryItem

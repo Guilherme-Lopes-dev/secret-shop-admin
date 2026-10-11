@@ -328,6 +328,11 @@ export const adminService = {
     return api.get<TodayTasks>('/dashboard/today-tasks')
   },
 
+  /** Atende a fila de encomendas com o estoque atual (rodar depois de importar o lote). */
+  async allocateBackorders() {
+    return api.post<{ allocated: number; waiting: number }>('/collector-sales/admin/backorders/allocate')
+  },
+
   async getAllSales(
     page: number = 1,
     limit: number = 20,
@@ -798,6 +803,7 @@ export const adminService = {
       tradable?: boolean
       marketable?: boolean
       commodity?: boolean
+      giftableUntil?: string | null
       price?: number | null
       heroSlug?: string
     }>
@@ -1025,6 +1031,8 @@ export const adminService = {
     friendship?: string
     minFriendDays?: number
     maxFriendDays?: number
+    /** cache_id do baú (ex.: troveofterror2026). */
+    treasure?: string
   } = {}) {
     const p = new URLSearchParams({ page: String(params.page ?? 1), limit: String(params.limit ?? 20) })
     if (params.payment_status) p.append('payment_status', params.payment_status)
@@ -1036,6 +1044,7 @@ export const adminService = {
     if (params.friendship) p.append('friendship', params.friendship)
     if (params.minFriendDays !== undefined) p.append('minFriendDays', String(params.minFriendDays))
     if (params.maxFriendDays !== undefined) p.append('maxFriendDays', String(params.maxFriendDays))
+    if (params.treasure) p.append('treasure', params.treasure)
     return api.get(`/collector-sales/admin/list?${p}`)
   },
 

@@ -109,7 +109,20 @@ const todayCards = computed(() => [
     },
 ])
 
-const stats = ref([
+type StatCard = { label: string; value: string; icon: string; color: string }
+
+/** Card do baú da promoção: vem pronto do backend junto dos totais. */
+type TreasureSalesCard = { label: string; value: string; detail: string; treasure: string; revenue: number }
+
+/** A partir disso (centavos) a home mostra o aviso embaixo do card do baú. */
+const TREASURE_ALERT_CENTS = 145_000
+
+const treasureSales = ref<TreasureSalesCard | null>(null)
+
+/** Reposição: 1 Ultra Rare a cada R$ 1.450,00 vendidos do baú. */
+const ultraRaresToBuy = computed(() => Math.floor((treasureSales.value?.revenue ?? 0) / TREASURE_ALERT_CENTS))
+
+const stats = ref<StatCard[]>([
     { label: 'Vendas Pagas', value: '...', icon: 'mdi:currency-usd', color: '#4caf50' },
     { label: 'Pedidos Realizados', value: '...', icon: 'mdi:cart-outline', color: '#2196f3' },
     { label: 'Novos Usuários', value: '...', icon: 'mdi:account-group', color: '#ff9800' },
@@ -146,6 +159,7 @@ const fetchDashboardData = async () => {
                 { label: 'Novos Usuários', value: statsRes.data[2].value, icon: 'mdi:account-group', color: '#ff9800' },
                 { label: 'Skins Ativas', value: statsRes.data[3].value, icon: 'mdi:sword', color: '#9c27b0' },
             ]
+            treasureSales.value = statsRes.data.find((stat: any) => stat.treasure) ?? null
         }
 
         if (ordersRes.data) recentSales.value = ordersRes.data
@@ -305,6 +319,38 @@ onUnmounted(() => clearInterval(todayPoll))
             </div>
         </div>
 
+        <div v-if="treasureSales" class="treasure-block">
+            <router-link
+                :to="{ path: '/collector-orders', query: { treasure: treasureSales.treasure, payment_status: 'PAID' } }"
+                class="treasure-card"
+            >
+                <div class="treasure-card__icon">
+                    <Icon icon="mdi:treasure-chest" width="34" />
+                </div>
+                <div class="treasure-card__info">
+                    <span class="stat-label">{{ treasureSales.label }}</span>
+                    <span class="treasure-card__value">{{ treasureSales.value }}</span>
+                    <span class="stat-delta">{{ treasureSales.detail }}</span>
+                </div>
+                <span class="treasure-card__cta">
+                    Ver pedidos
+                    <Icon icon="mdi:arrow-right" width="18" />
+                </span>
+            </router-link>
+
+            <div v-if="ultraRaresToBuy > 0" class="treasure-alert" role="alert">
+                <Icon icon="mdi:alert-outline" width="22" class="treasure-alert__icon" />
+                <div class="treasure-alert__text">
+                    <strong>As vendas do baú passaram de {{ formatCurrency(TREASURE_ALERT_CENTS) }}.</strong>
+                    <span>Total pago até agora: {{ treasureSales.value }} · 1 Ultra Rare a cada {{ formatCurrency(TREASURE_ALERT_CENTS) }} vendidos</span>
+                </div>
+                <div class="treasure-alert__count">
+                    <span class="treasure-alert__count-value">{{ ultraRaresToBuy }}</span>
+                    <span>Ultra Rare a comprar</span>
+                </div>
+            </div>
+        </div>
+
         <div class="dashboard-grid">
             <div class="section chart-section">
                 <div class="section-header">
@@ -432,6 +478,108 @@ onUnmounted(() => clearInterval(todayPoll))
 
 .stat-delta--down
     color #f44336
+
+.treasure-block
+    display flex
+    flex-direction column
+    gap 0.75rem
+    margin -0.75rem 0 2rem
+
+.treasure-card
+    display flex
+    align-items center
+    gap 1.25rem
+    padding 1.5rem 1.75rem
+    border-radius 12px
+    background linear-gradient(90deg, rgba(230,81,0,0.14), #1a1a1e 60%)
+    border 1px solid rgba(230,81,0,0.25)
+    color inherit
+    text-decoration none
+    transition border-color 0.15s
+    &:hover
+        border-color rgba(230,81,0,0.6)
+
+.treasure-card__icon
+    width 64px
+    height 64px
+    border-radius 14px
+    display flex
+    align-items center
+    justify-content center
+    flex-shrink 0
+    background rgba(230,81,0,0.15)
+    color #ff8a3d
+
+.treasure-card__info
+    display flex
+    flex-direction column
+    flex 1
+    min-width 0
+
+.treasure-card__value
+    font-size 1.9rem
+    font-weight 800
+    line-height 1.15
+
+.treasure-card__cta
+    display flex
+    align-items center
+    gap 0.35rem
+    font-size 0.85rem
+    font-weight 600
+    color #ff8a3d
+    white-space nowrap
+
+.treasure-alert
+    display flex
+    align-items center
+    gap 0.9rem
+    padding 1rem 1.25rem
+    border-radius 12px
+    background rgba(244,67,54,0.1)
+    border 1px solid rgba(244,67,54,0.35)
+    color #fecaca
+
+.treasure-alert__icon
+    flex-shrink 0
+    color #f87171
+
+.treasure-alert__text
+    display flex
+    flex-direction column
+    gap 0.15rem
+    flex 1
+    min-width 0
+    font-size 0.88rem
+
+    strong
+        color #fff
+        font-size 0.95rem
+
+.treasure-alert__count
+    display flex
+    flex-direction column
+    align-items center
+    flex-shrink 0
+    padding 0.4rem 1rem
+    border-radius 10px
+    background rgba(244,67,54,0.15)
+    font-size 0.75rem
+    white-space nowrap
+
+.treasure-alert__count-value
+    color #fff
+    font-size 1.6rem
+    font-weight 800
+    line-height 1.1
+
+@media (max-width: 600px)
+    .treasure-alert
+        flex-wrap wrap
+    .treasure-card
+        flex-wrap wrap
+    .treasure-card__cta
+        width 100%
 
 .pendings-section
     margin-bottom 2rem

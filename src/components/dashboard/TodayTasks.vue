@@ -2,13 +2,17 @@
 import { computed, onMounted, ref } from 'vue'
 import { Icon } from '@iconify/vue'
 import { adminService } from '@/services/admin/admin.service'
-import type { CollectorTask, CollectorTaskAction, DropshipStage, DropshipTask, TodayTasks } from '@/services/admin/types'
+import { toast } from 'vue3-toastify'
+import type { BackorderQueueAccount, BackorderQueueEntry, CollectorTask, CollectorTaskAction, DropshipStage, DropshipTask, TodayTasks } from '@/services/admin/types'
 import { formatCurrency } from '@/utils/formatCurrency'
 import { persistedRef } from '@/utils/persistedRef'
 import RefreshFriendshipButton from '@/components/common/RefreshFriendshipButton.vue'
 
 /** Dropship parado mais que isso fica vermelho. */
 const DROPSHIP_LATE_DAYS = 3
+/** Prazo de presente a esse ponto fica vermelho / laranja. */
+const GIFT_DEADLINE_CRITICAL_DAYS = 3
+const GIFT_DEADLINE_WARN_DAYS = 7
 
 const tasks = ref<TodayTasks | null>(null)
 const loading = ref(true)
@@ -73,6 +77,66 @@ const waitingTone = (task: DropshipTask, stage: DropshipStage) => {
 
 const totalCount = computed(() => (tasks.value?.collector.length ?? 0) + dropship.value.length)
 
+const giftStock = computed(() => tasks.value?.gift_stock ?? [])
+
+const shortDate = (iso: string) => new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
+
+const deadlineTone = (daysLeft: number) => {
+    if (daysLeft <= GIFT_DEADLINE_CRITICAL_DAYS) return 'badge--critical'
+    if (daysLeft <= GIFT_DEADLINE_WARN_DAYS) return 'badge--warn'
+    return 'badge--muted'
+}
+
+const deadlineText = (iso: string, daysLeft: number) => {
+    if (daysLeft < 0) return `venceu em ${shortDate(iso)}`
+    return `presente até ${shortDate(iso)} · ${days(daysLeft)}`
+}
+
+const taskDeadlineTone = (task: CollectorTask) =>
+    task.misses_gift_deadline ? 'badge--critical' : deadlineTone(task.gift_deadline_days ?? 0)
+
+const taskDeadlineText = (task: CollectorTask) => {
+    const text = deadlineText(task.gift_deadline as string, task.gift_deadline_days ?? 0)
+    return task.misses_gift_deadline ? `não dá tempo — ${text}` : text
+}
+
+const setsText = (sets: Array<{ name: string; units: number }>) =>
+    sets.map(set => (set.units > 1 ? `${set.name} ×${set.units}` : set.name)).join(', ')
+
+// ── Fila do próximo lote ──
+const backorderQueue = computed(() => tasks.value?.backorder_queue ?? [])
+const queueUnits = computed(() => backorderQueue.value.reduce((total, account) => total + account.units, 0))
+const allocating = ref(false)
+
+const openAtText = (account: BackorderQueueAccount) => {
+    if (account.open_now) return 'abrir lote já'
+    if (!account.open_at) return 'ninguém da fila é amigo da conta ainda'
+    return `abrir lote em ${shortDate(account.open_at)}`
+}
+
+const toneByAction = Object.fromEntries(collectorSections.map(section => [section.action, section.tone])) as Record<CollectorTaskAction, string>
+
+const queueStatusText: Record<CollectorTaskAction, (entry: BackorderQueueEntry) => string> = {
+    ready: () => 'presente liberado',
+    waiting: entry => (entry.unlocks_at ? `libera em ${shortDate(entry.unlocks_at)}` : 'contando os 30 dias'),
+    add_friend: () => 'não é amigo da conta',
+    check_friendship: () => 'sem dados da Steam',
+}
+
+const allocateBackorders = async () => {
+    allocating.value = true
+    try {
+        const { data } = await adminService.allocateBackorders()
+        toast.success(`${data.allocated} encomenda(s) alocada(s) · ${data.waiting} seguem na fila`)
+        await fetchTasks()
+    } catch (error) {
+        console.error('Erro ao alocar encomendas:', error)
+        toast.error('Falha ao alocar encomendas.')
+    } finally {
+        allocating.value = false
+    }
+}
+
 const days = (count: number | null) => {
     if (count === null) return '? dias'
     return `${count} ${count === 1 ? 'dia' : 'dias'}`
@@ -120,7 +184,7 @@ onMounted(fetchTasks)
 
         <template v-if="!collapsed">
         <p v-if="failed" class="empty empty--error">Falha ao carregar as pendências. Tente recalcular.</p>
-        <p v-else-if="!loading && totalCount === 0" class="empty">Nada a tratar hoje.</p>
+        <p v-else-if="!loading && totalCount === 0 && giftStock.length === 0 && queueUnits === 0" class="empty">Nada a tratar hoje.</p>
 
         <div v-for="section in visibleSections" :key="section.action" class="task-group" :class="`task-group--${section.tone}`">
             <h3 class="group-title">
@@ -139,6 +203,9 @@ onMounted(fetchTasks)
                 <span class="task-items" :title="task.items.join(', ')">{{ task.items.join(', ') }}</span>
                 <span class="task-meta">
                     <span class="badge" :class="`badge--${section.tone}`">{{ friendshipText(task) }}</span>
+                    <span v-if="task.gift_deadline" class="badge" :class="taskDeadlineTone(task)">
+                        {{ taskDeadlineText(task) }}
+                    </span>
                     <span class="badge" :class="task.overdue ? 'badge--critical' : 'badge--muted'">
                         pago há {{ days(task.paid_days_ago) }}{{ task.overdue ? ' — atrasado' : '' }}
                     </span>
@@ -167,6 +234,64 @@ onMounted(fetchTasks)
                         aguardando há {{ days(task.waiting_days) }}
                     </span>
                     <span class="task-amount">{{ formatCurrency(task.total_amount) }}</span>
+                </span>
+            </router-link>
+        </div>
+
+        <div v-if="queueUnits > 0" class="task-group task-group--warn">
+            <h3 class="group-title">
+                <Icon icon="mdi:package-variant-closed-plus" width="16" />
+                Fila do próximo lote
+                <span class="group-count">{{ queueUnits }}</span>
+                <button type="button" class="refresh-btn group-action" :disabled="allocating" @click="allocateBackorders">
+                    <Icon icon="mdi:check-all" width="15" :class="{ spin: allocating }" />
+                    Alocar do estoque
+                </button>
+            </h3>
+            <template v-for="account in backorderQueue" :key="account.steam_id">
+                <div class="queue-account">
+                    <span class="task-order">{{ account.account_name }}</span>
+                    <span class="task-items" :title="setsText(account.sets)">{{ setsText(account.sets) }}</span>
+                    <span class="badge" :class="account.open_at ? 'badge--warn' : 'badge--muted'">{{ openAtText(account) }}</span>
+                </div>
+                <router-link
+                    v-for="entry in account.entries"
+                    :key="`${entry.id}-${entry.item}`"
+                    :to="`/collector-orders/${entry.id}`"
+                    class="task-row"
+                >
+                    <span class="task-order">{{ entry.order_number }}</span>
+                    <span class="task-user">{{ entry.user_name }}</span>
+                    <span class="task-items">{{ entry.item }}</span>
+                    <span class="task-meta">
+                        <span class="badge" :class="`badge--${toneByAction[entry.action] ?? 'muted'}`">{{ queueStatusText[entry.action]?.(entry) }}</span>
+                        <span class="badge badge--muted">pago há {{ days(entry.paid_days_ago) }}</span>
+                    </span>
+                </router-link>
+            </template>
+        </div>
+
+        <div v-if="giftStock.length > 0" class="task-group task-group--warn">
+            <h3 class="group-title">
+                <Icon icon="mdi:gift-open-outline" width="16" />
+                Estoque com prazo de presente — vender antes de vencer
+                <span class="group-count">{{ giftStock.length }}</span>
+            </h3>
+            <router-link
+                v-for="group in giftStock"
+                :key="`${group.steam_id}-${group.giftable_until}`"
+                to="/collectors/sets"
+                class="task-row"
+            >
+                <span class="task-order">{{ group.available }} {{ group.available === 1 ? 'unidade' : 'unidades' }}</span>
+                <span class="task-user">{{ group.account_name }}</span>
+                <span class="task-items" :title="setsText(group.sets)">{{ setsText(group.sets) }}</span>
+                <span class="task-meta">
+                    <span class="badge" :class="deadlineTone(group.days_left)">
+                        {{ deadlineText(group.giftable_until, group.days_left) }}
+                    </span>
+                    <span v-if="group.recycle" class="badge badge--critical">fora da venda — reciclar</span>
+                    <span v-if="group.unpriced > 0" class="badge badge--warn">{{ group.unpriced }} sem preço</span>
                 </span>
             </router-link>
         </div>
@@ -308,6 +433,24 @@ onMounted(fetchTasks)
 
 .task-order
     font-weight 600
+
+.group-action
+    margin-left auto
+
+// Cabeçalho da conta dentro da fila: o que abrir e quando.
+.queue-account
+    display grid
+    grid-template-columns 150px 1fr auto
+    align-items center
+    gap 0.75rem
+    padding 0.4rem 0.75rem
+    margin-top 0.4rem
+    font-size 0.82rem
+    color #cbd5e1
+    border-top 1px solid rgba(255,255,255,0.06)
+    @media (max-width: 900px)
+        grid-template-columns 1fr
+        gap 0.25rem
 
 .task-user
     color #94a3b8

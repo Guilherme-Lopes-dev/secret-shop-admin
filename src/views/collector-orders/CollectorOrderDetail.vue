@@ -13,6 +13,11 @@ const router = useRouter()
 const sale    = ref<any>(null)
 const loading = ref(true)
 const lines   = computed<any[]>(() => sale.value?.collector_sales ?? [])
+// Alocada já virou linha acima: aqui só o que ainda espera lote (ou foi cancelado).
+const backorders = computed<any[]>(() =>
+    (sale.value?.collector_backorders ?? []).filter((backorder: any) => backorder.status !== 'ALLOCATED'),
+)
+const backorderLabel = (status: string) => (status === 'QUEUED' ? 'Na fila do lote' : 'Cancelada')
 
 // AWAITING_SHIPPING tem prioridade: se qualquer linha está pendente, o pedido está pendente
 const aggregateDeliveryStatus = computed<string | null>(() => {
@@ -426,6 +431,31 @@ onMounted(fetchSale)
                             </div>
                             <div v-if="index < lines.length - 1" class="line-divider" />
                         </template>
+                    </div>
+
+                    <!-- Encomendas do próximo lote (Trove of Terror e afins) -->
+                    <div v-if="backorders.length > 0" class="card">
+                        <div class="card-title-row">
+                            <span class="card-title">Encomendas do próximo lote ({{ backorders.length }})</span>
+                        </div>
+                        <div v-for="backorder in backorders" :key="backorder.id" class="item-row">
+                            <img v-if="backorder.icon_url_large" :src="backorder.icon_url_large" class="item-img" :alt="backorder.name" />
+                            <div v-else class="item-img-placeholder">
+                                <Icon icon="mdi:package-variant-closed" />
+                            </div>
+                            <div class="item-info">
+                                <div class="item-name">{{ backorder.name }}</div>
+                                <div class="item-hash">Conta do lote: <span class="mono">{{ backorder.account_steam_id }}</span></div>
+                                <div class="line-qty-row">
+                                    <span>{{ formatCurrency(backorder.unit_price) }}</span>
+                                </div>
+                            </div>
+                            <div class="line-delivery">
+                                <span class="status-badge" :class="backorder.status === 'QUEUED' ? 'badge-awaiting' : ''">
+                                    {{ backorderLabel(backorder.status) }}
+                                </span>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- Financeiro -->

@@ -70,6 +70,51 @@ export interface CollectorTask {
   unlocks_in_days: number | null
   /** Conta collector que decide o status (a mais travada do pedido). */
   blocking_account?: string | null
+  /** Prazo de presente mais curto do pedido ("Giftable until"); null = sem prazo. */
+  gift_deadline?: string | null
+  gift_deadline_days?: number | null
+  /** A amizade não libera antes do prazo: do jeito que está, não dá pra entregar. */
+  misses_gift_deadline?: boolean
+}
+
+/** Estoque com prazo de presente numa conta, agrupado pelo dia em que vence. */
+export interface GiftStockGroup {
+  steam_id: string
+  account_name: string
+  giftable_until: string
+  /** Negativo = já venceu e ficou preso no bot. */
+  days_left: number
+  available: number
+  unpriced: number
+  /** Já não dá tempo de vender e entregar: pior caso, reciclar. */
+  recycle?: boolean
+  sets: Array<{ name: string; units: number }>
+}
+
+/** Encomenda paga esperando o próximo lote. */
+export interface BackorderQueueEntry {
+  /** UUID do pedido. */
+  id: string
+  order_number: string
+  user_name: string
+  item: string
+  paid_days_ago: number
+  action: CollectorTaskAction
+  /** Quando o presente libera pro cliente; null se ainda não é amigo da conta. */
+  unlocks_at: string | null
+}
+
+/** Fila do próximo lote numa conta: o que abrir e quando. */
+export interface BackorderQueueAccount {
+  steam_id: string
+  account_name: string
+  units: number
+  /** Sugestão de quando abrir o lote: quando o primeiro amigo da fila libera. */
+  open_at: string | null
+  /** O primeiro da fila já liberou: abrir o lote agora. */
+  open_now: boolean
+  sets: Array<{ name: string; units: number }>
+  entries: BackorderQueueEntry[]
 }
 
 export interface DropshipTask {
@@ -87,6 +132,8 @@ export interface TodayTasks {
   generated_at: string
   collector: CollectorTask[]
   dropship: DropshipTask[]
+  gift_stock?: GiftStockGroup[]
+  backorder_queue?: BackorderQueueAccount[]
 }
 
 export type SwapNotificationType =

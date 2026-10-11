@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import FilterField from '@/components/common/FilterField.vue'
 import { toast } from 'vue3-toastify'
-import { adminService } from '@/services/admin/admin.service'
+import { adminService, type ItemSet } from '@/services/admin/admin.service'
 import {
     createNormalizedCollectorItem,
     getCollectorItemKey,
@@ -49,6 +49,8 @@ const lastError = ref('')
 const selectedItemKeys = ref<string[]>([])
 const cacheStore = ref<CollectorsCacheStore>(createEmptyCacheStore())
 const selectedRarity = ref<Dota2Rarity | ''>('')
+const selectedTreasure = ref('')
+const itemSets = ref<ItemSet[]>([])
 const onlyMythicalBundles = persistedRef('collectors:only-mythical-bundles', false)
 const onlyMythicalWearables = persistedRef('collectors:only-mythical-wearables', false)
 const onlyNotTradable = persistedRef('collectors:only-not-tradable', false)
@@ -70,8 +72,34 @@ const hasCachedCurrentSteamId = computed(
 )
 const openCacheButtonLabel = computed(() => (hasCachedCurrentSteamId.value ? 'Abrir cache' : 'Buscar'))
 
+/** market_hash_name do set → baú de onde ele sai. */
+const treasureBySetName = computed(
+    () => new Map(itemSets.value.map((set) => [set.market_hash_name, set.cache_id])),
+)
+
+/** Só os baús que têm item no inventário carregado. */
+const treasureOptions = computed(() => {
+    const present = new Set(
+        (inventory.value?.items ?? []).map((item) => treasureBySetName.value.get(item.marketHashName)),
+    )
+    const names = new Map(
+        itemSets.value
+            .filter((set) => present.has(set.cache_id))
+            .map((set) => [set.cache_id, set.cache_name]),
+    )
+    return [...names]
+        .map(([id, name]) => ({ id, name }))
+        .sort((a, b) => a.name.localeCompare(b.name))
+})
+
 const filteredItems = computed(() => {
     let source = inventory.value?.items ?? []
+
+    if (selectedTreasure.value) {
+        source = source.filter(
+            (item) => treasureBySetName.value.get(item.marketHashName) === selectedTreasure.value,
+        )
+    }
 
     if (selectedRarity.value) {
         source = source.filter((item) => getRarityFromType(item.type) === selectedRarity.value)
@@ -362,7 +390,17 @@ function proceedWithSelected() {
     router.push('/collectors/review')
 }
 
+async function loadItemSets() {
+    try {
+        const { data } = await adminService.getItemSets()
+        itemSets.value = data
+    } catch {
+        toast.error('Erro ao carregar os baús para o filtro.')
+    }
+}
+
 onMounted(() => {
+    void loadItemSets()
     cacheStore.value = readCacheStore()
 
     if (cacheStore.value.lastSteamId) {
@@ -498,6 +536,15 @@ watch([itemSearch, selectedRarity, onlyMythicalBundles, onlyMythicalWearables, o
                         class="search-input"
                     />
                 </div>
+            </FilterField>
+
+            <FilterField label="Baú">
+                <select v-model="selectedTreasure" class="filter-select">
+                    <option value="">Todos</option>
+                    <option v-for="treasure in treasureOptions" :key="treasure.id" :value="treasure.id">
+                        {{ treasure.name }}
+                    </option>
+                </select>
             </FilterField>
 
             <FilterField label="Raridade">

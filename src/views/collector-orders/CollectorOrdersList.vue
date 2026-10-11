@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue'
+import { computed, ref, onMounted, type Ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { adminService } from '@/services/admin/admin.service'
+import { adminService, type ItemSet } from '@/services/admin/admin.service'
 import { formatCurrency } from '@/utils/formatCurrency'
 import { toast } from 'vue3-toastify'
 import { Icon } from '@iconify/vue'
@@ -27,55 +27,41 @@ const totalPages  = ref(1)
 const totalItems  = ref(0)
 const limit       = ref(20)
 
+/**
+ * Filtro vindo no link (?delivery_status=..., ?payment_status=..., card do baú) vale só nesta
+ * visita: manda mais que o guardado, mas não sobrescreve o que o admin deixou salvo.
+ */
+const linkOrPersisted = (queryKey: string, storageKey: string): Ref<string> => {
+    const linked = route.query[queryKey]
+    if (linked !== undefined) return ref(String(linked))
+    return persistedRef(storageKey, '')
+}
+
 const search         = persistedRef('collector-orders:search', '')
-const filterPayment  = persistedRef('collector-orders:payment', '')
-const filterDelivery = persistedRef('collector-orders:delivery', '')
+const filterPayment  = linkOrPersisted('payment_status', 'collector-orders:payment')
+const filterDelivery = linkOrPersisted('delivery_status', 'collector-orders:delivery')
 const filterFriendship = persistedRef('collector-orders:friendship', '')
 const friendDurationIndex = persistedRef('collector-orders:friend-duration', '0')
+const filterTreasure = ref(route.query.treasure === undefined ? '' : String(route.query.treasure))
+const itemSets = ref<ItemSet[]>([])
 
-// Link com ?delivery_status=... manda mais que o filtro guardado.
-if (route.query.delivery_status !== undefined) filterDelivery.value = String(route.query.delivery_status)
+const treasureOptions = computed(() => {
+    const names = new Map(itemSets.value.map((set) => [set.cache_id, set.cache_name]))
+    return [...names].map(([id, name]) => ({ id, name }))
+})
+
+const loadItemSets = async () => {
+    try {
+        const { data } = await adminService.getItemSets()
+        itemSets.value = data
+    } catch {
+        toast.error('Erro ao carregar os baús para o filtro.')
+    }
+}
 let   searchTimer: ReturnType<typeof setTimeout> | null = null
 
 const PENDINGS_CLEARED_KEY = 'admin_pendings_cleared_at'
 const pendingClearedAt = ref(localStorage.getItem(PENDINGS_CLEARED_KEY) ?? '')
-
-const FILTERS_STORAGE_KEY = 'secretshop-admin:collector-orders-filters:v1'
-
-type CollectorOrdersFilters = {
-    search: string
-    filterPayment: string
-    filterDelivery: string
-}
-
-function readFiltersStore(): Partial<CollectorOrdersFilters> {
-    if (typeof window === 'undefined') {
-        return {}
-    }
-
-    try {
-        const raw = window.localStorage.getItem(FILTERS_STORAGE_KEY)
-        return raw ? JSON.parse(raw) : {}
-    } catch {
-        return {}
-    }
-}
-
-function saveFiltersStore(filters: CollectorOrdersFilters) {
-    if (typeof window === 'undefined') {
-        return
-    }
-
-    window.localStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify(filters))
-}
-
-function persistFilters() {
-    saveFiltersStore({
-        search: search.value,
-        filterPayment: filterPayment.value,
-        filterDelivery: filterDelivery.value,
-    })
-}
 
 const fetchSales = async (page: number) => {
     loading.value = true
@@ -92,6 +78,7 @@ const fetchSales = async (page: number) => {
             friendship:      filterFriendship.value || undefined,
             minFriendDays:   duration.min,
             maxFriendDays:   duration.max,
+            treasure:        filterTreasure.value || undefined,
         })
         if (res.data) {
             sales.value       = res.data.data
@@ -108,10 +95,7 @@ const fetchSales = async (page: number) => {
 
 const onSearchInput = () => {
     if (searchTimer) clearTimeout(searchTimer)
-    searchTimer = setTimeout(() => {
-        fetchSales(1)
-        persistFilters()
-    }, 400)
+    searchTimer = setTimeout(() => fetchSales(1), 400)
 }
 
 const onFilterChange = () => fetchSales(1)
@@ -163,17 +147,9 @@ const paymentMethodLabel = (m: string | null) =>
     ({ PIX: 'PIX', BOLETO: 'Boleto', CREDIT_CARD: 'Cartão' }[m ?? ''] ?? m ?? '-')
 
 onMounted(() => {
-    const savedFilters = readFiltersStore()
-    if (typeof savedFilters.search === 'string') search.value = savedFilters.search
-    if (typeof savedFilters.filterPayment === 'string') filterPayment.value = savedFilters.filterPayment
-    if (typeof savedFilters.filterDelivery === 'string' && !route.query.delivery_status) {
-        filterDelivery.value = savedFilters.filterDelivery
-    }
-
     fetchSales(1)
+    void loadItemSets()
 })
-
-watch([filterPayment, filterDelivery], persistFilters)
 </script>
 
 <template>
@@ -222,6 +198,14 @@ watch([filterPayment, filterDelivery], persistFilters)
                     <option value="AWAITING_SHIPPING">Aguard. envio</option>
                     <option value="SHIPPED">Enviado</option>
                     <option value="DELIVERED">Entregue</option>
+                </select>
+            </FilterField>
+            <FilterField label="Baú">
+                <select v-model="filterTreasure" class="filter-select" @change="onFilterChange">
+                    <option value="">Todos</option>
+                    <option v-for="treasure in treasureOptions" :key="treasure.id" :value="treasure.id">
+                        {{ treasure.name }}
+                    </option>
                 </select>
             </FilterField>
             <FilterField label="Amizade collector">

@@ -290,6 +290,22 @@ const unwrapBlobError = async (error: any): Promise<never> => {
   throw error
 }
 
+/** Extrato do saldo de vendas (venda de skin no trocador). Centavos; amount > 0 credita. */
+export interface StoreCreditStatement {
+  balance_cents: number
+  pending_cents: number
+  pending: Array<{ id: string; status: string; amount: number; created_at: string }>
+  entries: Array<{
+    id: string
+    amount: number
+    kind: string
+    reference: string | null
+    note: string | null
+    admin_name: string | null
+    created_at: string
+  }>
+}
+
 export const adminService = {
   async getSalesStats() {
     return api.get('/dashboard/stats')
@@ -510,6 +526,15 @@ export const adminService = {
     return api.patch<{ id: string; last_inventory_fetch_at: string | null }>(
       `/admin/users/${uuid}/reset-inventory-cooldown`,
     )
+  },
+
+  async getUserStoreCredit(uuid: string) {
+    return api.get<StoreCreditStatement>(`/admin/users/${uuid}/store-credit`)
+  },
+
+  /** Ajuste manual do saldo de vendas: positivo credita, negativo debita; vira linha no extrato. */
+  async adjustUserStoreCredit(uuid: string, payload: { amount: number; note: string }) {
+    return api.post<StoreCreditStatement>(`/admin/users/${uuid}/store-credit`, payload)
   },
 
   async setAllUsersSwap(enabled: boolean) {

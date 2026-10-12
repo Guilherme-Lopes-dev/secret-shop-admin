@@ -8,6 +8,7 @@ import { toast } from 'vue3-toastify'
 import UserPassCard from '@/components/passes/UserPassCard.vue'
 import UserProgressCard from '@/components/profile-progress/UserProgressCard.vue'
 import CatalogCard from '@/components/users/CatalogCard.vue'
+import StoreCreditCard from '@/components/users/StoreCreditCard.vue'
 import { countryName } from '@/utils/countries'
 import dayjs from 'dayjs'
 import { RUNE_TYPES, runeInfo } from '@/utils/runes'
@@ -365,6 +366,10 @@ onMounted(fetchUser)
                             </span>
                         </div>
                         <div class="info-row">
+                            <span class="info-label">Saldo cashback</span>
+                            <span class="info-value">{{ formatCurrency(user.cashback_balance ?? 0) }}</span>
+                        </div>
+                        <div class="info-row">
                             <span class="info-label">Última busca de inventário (swap)</span>
                             <span class="info-value">{{ user.last_inventory_fetch_at ? $dayjs(user.last_inventory_fetch_at).format('DD/MM/YYYY HH:mm') : '—' }}</span>
                         </div>
@@ -373,6 +378,14 @@ onMounted(fetchUser)
                             <span class="info-value">{{ $dayjs(user.created_at).format('DD/MM/YYYY HH:mm') }}</span>
                         </div>
                     </div>
+                </details>
+
+                <details class="section" open>
+                    <summary class="section-title">
+                        Saldo de vendas
+                        <span class="section-note">venda de skin no trocador · não sacável</span>
+                    </summary>
+                    <StoreCreditCard :user-uuid="user.id" />
                 </details>
 
                 <details class="section" open>

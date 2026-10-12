@@ -201,13 +201,14 @@
                   <span class="count-pill">{{ swap.user_items?.length || 0 }} item(s)</span>
                 </td>
                 <td>
-                  <span class="count-pill">{{ swap.store_items?.length || 0 }} item(s)</span>
+                  <span v-if="isSale(swap)" class="count-pill">Venda → saldo</span>
+                  <span v-else class="count-pill">{{ swap.store_items?.length || 0 }} item(s)</span>
                 </td>
                 <td>
                   <div class="value-cell">
                     <span class="value-give">{{ formatCurrency(swap.user_items_value) }}</span>
                     <span class="value-sep">→</span>
-                    <span class="value-get">{{ formatCurrency(swap.store_items_value) }}</span>
+                    <span class="value-get">{{ formatCurrency(isSale(swap) ? swap.user_items_value : swap.store_items_value) }}</span>
                   </div>
                 </td>
                 <td>
@@ -253,7 +254,9 @@
           </section>
 
           <section class="trade-side">
-            <h4>Loja envia <span>{{ formatCurrency(detail.store_items_value) }}</span></h4>
+            <h4 v-if="isSale(detail)">Vira saldo <span>{{ formatCurrency(detail.user_items_value) }}</span></h4>
+            <p v-if="isSale(detail)" class="muted">Venda: o valor entra no saldo de vendas do usuário (não sacável) quando os itens forem conferidos.</p>
+            <h4 v-else>Loja envia <span>{{ formatCurrency(detail.store_items_value) }}</span></h4>
             <ul class="item-list">
               <li v-for="item in detail.store_items" :key="item.id">
                 <img v-if="item.bot_inventory?.skins?.icon_url_large" :src="item.bot_inventory.skins.icon_url_large" alt="" />
@@ -266,7 +269,7 @@
           </section>
         </div>
 
-        <div class="value-summary">
+        <div v-if="!isSale(detail)" class="value-summary">
           <div class="vs-cell">
             <span>Usuário oferece</span>
             <strong class="value-give">{{ formatCurrency(detail.user_items_value) }}</strong>
@@ -373,7 +376,7 @@
             {{ acting ? 'Processando...' : 'Aprovar (pedir itens)' }}
           </button>
           <button v-if="detail.status === 'items_received'" class="btn-primary" :disabled="acting" @click="deliver">
-            {{ acting ? 'Entregando...' : 'Entregar itens da loja' }}
+            {{ acting ? 'Processando...' : isSale(detail) ? 'Creditar saldo' : 'Entregar itens da loja' }}
           </button>
         </div>
       </div>
@@ -480,6 +483,9 @@ const phaseHints: Record<string, string> = {
   store_sent: 'Itens da loja enviados ao usuário. Aguardando aceite na Steam.',
 }
 const phaseHint = (status: string) => phaseHints[status] ?? ''
+
+// Sem item da loja = venda: na entrega o valor vira saldo de vendas do usuário.
+const isSale = (swap: any) => !swap?.store_items?.length
 
 const offerStatusLabel = (status: string) => offerStatusMeta[status] ?? status
 const mapOfferStatus = (status: string) => {

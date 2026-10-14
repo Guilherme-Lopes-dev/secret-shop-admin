@@ -18,7 +18,7 @@ const props = withDefaults(defineProps<{
     loadingLabel: 'Salvando...',
     icon: 'mdi:alert-outline',
     variant: 'primary',
-    delaySeconds: 10,
+    delaySeconds: 2,
     loading: false,
 })
 

@@ -504,6 +504,47 @@ export interface MarketTrendSearch {
   zeroHits: number
 }
 
+/** Faixa do desvio contra a mediana de 21 dias, já descontado o mercado. */
+export type SwapTrendSignal = 'pico' | 'alta' | 'estavel' | 'baixa' | 'fundo' | 'iliquido' | 'sem_dados'
+
+/** Fator por sinal no valor do item do usuário (1 = sem ajuste). "Sem dados" nunca mexe. */
+export type SwapTrendFactors = Record<Exclude<SwapTrendSignal, 'sem_dados'>, number>
+
+export interface SwapTrendItem {
+  marketHashName: string
+  name: string
+  image: string | null
+  hero: string | null
+  rarity: string | null
+  /** Preço de consenso por dia (centavos), 21 dias + o último sync. */
+  history: number[]
+  signal: SwapTrendSignal
+  priceNow: number | null
+  baseMedian: number | null
+  deviationPct: number | null
+  /** Desvio descontado o mercado — é o que decide o sinal. */
+  relativePct: number | null
+  change7Pct: number | null
+  /** Mediana medida da semana seguinte nessa faixa, contra o mercado. */
+  nextWeekPct: number | null
+  sold7d: number | null
+  buyOrderPrice: number | null
+  offerVolume: number | null
+  offered: number
+  owners: number
+  inOpenSwaps: number
+  /** Preço médio congelado nos snapshots do trocador (SteamWebAPI no fetch). */
+  frozenPrice: number | null
+  frozenVsNowPct: number | null
+}
+
+export interface SwapTrendsResponse {
+  day: string
+  market: { liquidItems: number; deviationPct: number | null }
+  exposure: { items: number; illiquid: number; frozenAbove: number }
+  items: SwapTrendItem[]
+}
+
 export interface MarketTrendsResponse {
   day: string
   fromDay: string

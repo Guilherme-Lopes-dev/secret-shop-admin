@@ -61,6 +61,8 @@ const sortOptions = [
     { label: 'Mais pedidos', value: 'orders' },
     { label: 'Maior gasto', value: 'spent' },
     { label: 'Último login', value: 'last_login' },
+    { label: 'Maior saldo de vendas', value: 'store_credit' },
+    { label: 'Maior cashback', value: 'cashback' },
 ]
 
 // Em minutos. "Agora" = mesma janela do card "Logados agora" do dashboard.
@@ -302,6 +304,7 @@ onMounted(() => {
                             <th>Runas</th>
                             <th>Pedidos</th>
                             <th>Valor Gasto</th>
+                            <th title="Saldo de vendas (venda de skin no trocador, não sacável) e, embaixo, o cashback">Saldo</th>
                             <th>Role</th>
                             <th>Trade</th>
                             <th>Cadastro</th>
@@ -327,6 +330,7 @@ onMounted(() => {
                                 <td><div class="skeleton skeleton-line" style="width: 90px" /></td>
                                 <td><div class="skeleton skeleton-line" style="width: 70px" /></td>
                                 <td><div class="skeleton skeleton-line" style="width: 50px" /></td>
+                                <td><div class="skeleton skeleton-line" style="width: 80px" /></td>
                                 <td><div class="skeleton skeleton-line" style="width: 80px" /></td>
                                 <td><div class="skeleton skeleton-line" style="width: 90px" /></td>
                                 <td><div class="skeleton skeleton-line" style="width: 70px" /></td>
@@ -376,6 +380,10 @@ onMounted(() => {
                                 </td>
                                 <td><span class="count-badge">{{ user._count?.sales ?? 0 }}</span></td>
                                 <td class="spent-cell">{{ formatCurrency(user.total_spent ?? 0) }}</td>
+                                <td class="balance-cell">
+                                    <span :class="{ 'balance-zero': !user.store_credit_balance }">{{ formatCurrency(user.store_credit_balance ?? 0) }}</span>
+                                    <small v-if="user.cashback_balance">cashback {{ formatCurrency(user.cashback_balance) }}</small>
+                                </td>
                                 <td>
                                     <span class="status-badge" :class="user.admin ? 'status-admin' : 'status-user'">
                                         {{ user.admin ? 'Admin' : 'User' }}
@@ -404,7 +412,7 @@ onMounted(() => {
                                 </td>
                             </tr>
                             <tr v-if="users.length === 0">
-                                <td colspan="13" class="empty-state">Nenhum usuário encontrado.</td>
+                                <td colspan="14" class="empty-state">Nenhum usuário encontrado.</td>
                             </tr>
                         </template>
                     </tbody>
@@ -676,6 +684,22 @@ table
     color #4caf50
     font-weight 500
     font-size 0.82rem
+
+.balance-cell
+    font-size 0.82rem
+    font-weight 500
+    color #a78bfa
+    white-space nowrap
+
+    small
+        display block
+        margin-top 2px
+        font-size 0.72rem
+        font-weight 400
+        color #fbbf24
+
+.balance-zero
+    color #475569
 
 .status-badge
     padding 3px 8px

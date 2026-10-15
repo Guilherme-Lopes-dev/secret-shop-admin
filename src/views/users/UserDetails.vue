@@ -90,6 +90,10 @@ const cartAge = (items: any[] = []): number | null => {
 const giftCost = (claims: any[] = []) =>
     claims.reduce((total, claim) => total + (claim.item?.retail_price ?? 0), 0)
 
+// Sem hash na URL: o card só rola até o extrato, o router não entra na história.
+const scrollToStoreCredit = () =>
+    document.getElementById('saldo-vendas')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+
 const fetchUser = async () => {
     loading.value = true
     error.value = ''
@@ -234,7 +238,7 @@ onMounted(fetchUser)
                         <button
                             class="btn-toggle-active btn-cooldown"
                             :disabled="resettingCooldown || !user.last_inventory_fetch_at"
-                            :title="user.last_inventory_fetch_at ? 'Zera o cooldown de 12h para o usuário poder atualizar o inventário no trocador' : 'Usuário já pode atualizar o inventário'"
+                            :title="user.last_inventory_fetch_at ? 'Zera o cooldown de 7 dias para o usuário poder atualizar o inventário no trocador' : 'Usuário já pode atualizar o inventário'"
                             @click="resetInventoryCooldown"
                         >
                             <Icon icon="mdi:refresh" />
@@ -285,6 +289,24 @@ onMounted(fetchUser)
                     <div class="stat-info">
                         <span class="stat-label">Pedidos Pagos</span>
                         <span class="stat-value">{{ user.orders_count ?? 0 }}</span>
+                    </div>
+                </div>
+                <a class="stat-card stat-card--link" href="#saldo-vendas" title="Ver extrato e ajustar" @click.prevent="scrollToStoreCredit">
+                    <div class="stat-icon stat-icon--purple">
+                        <Icon icon="mdi:wallet-outline" width="22" />
+                    </div>
+                    <div class="stat-info">
+                        <span class="stat-label">Saldo de vendas</span>
+                        <span class="stat-value">{{ formatCurrency(user.store_credit_balance ?? 0) }}</span>
+                    </div>
+                </a>
+                <div class="stat-card">
+                    <div class="stat-icon stat-icon--amber">
+                        <Icon icon="mdi:cash-refund" width="22" />
+                    </div>
+                    <div class="stat-info">
+                        <span class="stat-label">Cashback</span>
+                        <span class="stat-value">{{ formatCurrency(user.cashback_balance ?? 0) }}</span>
                     </div>
                 </div>
                 <div class="stat-card stat-card--runes">
@@ -366,10 +388,6 @@ onMounted(fetchUser)
                             </span>
                         </div>
                         <div class="info-row">
-                            <span class="info-label">Saldo cashback</span>
-                            <span class="info-value">{{ formatCurrency(user.cashback_balance ?? 0) }}</span>
-                        </div>
-                        <div class="info-row">
                             <span class="info-label">Última busca de inventário (swap)</span>
                             <span class="info-value">{{ user.last_inventory_fetch_at ? $dayjs(user.last_inventory_fetch_at).format('DD/MM/YYYY HH:mm') : '—' }}</span>
                         </div>
@@ -380,12 +398,12 @@ onMounted(fetchUser)
                     </div>
                 </details>
 
-                <details class="section" open>
+                <details id="saldo-vendas" class="section" open>
                     <summary class="section-title">
                         Saldo de vendas
                         <span class="section-note">venda de skin no trocador · não sacável</span>
                     </summary>
-                    <StoreCreditCard :user-uuid="user.id" />
+                    <StoreCreditCard :user-uuid="user.id" @balance="user.store_credit_balance = $event" />
                 </details>
 
                 <details class="section" open>
@@ -754,12 +772,27 @@ onMounted(fetchUser)
         background rgba(33,150,243,0.12)
         color #2196f3
 
+    &--purple
+        background rgba(167,139,250,0.12)
+        color #a78bfa
+
+    &--amber
+        background rgba(251,191,36,0.12)
+        color #fbbf24
+
 .stat-info
     display flex
     flex-direction column
 
 .stat-card--runes
     flex 1
+
+.stat-card--link
+    text-decoration none
+    transition border-color 0.15s
+
+    &:hover
+        border-color rgba(167,139,250,0.35)
 
 .rune-row
     display flex

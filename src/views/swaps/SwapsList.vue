@@ -5,129 +5,10 @@
         <h1 class="page-title">Trocas (Swaps)</h1>
         <p class="page-subtitle">{{ swaps.length }} trocas listadas</p>
       </div>
+      <router-link to="/swaps/config" class="btn-ghost config-link">
+        <Icon icon="mdi:cog-outline" width="16" /> Config do Trocador
+      </router-link>
     </header>
-
-    <section class="config-panel">
-      <div class="config-block">
-        <label>Multiplicadores de preço</label>
-        <div class="config-fields">
-          <div class="field">
-            <small>Itens do usuário</small>
-            <input v-model.number="multiplier" type="number" step="0.01" min="0" />
-          </div>
-          <div class="field">
-            <small>Itens da loja</small>
-            <input v-model.number="storeMultiplier" type="number" step="0.01" min="0" />
-          </div>
-          <button class="btn-primary" :disabled="savingMultiplier" @click="saveMultiplier">
-            {{ savingMultiplier ? 'Salvando...' : 'Salvar' }}
-          </button>
-        </div>
-        <span class="config-hint">usuário = preço SteamWebAPI × mult · loja = preço do catálogo × mult</span>
-      </div>
-
-      <div class="config-divider"></div>
-
-      <div class="config-block grow">
-        <label>Compensação em dinheiro (swap)</label>
-        <div class="config-fields">
-          <div class="field toggle-field">
-            <small>Ativada</small>
-            <label class="switch">
-              <input v-model="comp.enabled" type="checkbox" />
-              <span class="slider"></span>
-            </label>
-          </div>
-          <div class="field">
-            <small>Teto (R$)</small>
-            <input v-model.number="compMaxReais" type="number" step="0.01" min="0" />
-          </div>
-          <div class="field">
-            <small>Margem-alvo (fator)</small>
-            <input v-model.number="comp.margin" type="number" step="0.01" min="0" />
-          </div>
-          <div class="field">
-            <small>Tolerância (%)</small>
-            <input v-model.number="comp.tolerance" type="number" step="0.1" min="0" />
-          </div>
-          <div class="field">
-            <small>Máx. itens do usuário</small>
-            <input v-model.number="comp.maxUserItems" type="number" step="1" min="0" />
-          </div>
-          <button class="btn-primary" :disabled="savingComp" @click="saveComp">
-            {{ savingComp ? 'Salvando...' : 'Salvar config' }}
-          </button>
-        </div>
-        <span class="config-hint">
-          comp = recebe − oferece (&gt;0 user paga PIX). Acima do teto bloqueia; off exige troca exata. Máx. itens 0 = sem limite.
-        </span>
-      </div>
-
-      <div class="config-divider"></div>
-
-      <div class="config-block">
-        <label>Acesso ao trade (todos)</label>
-        <div class="config-fields">
-          <button class="btn-primary" :disabled="settingAllSwap" @click="setAllSwap(true)">
-            {{ settingAllSwap ? 'Aplicando...' : 'Liberar p/ todos' }}
-          </button>
-          <button class="btn-danger" :disabled="settingAllSwap" @click="setAllSwap(false)">
-            Bloquear p/ todos
-          </button>
-        </div>
-        <span class="config-hint">aplica a todos de uma vez; o ajuste 1 a 1 fica na tela de Usuários.</span>
-      </div>
-
-      <div class="config-divider"></div>
-
-      <div class="config-block grow">
-        <label>Multiplicador por raridade</label>
-        <div class="rarity-grid">
-          <div class="rarity-row rarity-head">
-            <span>Raridade</span>
-            <span>Usuário</span>
-            <span>Loja</span>
-            <span>Ativo</span>
-            <span></span>
-          </div>
-          <div v-for="row in rarityMultipliers" :key="row.rarity" class="rarity-row">
-            <span class="rarity-name">{{ row.rarity }}</span>
-            <input v-model.number="row.userMultiplier" type="number" step="0.01" min="0" />
-            <input v-model.number="row.storeMultiplier" type="number" step="0.01" min="0" />
-            <label class="switch sm">
-              <input v-model="row.active" type="checkbox" />
-              <span class="slider"></span>
-            </label>
-            <div class="rarity-actions">
-              <button class="btn-primary sm" :disabled="savingRarity === row.rarity" @click="saveRarity(row)">
-                {{ savingRarity === row.rarity ? '...' : 'Salvar' }}
-              </button>
-              <button class="btn-danger sm" :disabled="savingRarity === row.rarity" @click="removeRarity(row.rarity)">
-                Remover
-              </button>
-            </div>
-          </div>
-
-          <div class="rarity-row rarity-add">
-            <select v-model="newRarity.rarity">
-              <option value="">Adicionar raridade…</option>
-              <option v-for="r in availableRarities" :key="r" :value="r">{{ r }}</option>
-            </select>
-            <input v-model.number="newRarity.userMultiplier" type="number" step="0.01" min="0" />
-            <input v-model.number="newRarity.storeMultiplier" type="number" step="0.01" min="0" />
-            <span></span>
-            <button
-              class="btn-primary sm"
-              :disabled="!newRarity.rarity || savingRarity === newRarity.rarity"
-              @click="addRarity"
-            >
-              Adicionar
-            </button>
-          </div>
-        </div>
-        <span class="config-hint">raridade na lista usa estes multiplicadores; o resto cai no multiplicador global acima.</span>
-      </div>
-    </section>
 
     <section v-if="pendings.length" class="pendings">
       <header class="pendings-head">
@@ -248,6 +129,30 @@
                 <div>
                   <span class="item-name">{{ item.market_hash_name }}</span>
                   <span class="item-price">{{ formatCurrency(item.price_at_time) }}</span>
+                  <span
+                    v-if="item.trend_signal"
+                    class="trend-line"
+                    title="Sinal de tendência e fator gravados quando a troca foi criada: é o que entrou no valor acima."
+                  >
+                    <span class="trend-when">na troca</span>
+                    <span class="trend-tag" :style="signalStyle(item.trend_signal)">
+                      {{ SWAP_TREND_SIGNALS[item.trend_signal as SwapTrendSignal]?.label ?? item.trend_signal }}
+                    </span>
+                    <span class="trend-when">× {{ Number(item.trend_factor).toLocaleString('pt-BR') }}</span>
+                  </span>
+                  <span v-if="trendOf(item)" class="trend-line">
+                    <span class="trend-when">hoje</span>
+                    <span
+                      class="trend-tag"
+                      :style="signalStyle(trendOf(item)!.signal)"
+                      :title="SWAP_TREND_SIGNALS[trendOf(item)!.signal].advice"
+                    >
+                      {{ SWAP_TREND_SIGNALS[trendOf(item)!.signal].label }} {{ formatPct(trendOf(item)!.relativePct) }}
+                    </span>
+                    <span v-if="frozenAbovePct(item) !== null" class="trend-warn" title="O preço da troca saiu do snapshot do usuário, que fica congelado até 7 dias.">
+                      preço {{ formatPct(frozenAbovePct(item)) }} acima de hoje
+                    </span>
+                  </span>
                 </div>
               </li>
             </ul>
@@ -282,6 +187,10 @@
           <div class="vs-cell vs-diff">
             <span>Diferença (loja − usuário)</span>
             <strong>{{ formatCurrency(detail.store_items_value - detail.user_items_value) }}</strong>
+          </div>
+          <div v-if="surplusOf(detail) > 0" class="vs-cell vs-diff" title="Itens do usuário + PIX − itens da loja. Entra no saldo de vendas quando os itens da loja são enviados.">
+            <span>Vira saldo</span>
+            <strong class="value-give">{{ formatCurrency(surplusOf(detail)) }}</strong>
           </div>
         </div>
 
@@ -385,11 +294,12 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue3-toastify'
-import { adminService, type SwapCompensationConfig, type RarityMultiplier } from '@/services/admin/admin.service'
-import type { SwapNotificationDto } from '@/services/admin/types'
+import { adminService } from '@/services/admin/admin.service'
+import type { SwapNotificationDto, SwapTrendItem, SwapTrendSignal } from '@/services/admin/types'
+import { formatPct, signalStyle, SWAP_TREND_SIGNALS } from '@/components/swaps/swapTrendSignals'
 import { formatCurrency } from '@/utils/formatCurrency'
 import { persistedRef } from '@/utils/persistedRef'
 
@@ -398,32 +308,12 @@ const loading = ref(true)
 const detail = ref<any>(null)
 const acting = ref(false)
 const actionError = ref('')
-const multiplier = ref(1)
-const storeMultiplier = ref(1)
-const savingMultiplier = ref(false)
 const route = useRoute()
 const router = useRouter()
 const activeStatus = persistedRef('swaps:status', '')
 
 // Link com ?status=... manda mais que o filtro guardado.
 if (route.query.status !== undefined) activeStatus.value = String(route.query.status)
-
-const KNOWN_RARITIES = ['Common', 'Uncommon', 'Rare', 'Mythical', 'Legendary', 'Ancient', 'Immortal', 'Arcana']
-const rarityMultipliers = ref<RarityMultiplier[]>([])
-const savingRarity = ref('')
-const newRarity = ref({ rarity: '', userMultiplier: 1, storeMultiplier: 1 })
-const availableRarities = computed(() =>
-  KNOWN_RARITIES.filter(
-    (r) => !rarityMultipliers.value.some((m) => m.rarity.toLowerCase() === r.toLowerCase()),
-  ),
-)
-
-const comp = ref<SwapCompensationConfig>({ enabled: true, max: 100000, tolerance: 0, margin: 1, maxUserItems: 10 })
-const savingComp = ref(false)
-const compMaxReais = computed({
-  get: () => Math.round((comp.value.max / 100) * 100) / 100,
-  set: (v: number) => { comp.value.max = Math.round((Number(v) || 0) * 100) },
-})
 
 const compStatusMeta: Record<string, { label: string; cls: string }> = {
   pending: { label: 'Aguardando PIX', cls: 'status-scheduled' },
@@ -486,6 +376,9 @@ const phaseHint = (status: string) => phaseHints[status] ?? ''
 
 // Sem item da loja = venda: na entrega o valor vira saldo de vendas do usuário.
 const isSale = (swap: any) => !swap?.store_items?.length
+// Mesma conta do backend (swapSurplusOf): sobra da troca e PIX mínimo acima da diferença viram saldo.
+const surplusOf = (swap: any) =>
+  Math.max(0, (swap?.user_items_value ?? 0) + (swap?.compensation_amount ?? 0) - (swap?.store_items_value ?? 0))
 
 const offerStatusLabel = (status: string) => offerStatusMeta[status] ?? status
 const mapOfferStatus = (status: string) => {
@@ -540,71 +433,45 @@ const fetchSwaps = async () => {
   }
 }
 
-const fetchMultiplier = async () => {
-  const res = await adminService.getSwapMultiplier()
-  multiplier.value = res.data.multiplier
-  storeMultiplier.value = res.data.storeMultiplier ?? 1
-}
-
-const fetchComp = async () => {
-  const res = await adminService.getSwapCompensationConfig()
-  comp.value = res.data
-}
-
-const saveComp = async () => {
-  savingComp.value = true
-  try {
-    const res = await adminService.setSwapCompensationConfig(comp.value)
-    comp.value = res.data
-    toast.success('Configuração de compensação salva.')
-  } catch (err: any) {
-    toast.error(err.response?.data?.message ?? 'Erro ao salvar configuração.')
-  } finally {
-    savingComp.value = false
-  }
-}
-
-const settingAllSwap = ref(false)
-const setAllSwap = async (enabled: boolean) => {
-  const verb = enabled ? 'liberar' : 'bloquear'
-  if (!window.confirm(`Tem certeza que deseja ${verb} o trade para TODOS os usuários?`)) return
-  settingAllSwap.value = true
-  try {
-    const { data } = await adminService.setAllUsersSwap(enabled)
-    toast.success(`Trade ${enabled ? 'liberado' : 'bloqueado'} para ${data.updated} usuário(s).`)
-  } catch (err: any) {
-    toast.error(err.response?.data?.message ?? 'Falha ao atualizar acesso em massa.')
-  } finally {
-    settingAllSwap.value = false
-  }
-}
-
 const setStatus = (status: string) => {
   activeStatus.value = status
   router.replace({ query: status ? { status } : {} })
   fetchSwaps()
 }
 
-const saveMultiplier = async () => {
-  savingMultiplier.value = true
-  try {
-    const res = await adminService.setSwapMultiplier({
-      multiplier: multiplier.value,
-      storeMultiplier: storeMultiplier.value,
-    })
-    multiplier.value = res.data.multiplier
-    storeMultiplier.value = res.data.storeMultiplier
-    toast.success('Multiplicadores salvos.')
-  } catch (err: any) {
-    toast.error(err.response?.data?.message ?? 'Erro ao salvar multiplicadores.')
-  } finally {
-    savingMultiplier.value = false
-  }
-}
-
 const openDetail = (swap: any) => {
   actionError.value = ''
   detail.value = swap
+  loadItemTrends(swap)
+}
+
+// Tendência dos itens do usuário pra decidir a aprovação. É apoio: falhou, o detalhe abre igual.
+const itemTrends = ref<Record<string, SwapTrendItem>>({})
+
+const loadItemTrends = async (swap: any) => {
+  itemTrends.value = {}
+  const names: string[] = [...new Set<string>((swap.user_items ?? []).map((item: any) => item.market_hash_name))]
+  if (!names.length) return
+
+  try {
+    const res = await adminService.getSwapTrends(names)
+    // Outro detalhe aberto enquanto carregava: resposta velha não pinta o novo.
+    if (detail.value?.id !== swap.id) return
+    itemTrends.value = Object.fromEntries(res.data.items.map((trend) => [trend.marketHashName, trend]))
+  } catch {
+    itemTrends.value = {}
+  }
+}
+
+const trendOf = (item: any): SwapTrendItem | undefined => itemTrends.value[item.market_hash_name]
+
+// api_price = preço Steam do snapshot; priceNow = consenso de hoje. Só avisa acima de 10%.
+const frozenAbovePct = (item: any) => {
+  const priceNow = trendOf(item)?.priceNow
+  if (!priceNow || !item.api_price) return null
+
+  const pct = Math.round((item.api_price / priceNow - 1) * 1000) / 10
+  return pct > 10 ? pct : null
 }
 
 const canReject = (status: string) =>
@@ -656,71 +523,9 @@ const applyUpdate = (updated: any) => {
   detail.value = updated
 }
 
-const fetchRarityMultipliers = async () => {
-  try {
-    const res = await adminService.getRarityMultipliers()
-    rarityMultipliers.value = res.data
-  } catch {
-    /* opcional */
-  }
-}
-
-const saveRarity = async (row: RarityMultiplier) => {
-  savingRarity.value = row.rarity
-  try {
-    const res = await adminService.upsertRarityMultiplier({
-      rarity: row.rarity,
-      userMultiplier: row.userMultiplier,
-      storeMultiplier: row.storeMultiplier,
-      active: row.active,
-    })
-    rarityMultipliers.value = res.data
-    toast.success('Multiplicador salvo.')
-  } catch (err: any) {
-    toast.error(err.response?.data?.message ?? 'Erro ao salvar.')
-  } finally {
-    savingRarity.value = ''
-  }
-}
-
-const addRarity = async () => {
-  const next = newRarity.value
-  if (!next.rarity) return
-  savingRarity.value = next.rarity
-  try {
-    const res = await adminService.upsertRarityMultiplier({
-      rarity: next.rarity,
-      userMultiplier: next.userMultiplier,
-      storeMultiplier: next.storeMultiplier,
-    })
-    rarityMultipliers.value = res.data
-    newRarity.value = { rarity: '', userMultiplier: 1, storeMultiplier: 1 }
-    toast.success('Raridade adicionada.')
-  } catch (err: any) {
-    toast.error(err.response?.data?.message ?? 'Erro ao adicionar.')
-  } finally {
-    savingRarity.value = ''
-  }
-}
-
-const removeRarity = async (rarity: string) => {
-  savingRarity.value = rarity
-  try {
-    const res = await adminService.deleteRarityMultiplier(rarity)
-    rarityMultipliers.value = res.data
-  } catch (err: any) {
-    toast.error(err.response?.data?.message ?? 'Erro ao remover.')
-  } finally {
-    savingRarity.value = ''
-  }
-}
-
 onMounted(() => {
   fetchSwaps()
   fetchPendings()
-  fetchMultiplier()
-  fetchComp()
-  fetchRarityMultipliers()
 })
 </script>
 
@@ -746,149 +551,6 @@ onMounted(() => {
   font-size 0.85rem
   color rgba(255,255,255,0.45)
   margin 0
-
-.config-panel
-  display flex
-  align-items stretch
-  gap 1.5rem
-  width 100%
-  background #16161a
-  border 1px solid rgba(255,255,255,0.06)
-  border-radius 12px
-  padding 1.1rem 1.25rem
-  margin-bottom 1.5rem
-  flex-wrap wrap
-
-.config-block
-  display flex
-  flex-direction column
-  gap 0.75rem
-
-  &.grow
-    flex 1
-    min-width 320px
-
-  label
-    font-size 0.72rem
-    text-transform uppercase
-    letter-spacing 0.04em
-    color rgba(255,255,255,0.45)
-
-.config-divider
-  width 1px
-  align-self stretch
-  background rgba(255,255,255,0.07)
-
-.config-fields
-  display flex
-  align-items flex-end
-  gap 1rem
-  flex-wrap wrap
-
-.field
-  display flex
-  flex-direction column
-  gap 5px
-
-  small
-    font-size 0.7rem
-    color rgba(255,255,255,0.5)
-
-  input
-    width 120px
-    background #0e0e11
-    border 1px solid rgba(255,255,255,0.12)
-    border-radius 8px
-    padding 0.45rem 0.6rem
-    color #fff
-    font-size 0.9rem
-
-.toggle-field
-  justify-content space-between
-  min-height 56px
-
-.config-hint
-  font-size 0.72rem
-  color rgba(255,255,255,0.35)
-
-.rarity-grid
-  display flex
-  flex-direction column
-  gap 6px
-  margin-top 4px
-
-.rarity-row
-  display grid
-  grid-template-columns 110px 90px 90px 50px 1fr
-  align-items center
-  gap 10px
-
-  input, select
-    width 100%
-    background #0e0e11
-    border 1px solid rgba(255,255,255,0.12)
-    border-radius 8px
-    padding 0.4rem 0.55rem
-    color #fff
-    font-size 0.85rem
-
-.rarity-head
-  font-size 0.7rem
-  color rgba(255,255,255,0.45)
-  text-transform uppercase
-  letter-spacing 0.04em
-
-.rarity-name
-  font-weight 600
-  font-size 0.9rem
-
-.rarity-actions
-  display flex
-  gap 6px
-
-.btn-primary.sm,
-.btn-danger.sm
-  height 32px
-  padding 0 10px
-  font-size 0.78rem
-
-.config-fields .btn-primary,
-.config-fields .btn-danger
-  height 38px
-
-.switch
-  position relative
-  display inline-block
-  width 40px
-  height 22px
-
-  input
-    opacity 0
-    width 0
-    height 0
-
-.slider
-  position absolute
-  cursor pointer
-  inset 0
-  background rgba(255,255,255,0.18)
-  border-radius 999px
-  transition 0.2s
-  &::before
-    content ''
-    position absolute
-    height 16px
-    width 16px
-    left 3px
-    bottom 3px
-    background #fff
-    border-radius 50%
-    transition 0.2s
-
-.switch input:checked + .slider
-  background #6366f1
-.switch input:checked + .slider::before
-  transform translateX(18px)
 
 .comp-block
   margin-top 1.25rem
@@ -1193,6 +855,12 @@ tbody tr:hover td
   &:hover
     background rgba(255,255,255,0.06)
 
+.config-link
+  display inline-flex
+  align-items center
+  gap 6px
+  text-decoration none
+
 .btn-dev
   border-style dashed
   border-color rgba(251,191,36,0.4)
@@ -1304,6 +972,30 @@ tbody tr:hover td
 .item-price
   font-size 0.75rem
   color rgba(255,255,255,0.45)
+
+.trend-line
+  display flex
+  flex-wrap wrap
+  align-items center
+  gap 6px
+  margin-top 3px
+
+.trend-tag
+  padding 1px 8px
+  border 1px solid
+  border-radius 999px
+  font-size 0.7rem
+  font-weight 600
+  cursor help
+
+.trend-warn
+  font-size 0.7rem
+  color #fc8181
+  cursor help
+
+.trend-when
+  font-size 0.68rem
+  color rgba(255,255,255,0.4)
 
 .offers-block
   margin-top 1.25rem

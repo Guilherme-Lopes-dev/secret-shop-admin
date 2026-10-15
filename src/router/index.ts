@@ -343,6 +343,11 @@ const routes = [
         component: () => import('@/views/swaps/SwapsList.vue'),
       },
       {
+        path: 'swaps/config',
+        name: 'swap-config',
+        component: () => import('@/views/swaps/SwapConfig.vue'),
+      },
+      {
         path: 'bots',
         name: 'bots',
         component: () => import('@/views/bots/SteamBotsList.vue'),

@@ -28,6 +28,8 @@ import type {
   PassProgressDto,
   DemandRow,
   MarketTrendsResponse,
+  SwapTrendFactors,
+  SwapTrendsResponse,
   ProfileProgressDto,
   SkinSalesRow,
   TodayTasks,
@@ -407,6 +409,13 @@ export const adminService = {
     })
     if (filters.day) params.append('day', filters.day)
     return api.get<MarketTrendsResponse>(`/admin/market-trends?${params}`)
+  },
+
+  /** Sem nomes: os itens com mais peso no trocador. Nome repetido no query (pode ter vírgula). */
+  async getSwapTrends(names: string[] = []) {
+    const params = new URLSearchParams()
+    names.forEach((name) => params.append('names', name))
+    return api.get<SwapTrendsResponse>(`/admin/market-trends/swap?${params}`)
   },
 
   async getBulkAsaasReceipts(filters: { from?: string; to?: string }) {
@@ -1760,6 +1769,14 @@ export const adminService = {
 
   async setSwapCompensationConfig(config: Partial<SwapCompensationConfig>) {
     return api.post<SwapCompensationConfig>('/swaps/config/compensation', config)
+  },
+
+  async getSwapTrendFactors() {
+    return api.get<SwapTrendFactors>('/swaps/config/trend-factors')
+  },
+
+  async setSwapTrendFactors(factors: Partial<SwapTrendFactors>) {
+    return api.post<SwapTrendFactors>('/swaps/config/trend-factors', factors)
   },
 
   async getRarityMultipliers() {

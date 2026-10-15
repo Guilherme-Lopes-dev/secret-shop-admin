@@ -7,6 +7,7 @@ import { adminService, type StoreCreditStatement } from '@/services/admin/admin.
 import { formatCurrency } from '@/utils/formatCurrency'
 
 const props = defineProps<{ userUuid: string }>()
+const emit = defineEmits<{ balance: [cents: number] }>()
 
 const statement = ref<StoreCreditStatement | null>(null)
 const amountInput = ref('')
@@ -18,20 +19,46 @@ const KIND_LABELS: Record<string, string> = {
     purchase: 'Compra',
     purchase_returned: 'Saldo devolvido (pedido não pago)',
     purchase_reclaimed: 'Pago após expirar (descontado de novo)',
+    swap_surplus: 'Sobra de troca',
     admin_adjustment: 'Ajuste manual',
 }
 
-/** "-25,50" → -2550. Aceita vírgula ou ponto; vazio ou inválido → null. */
+/** Com vírgula, ponto é milhar ("1.500,56"); sem vírgula, ponto é decimal ("25.50"). */
+const toDecimalString = (value: string) => {
+    const compact = value.replace(/\s|R\$/g, '')
+    if (!compact.includes(',')) return compact
+
+    return compact.replace(/\./g, '').replace(',', '.')
+}
+
+/** "-25,50" → -2550. Vazio ou inválido → null. */
 const parseSignedCents = (value: string): number | null => {
-    const normalized = value.replace(/\s|R\$/g, '').replace(',', '.')
+    const normalized = toDecimalString(value)
     if (!/^-?\d+(\.\d{1,2})?$/.test(normalized)) return null
     return Math.round(Number(normalized) * 100)
 }
 
 const amountCents = computed(() => parseSignedCents(amountInput.value))
+const projectedBalance = computed(() => (statement.value?.balance_cents ?? 0) + (amountCents.value ?? 0))
 const canSave = computed(
-    () => !saving.value && !!amountCents.value && note.value.trim().length >= 3,
+    () => !saving.value && !!amountCents.value && projectedBalance.value >= 0 && note.value.trim().length >= 3,
 )
+
+// Prévia do que foi digitado, em reais, e de como o saldo fica.
+const amountHint = computed(() => {
+    if (!amountInput.value.trim()) return null
+
+    const cents = amountCents.value
+    if (cents === null) return { tone: 'bad', text: 'Valor inválido (ex: 25,00 ou -25,00)' }
+    if (cents === 0) return { tone: 'bad', text: 'Valor zero não lança nada' }
+    if (projectedBalance.value < 0) return { tone: 'bad', text: `Debita ${formatCurrency(-cents)}: maior que o saldo` }
+
+    const verb = cents > 0 ? 'Credita' : 'Debita'
+    return {
+        tone: cents > 0 ? 'credit' : 'debit',
+        text: `${verb} ${formatCurrency(Math.abs(cents))} · saldo fica ${formatCurrency(projectedBalance.value)}`,
+    }
+})
 
 const load = async () => {
     try {
@@ -50,6 +77,8 @@ const save = async () => {
             note: note.value.trim(),
         })
         statement.value = data
+        // Quem mostra o saldo fora do card (topo da tela do usuário) acompanha o ajuste.
+        emit('balance', data.balance_cents)
         amountInput.value = ''
         note.value = ''
         toast.success('Ajuste lançado no extrato do cliente.')
@@ -77,12 +106,17 @@ onMounted(load)
         </div>
 
         <form class="credit-adjust" @submit.prevent="save">
-            <input
-                v-model="amountInput"
-                class="credit-input credit-input--amount"
-                inputmode="decimal"
-                placeholder="R$ (ex: 25,00 ou -25,00)"
-            />
+            <div class="credit-amount">
+                <input
+                    v-model="amountInput"
+                    class="credit-input"
+                    inputmode="decimal"
+                    placeholder="R$ (ex: 25,00 ou -25,00)"
+                />
+                <small v-if="amountHint" class="credit-hint" :class="`credit-hint--${amountHint.tone}`" aria-live="polite">
+                    {{ amountHint.text }}
+                </small>
+            </div>
             <input
                 v-model="note"
                 class="credit-input"
@@ -147,7 +181,30 @@ onMounted(load)
 .credit-adjust
     display flex
     flex-wrap wrap
+    align-items flex-start
     gap 0.5rem
+
+.credit-amount
+    flex 0 1 220px
+    display flex
+    flex-direction column
+    gap 4px
+
+    .credit-input
+        flex none
+
+.credit-hint
+    font-size 0.72rem
+    padding-left 2px
+
+    &--credit
+        color #4ade80
+
+    &--debit
+        color #fbbf24
+
+    &--bad
+        color #f87171
 
 .credit-input
     flex 1 1 220px
@@ -157,9 +214,6 @@ onMounted(load)
     background rgba(255,255,255,0.04)
     color inherit
     font-size 0.85rem
-
-    &--amount
-        flex 0 1 180px
 
     &:focus
         outline none

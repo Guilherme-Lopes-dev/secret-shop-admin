@@ -43,10 +43,18 @@ const navGroups: NavGroup[] = [
             { label: 'Resumo', icon: 'mdi:chart-bar', to: '/sales/summary', name: 'sales-summary' },
             { label: 'Vendas por Skin', icon: 'mdi:chart-timeline-variant', to: '/sales/by-skin', name: 'sales-by-skin' },
             { label: 'Demanda', icon: 'mdi:heart-multiple-outline', to: '/sales/demand', name: 'sales-demand' },
-            { label: 'Compras Wix', icon: 'mdi:store-outline', to: '/reports/wix', name: 'wix-purchases' },
             { label: 'Pedidos Collector', icon: 'mdi:receipt-text-outline', to: '/collector-orders', name: 'collector-orders' },
             { label: 'Envios Dropship', icon: 'mdi:package-variant-closed', to: '/dropship-orders', name: 'dropship-orders' },
             { label: 'Pedidos Físicos', icon: 'mdi:truck-outline', to: '/physical-orders', name: 'physical-orders' },
+        ],
+    },
+    {
+        label: 'Trocas e Compras',
+        icon: 'mdi:swap-horizontal-bold',
+        key: 'trocas',
+        items: [
+            { label: 'Trocas', icon: 'mdi:swap-horizontal-bold', to: '/swaps', name: 'swaps' },
+            { label: 'Config do Trocador', icon: 'mdi:tune-variant', to: '/swaps/config', name: 'swap-config' },
         ],
     },
     {
@@ -89,8 +97,6 @@ const navGroups: NavGroup[] = [
         items: [
             { label: 'Bots Steam', icon: 'mdi:robot-outline', to: '/bots', name: 'bots' },
             { label: 'Trade Offers', icon: 'mdi:swap-horizontal', to: '/trade-offers', name: 'trade-offers' },
-            { label: 'Trocas (Swaps)', icon: 'mdi:swap-horizontal-bold', to: '/swaps', name: 'swaps' },
-            { label: 'Partidas', icon: 'mdi:gamepad-variant-outline', to: '/match-history', name: 'match-history' },
         ],
     },
     {
@@ -126,10 +132,7 @@ const navGroups: NavGroup[] = [
             { label: 'Sorteios', icon: 'mdi:ticket-confirmation-outline', to: '/raffles', name: 'raffles' },
             { label: 'Novidades', icon: 'mdi:bullhorn-outline', to: '/news', name: 'news' },
             { label: 'Feedbacks', icon: 'mdi:comment-quote-outline', to: '/feedbacks', name: 'feedbacks' },
-            { label: 'WhatsApp Blast', icon: 'mdi:whatsapp', to: '/whatsapp/blast', name: 'whatsapp-blast' },
-            { label: 'Recomendações', icon: 'mdi:star-shooting-outline', to: '/recommendations', name: 'recommendations' },
             { label: 'Brindes', icon: 'mdi:gift-outline', to: '/rewards', name: 'rewards' },
-            { label: 'Simular brindes', icon: 'mdi:dice-multiple-outline', to: '/rewards/simulate', name: 'rewards-simulate' },
             { label: 'Discord', icon: 'mdi:discord', to: '/discord', name: 'discord' },
         ],
     },
@@ -149,6 +152,18 @@ const navGroups: NavGroup[] = [
         items: [
             { label: 'Mídia', icon: 'mdi:multimedia', to: '/media', name: 'media' },
             { label: 'Backup do Banco', icon: 'mdi:database-cog-outline', to: '/backup', name: 'backup' },
+        ],
+    },
+    {
+        label: 'Menos usados',
+        icon: 'mdi:archive-outline',
+        key: 'menos-usados',
+        items: [
+            { label: 'Compras Wix', icon: 'mdi:store-outline', to: '/reports/wix', name: 'wix-purchases' },
+            { label: 'Partidas', icon: 'mdi:gamepad-variant-outline', to: '/match-history', name: 'match-history' },
+            { label: 'WhatsApp Blast', icon: 'mdi:whatsapp', to: '/whatsapp/blast', name: 'whatsapp-blast' },
+            { label: 'Simular brindes', icon: 'mdi:dice-multiple-outline', to: '/rewards/simulate', name: 'rewards-simulate' },
+            { label: 'Recomendações', icon: 'mdi:star-shooting-outline', to: '/recommendations', name: 'recommendations' },
         ],
     },
 ]

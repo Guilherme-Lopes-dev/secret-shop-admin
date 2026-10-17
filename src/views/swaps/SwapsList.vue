@@ -164,7 +164,7 @@
             <h4 v-else>Loja envia <span>{{ formatCurrency(detail.store_items_value) }}</span></h4>
             <ul class="item-list">
               <li v-for="item in detail.store_items" :key="item.id">
-                <img v-if="item.bot_inventory?.skins?.icon_url_large" :src="item.bot_inventory.skins.icon_url_large" alt="" />
+                <img v-if="item.bot_inventory?.skins?.icon_url_large" :src="buildSteamImageUrl(item.bot_inventory.skins.icon_url_large) ?? ''" alt="" />
                 <div>
                   <span class="item-name">{{ item.bot_inventory?.skins?.name || item.bot_inventory?.asset_id }}</span>
                   <span class="item-price">{{ formatCurrency(item.price_at_time) }}</span>
@@ -302,6 +302,7 @@ import type { SwapNotificationDto, SwapTrendItem, SwapTrendSignal } from '@/serv
 import { formatPct, signalStyle, SWAP_TREND_SIGNALS } from '@/components/swaps/swapTrendSignals'
 import { formatCurrency } from '@/utils/formatCurrency'
 import { persistedRef } from '@/utils/persistedRef'
+import { buildSteamImageUrl } from '@/utils/steamImage'
 
 const swaps = ref<any[]>([])
 const loading = ref(true)

@@ -2,12 +2,20 @@
 import { computed, onMounted, ref } from 'vue'
 import { Icon } from '@iconify/vue'
 import FilterField from '@/components/common/FilterField.vue'
+import SortableTh from '@/components/common/SortableTh.vue'
 import { toast } from 'vue3-toastify'
 import { adminService } from '@/services/admin/admin.service'
 import { formatCurrency } from '@/utils/formatCurrency'
 import { buildSteamImageUrl } from '@/utils/steamImage'
 import type { ItemSet } from '@/services/admin/admin.service'
 import { persistedRef } from '@/utils/persistedRef'
+import { nextSort, sortRows, type SortGetters, type SortState } from '@/utils/tableSort'
+
+// Preço salvo, não o digitado: editar o campo não pode tirar a linha de baixo do cursor.
+const SORTS: SortGetters<ItemSet> = {
+    available: set => set.available,
+    price: set => set.price,
+}
 
 const sets = ref<ItemSet[]>([])
 const loading = ref(false)
@@ -82,6 +90,12 @@ const filtered = computed(() => {
         ),
     )
 })
+
+const sort = ref<SortState>()
+const sorted = computed(() => sortRows(filtered.value, SORTS, sort.value))
+const toggleSort = (column: string) => {
+    sort.value = nextSort(sort.value, column)
+}
 
 const stats = computed(() => ({
     comEstoque: sets.value.filter((s) => s.available > 0).length,
@@ -410,13 +424,20 @@ onMounted(loadSets)
                             <th>Herói</th>
                             <th>Baú</th>
                             <th>Raridade</th>
-                            <th class="num-col">Estoque</th>
-                            <th class="price-col">Preço (centavos)</th>
+                            <SortableTh class="num-col" column="available" label="Estoque" :sort="sort" @toggle="toggleSort" />
+                            <SortableTh
+                                class="price-col"
+                                column="price"
+                                label="Preço (centavos)"
+                                :sort="sort"
+                                title="Ordena pelo preço salvo"
+                                @toggle="toggleSort"
+                            />
                         </tr>
                     </thead>
                     <tbody>
                         <tr
-                            v-for="set in filtered"
+                            v-for="set in sorted"
                             :key="set.defindex"
                             :class="{ 'row-dirty': isDirty(set) }"
                         >

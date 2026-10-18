@@ -3,15 +3,26 @@ import { computed, onMounted, ref } from 'vue'
 import dayjs from 'dayjs'
 import { Icon } from '@iconify/vue'
 import InfoTip from '@/components/common/InfoTip.vue'
+import SortableTh from '@/components/common/SortableTh.vue'
 import Sparkline from '@/components/common/Sparkline.vue'
 import { adminService } from '@/services/admin/admin.service'
 import type { SwapTrendItem, SwapTrendSignal, SwapTrendsResponse } from '@/services/admin/types'
 import { formatCurrency } from '@/utils/formatCurrency'
 import { buildSteamImageUrl } from '@/utils/steamImage'
 import { persistedRef } from '@/utils/persistedRef'
+import { nextSort, sortRows, type SortGetters, type SortState } from '@/utils/tableSort'
 import { formatPct, signalStyle, SWAP_TREND_SIGNALS } from './swapTrendSignals'
 
 const FILTERS: ('todos' | SwapTrendSignal)[] = ['todos', 'pico', 'alta', 'estavel', 'baixa', 'fundo', 'iliquido']
+
+const SORTS: SortGetters<SwapTrendItem> = {
+    relativePct: item => item.relativePct,
+    change7Pct: item => item.change7Pct,
+    priceNow: item => item.priceNow,
+    sold7d: item => item.sold7d,
+    frozenVsNowPct: item => item.frozenVsNowPct,
+    offered: item => item.offered,
+}
 
 const data = ref<SwapTrendsResponse | null>(null)
 const loading = ref(false)
@@ -19,6 +30,7 @@ const errorMessage = ref('')
 const signalFilter = persistedRef<'todos' | SwapTrendSignal>('swap-trends:signal', 'todos')
 const search = ref('')
 const brokenImages = ref(new Set<string>())
+const sort = ref<SortState>()
 
 const share = (part: number, total: number) => (total ? Math.round((part / total) * 100) : 0)
 
@@ -32,11 +44,17 @@ const countOf = (filter: 'todos' | SwapTrendSignal) => {
 const matchesSearch = (item: SwapTrendItem) =>
     !search.value || item.name.toLowerCase().includes(search.value.trim().toLowerCase())
 
-const visibleItems = computed(() =>
-    (data.value?.items ?? [])
+const visibleItems = computed(() => {
+    const filtered = (data.value?.items ?? [])
         .filter((item) => signalFilter.value === 'todos' || item.signal === signalFilter.value)
-        .filter(matchesSearch),
-)
+        .filter(matchesSearch)
+
+    return sortRows(filtered, SORTS, sort.value)
+})
+
+const toggleSort = (column: string) => {
+    sort.value = nextSort(sort.value, column)
+}
 
 // Números ao vivo entram no texto; o resto é a medição de 14/10/2026 (swap-trends.ts no backend).
 const considerations = computed(() => {
@@ -211,13 +229,29 @@ onMounted(load)
                         <tr>
                             <th>Item</th>
                             <th>Sinal</th>
-                            <th>Vs normal <InfoTip text="Desvio contra a mediana de 21 dias, já descontado o mercado. É o que decide o sinal." /></th>
-                            <th>7 dias</th>
-                            <th>Hoje / normal</th>
+                            <SortableTh column="relativePct" label="Vs normal" :sort="sort" @toggle="toggleSort">
+                                <InfoTip text="Desvio contra a mediana de 21 dias, já descontado o mercado. É o que decide o sinal." />
+                            </SortableTh>
+                            <SortableTh column="change7Pct" label="7 dias" :sort="sort" @toggle="toggleSort" />
+                            <SortableTh
+                                column="priceNow"
+                                label="Hoje / normal"
+                                :sort="sort"
+                                title="Ordena pelo preço de hoje"
+                                @toggle="toggleSort"
+                            />
                             <th>21 dias</th>
-                            <th>Vendas 7d</th>
-                            <th>Congelado <InfoTip text="Preço médio salvo nos snapshots dos usuários contra o preço de hoje. Positivo = a troca pagaria acima de hoje." align="right" /></th>
-                            <th>No trocador</th>
+                            <SortableTh column="sold7d" label="Vendas 7d" :sort="sort" @toggle="toggleSort" />
+                            <SortableTh column="frozenVsNowPct" label="Congelado" :sort="sort" @toggle="toggleSort">
+                                <InfoTip text="Preço médio salvo nos snapshots dos usuários contra o preço de hoje. Positivo = a troca pagaria acima de hoje." align="right" />
+                            </SortableTh>
+                            <SortableTh
+                                column="offered"
+                                label="No trocador"
+                                :sort="sort"
+                                title="Ordena pelas unidades oferecidas"
+                                @toggle="toggleSort"
+                            />
                         </tr>
                     </thead>
                     <tbody>

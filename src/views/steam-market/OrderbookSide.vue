@@ -1,10 +1,19 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import InfoTip from '@/components/common/InfoTip.vue'
+import SortableTh from '@/components/common/SortableTh.vue'
 import type { SteamOrderLevel } from '@/services/admin/types'
+import { nextSort, sortRows, type SortGetters, type SortState } from '@/utils/tableSort'
 import { formatMoney, withCumulative } from './marketMath'
 
 const COLLAPSED_LEVELS = 12
+
+type LevelRow = ReturnType<typeof withCumulative>[number]
+
+const SORTS: SortGetters<LevelRow> = {
+    priceCents: level => level.priceCents,
+    quantity: level => level.quantity,
+}
 
 const props = defineProps<{
     title: string
@@ -16,12 +25,17 @@ const props = defineProps<{
 }>()
 
 const expanded = ref(false)
+const sort = ref<SortState>()
 
+// Acumulado sai na ordem do livro; a ordenação só reorganiza as linhas depois.
 const rows = computed(() => {
-    const all = withCumulative(props.levels)
+    const all = sortRows(withCumulative(props.levels), SORTS, sort.value)
     return expanded.value ? all : all.slice(0, COLLAPSED_LEVELS)
 })
-const deepest = computed(() => rows.value[rows.value.length - 1]?.cumulative ?? 1)
+const deepest = computed(() => Math.max(1, ...rows.value.map(row => row.cumulative)))
+const toggleSort = (column: string) => {
+    sort.value = nextSort(sort.value, column)
+}
 const depthWidth = (cumulative: number) => `${Math.round((cumulative / deepest.value) * 100)}%`
 </script>
 
@@ -37,8 +51,8 @@ const depthWidth = (cumulative: number) => `${Math.round((cumulative / deepest.v
         <table v-else>
             <thead>
                 <tr>
-                    <th>Preço (com taxa)</th>
-                    <th class="num">Qtd</th>
+                    <SortableTh column="priceCents" label="Preço (com taxa)" :sort="sort" @toggle="toggleSort" />
+                    <SortableTh class="num" column="quantity" label="Qtd" :sort="sort" @toggle="toggleSort" />
                     <th class="num">Acumulado</th>
                 </tr>
             </thead>

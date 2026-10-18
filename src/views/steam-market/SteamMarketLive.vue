@@ -5,9 +5,11 @@ import dayjs from 'dayjs'
 import { Icon } from '@iconify/vue'
 import { toast } from 'vue3-toastify'
 import InfoTip from '@/components/common/InfoTip.vue'
+import SortableTh from '@/components/common/SortableTh.vue'
 import { adminService, type MarketPriceHistoryResponse } from '@/services/admin/admin.service'
-import type { SteamListingsPage, SteamMarketSource, SteamOrderbook } from '@/services/admin/types'
+import type { SteamListing, SteamListingsPage, SteamMarketSource, SteamOrderbook } from '@/services/admin/types'
 import { buildSteamImageUrl } from '@/utils/steamImage'
+import { nextSort, sortRows, type SortGetters, type SortState } from '@/utils/tableSort'
 import BuyOrderPanel from './BuyOrderPanel.vue'
 import MarketItemSearch from './MarketItemSearch.vue'
 import OrderbookSide from './OrderbookSide.vue'
@@ -190,6 +192,20 @@ const signClass = (value: number | null) => {
     if (value == null || value === 0) return ''
     return value > 0 ? 'up' : 'down'
 }
+
+const LISTING_SORTS: SortGetters<SteamListing> = {
+    totalCents: listing => listing.totalCents,
+    sellerReceivesCents: listing => listing.sellerReceivesCents,
+    steamFeeCents: listing => listing.steamFeeCents,
+    publisherFeeCents: listing => listing.publisherFeeCents,
+    vsReference: listing => vsReference(listing.totalCents, listings.value?.currency),
+}
+
+const listingSort = ref<SortState>()
+const sortedListings = computed(() => sortRows(listings.value?.listings ?? [], LISTING_SORTS, listingSort.value))
+const toggleListingSort = (column: string) => {
+    listingSort.value = nextSort(listingSort.value, column)
+}
 </script>
 
 <template>
@@ -346,17 +362,17 @@ const signClass = (value: number | null) => {
                         <thead>
                             <tr>
                                 <th class="num">#</th>
-                                <th class="num">Comprador paga</th>
-                                <th class="num">Vendedor recebe</th>
-                                <th class="num">Taxa Steam</th>
-                                <th class="num">Taxa Dota</th>
-                                <th class="num">vs referência</th>
+                                <SortableTh class="num" column="totalCents" label="Comprador paga" :sort="listingSort" @toggle="toggleListingSort" />
+                                <SortableTh class="num" column="sellerReceivesCents" label="Vendedor recebe" :sort="listingSort" @toggle="toggleListingSort" />
+                                <SortableTh class="num" column="steamFeeCents" label="Taxa Steam" :sort="listingSort" @toggle="toggleListingSort" />
+                                <SortableTh class="num" column="publisherFeeCents" label="Taxa Dota" :sort="listingSort" @toggle="toggleListingSort" />
+                                <SortableTh class="num" column="vsReference" label="vs referência" :sort="listingSort" @toggle="toggleListingSort" />
                                 <th>Listing ID</th>
                                 <th>Asset ID</th>
                             </tr>
                         </thead>
                         <tbody>
-                            <tr v-for="(listing, index) in listings.listings" :key="listing.listingId">
+                            <tr v-for="(listing, index) in sortedListings" :key="listing.listingId">
                                 <td class="num muted">{{ index + 1 }}</td>
                                 <td class="num strong">{{ formatMoney(listing.totalCents, listings.currency) }}</td>
                                 <td class="num">{{ formatMoney(listing.sellerReceivesCents, listings.currency) }}</td>

@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import dayjs from 'dayjs'
 import Chart from 'chart.js/auto'
 import { Icon } from '@iconify/vue'
+import SortableTh from '@/components/common/SortableTh.vue'
 import {
     adminService,
     type MarketPriceHistoryResponse,
@@ -11,6 +12,7 @@ import {
     type SkinUnitTracking,
 } from '@/services/admin/admin.service'
 import { formatCurrency } from '@/utils/formatCurrency'
+import { nextSort, sortRows, type SortGetters, type SortState } from '@/utils/tableSort'
 
 const route = useRoute()
 const router = useRouter()
@@ -35,6 +37,40 @@ const skin = computed(() => {
 const points = computed(() => result.value?.points ?? marketResult.value?.points ?? [])
 const recentFirst = computed(() => [...points.value].reverse())
 const units = computed(() => result.value?.units ?? [])
+
+type PricePoint = (typeof points.value)[number]
+
+const POINT_SORTS: SortGetters<PricePoint> = {
+    lowest_price: point => point.lowest_price,
+    median_price: point => point.median_price,
+    manual_price: point => point.manual_price,
+    price_avg: point => point.price_avg,
+    price_avg_24h: point => point.price_avg_24h,
+    price_avg_7d: point => point.price_avg_7d,
+    price_avg_30d: point => point.price_avg_30d,
+    price_avg_90d: point => point.price_avg_90d,
+}
+
+const UNIT_SORTS: SortGetters<SkinUnitTracking> = {
+    cost_price: unit => unit.cost_price,
+    entry_market_price: unit => unit.entry_market_price,
+    exit_market_price: unit => unit.exit_market_price,
+    market_variation_pct: unit => unit.market_variation_pct,
+    sale_price: unit => unit.sale_price,
+    margin_pct: unit => unit.margin_pct,
+    protected_floor: unit => unit.protected_floor,
+}
+
+const pointSort = ref<SortState>()
+const unitSort = ref<SortState>()
+const sortedPoints = computed(() => sortRows(recentFirst.value, POINT_SORTS, pointSort.value))
+const sortedUnits = computed(() => sortRows(units.value, UNIT_SORTS, unitSort.value))
+const togglePointSort = (column: string) => {
+    pointSort.value = nextSort(pointSort.value, column)
+}
+const toggleUnitSort = (column: string) => {
+    unitSort.value = nextSort(unitSort.value, column)
+}
 const hasManualPrice = computed(() => points.value.some(p => typeof p.manual_price === 'number'))
 
 // preço atual = último ponto registrado (catálogo, com fallback pro mediano)
@@ -76,6 +112,17 @@ const sales = computed<SteamSaleTuple[]>(() =>
     (skin.value?.latest_10_sales ?? []).filter(isSaleTuple),
 )
 const maxSaleQty = computed(() => Math.max(1, ...sales.value.map(s => s[2] ?? 0)))
+
+const SALE_SORTS: SortGetters<SteamSaleTuple> = {
+    price: sale => sale[1],
+    quantity: sale => sale[2],
+}
+
+const saleSort = ref<SortState>()
+const sortedSales = computed(() => sortRows(sales.value, SALE_SORTS, saleSort.value))
+const toggleSaleSort = (column: string) => {
+    saleSort.value = nextSort(saleSort.value, column)
+}
 // px fixo (não %) — largura em % dentro de inline-flex é ambígua entre navegadores
 const qtyBarWidth = (qty: number) => `${Math.max(3, Math.round((qty / maxSaleQty.value) * 48))}px`
 
@@ -211,18 +258,18 @@ onUnmounted(() => chartInstance?.destroy())
                         <thead>
                             <tr>
                                 <th>Data</th>
-                                <th>Menor Preço</th>
-                                <th>Preço Mediano</th>
-                                <th>Preço Catálogo</th>
-                                <th class="col-avg">Média</th>
-                                <th class="col-avg-24h">24h</th>
-                                <th class="col-avg-7d">7d</th>
-                                <th class="col-avg-30d">30d</th>
-                                <th class="col-avg-90d">90d</th>
+                                <SortableTh column="lowest_price" label="Menor Preço" :sort="pointSort" @toggle="togglePointSort" />
+                                <SortableTh column="median_price" label="Preço Mediano" :sort="pointSort" @toggle="togglePointSort" />
+                                <SortableTh column="manual_price" label="Preço Catálogo" :sort="pointSort" @toggle="togglePointSort" />
+                                <SortableTh class="col-avg" column="price_avg" label="Média" :sort="pointSort" @toggle="togglePointSort" />
+                                <SortableTh class="col-avg-24h" column="price_avg_24h" label="24h" :sort="pointSort" @toggle="togglePointSort" />
+                                <SortableTh class="col-avg-7d" column="price_avg_7d" label="7d" :sort="pointSort" @toggle="togglePointSort" />
+                                <SortableTh class="col-avg-30d" column="price_avg_30d" label="30d" :sort="pointSort" @toggle="togglePointSort" />
+                                <SortableTh class="col-avg-90d" column="price_avg_90d" label="90d" :sort="pointSort" @toggle="togglePointSort" />
                             </tr>
                         </thead>
                         <tbody>
-                            <tr v-for="p in recentFirst" :key="p.day">
+                            <tr v-for="p in sortedPoints" :key="p.day">
                                 <td>{{ $dayjs(p.day).format('DD/MM/YYYY') }}</td>
                                 <td class="price">{{ formatCurrency(p.lowest_price) }}</td>
                                 <td class="price">{{ formatCurrency(p.median_price) }}</td>
@@ -248,19 +295,25 @@ onUnmounted(() => chartInstance?.destroy())
                                 <th>Bot</th>
                                 <th>Entrada</th>
                                 <th>Saída</th>
-                                <th>Custo pago (entrada)</th>
+                                <SortableTh column="cost_price" label="Custo pago (entrada)" :sort="unitSort" @toggle="toggleUnitSort" />
                                 <th class="col-estimated">Custo estimado</th>
-                                <th>Mercado (entrada)</th>
-                                <th>Mercado (saída)</th>
-                                <th>Var. mercado</th>
-                                <th>Venda</th>
-                                <th>Margem</th>
-                                <th class="col-group-start">Piso protegido</th>
+                                <SortableTh column="entry_market_price" label="Mercado (entrada)" :sort="unitSort" @toggle="toggleUnitSort" />
+                                <SortableTh column="exit_market_price" label="Mercado (saída)" :sort="unitSort" @toggle="toggleUnitSort" />
+                                <SortableTh column="market_variation_pct" label="Var. mercado" :sort="unitSort" @toggle="toggleUnitSort" />
+                                <SortableTh column="sale_price" label="Venda" :sort="unitSort" @toggle="toggleUnitSort" />
+                                <SortableTh column="margin_pct" label="Margem" :sort="unitSort" @toggle="toggleUnitSort" />
+                                <SortableTh
+                                    class="col-group-start"
+                                    column="protected_floor"
+                                    label="Piso protegido"
+                                    :sort="unitSort"
+                                    @toggle="toggleUnitSort"
+                                />
                                 <th>Status</th>
                             </tr>
                         </thead>
                         <tbody>
-                            <tr v-for="u in units" :key="u.id">
+                            <tr v-for="u in sortedUnits" :key="u.id">
                                 <td>{{ u.bot_name || '—' }}</td>
                                 <td>{{ formatDateOrDash(u.entered_at) }}</td>
                                 <td>{{ u.exited_at ? formatDateOrDash(u.exited_at) : (u.is_sold ? 'Vendida' : 'Ativa') }}</td>
@@ -291,12 +344,12 @@ onUnmounted(() => chartInstance?.destroy())
                             <tr>
                                 <th class="col-index">#</th>
                                 <th>Data</th>
-                                <th>Preço</th>
-                                <th>Qtd. vendida</th>
+                                <SortableTh column="price" label="Preço" :sort="saleSort" @toggle="toggleSaleSort" />
+                                <SortableTh column="quantity" label="Qtd. vendida" :sort="saleSort" @toggle="toggleSaleSort" />
                             </tr>
                         </thead>
                         <tbody>
-                            <tr v-for="(sale, i) in sales" :key="i">
+                            <tr v-for="(sale, i) in sortedSales" :key="i">
                                 <td class="col-index">{{ i + 1 }}</td>
                                 <td>{{ formatSaleDate(sale[0]) }}</td>
                                 <td class="price">{{ formatSalePrice(sale[1]) }}</td>

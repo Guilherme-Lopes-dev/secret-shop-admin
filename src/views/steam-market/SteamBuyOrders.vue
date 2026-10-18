@@ -5,9 +5,11 @@ import { Icon } from '@iconify/vue'
 import { toast } from 'vue3-toastify'
 import ConfirmActionModal from '@/components/common/ConfirmActionModal.vue'
 import InfoTip from '@/components/common/InfoTip.vue'
+import SortableTh from '@/components/common/SortableTh.vue'
 import { adminService } from '@/services/admin/admin.service'
 import type { SteamOpenBuyOrder } from '@/services/admin/types'
 import { buildSteamImageUrl } from '@/utils/steamImage'
+import { nextSort, sortRows, type SortGetters, type SortState } from '@/utils/tableSort'
 import { formatMoney } from './marketMath'
 import { useSteamBotWallet } from './useSteamBotWallet'
 
@@ -55,6 +57,18 @@ const closeCancelModal = (open: boolean) => {
 
 const currency = computed(() => wallet.value?.currency ?? orders.value[0]?.currency ?? 'BRL')
 const committedCents = (order: SteamOpenBuyOrder) => order.priceCents * order.quantityRemaining
+
+const SORTS: SortGetters<SteamOpenBuyOrder> = {
+    priceCents: order => order.priceCents,
+    quantityRemaining: order => order.quantityRemaining,
+    committedCents,
+}
+
+const sort = ref<SortState>()
+const sortedOrders = computed(() => sortRows(orders.value, SORTS, sort.value))
+const toggleSort = (column: string) => {
+    sort.value = nextSort(sort.value, column)
+}
 const totalCommitted = computed(() => orders.value.reduce((sum, order) => sum + committedCents(order), 0))
 const pendingItems = computed(() => orders.value.reduce((sum, order) => sum + order.quantityRemaining, 0))
 const overBalance = computed(() => wallet.value != null && totalCommitted.value > wallet.value.balanceCents)
@@ -146,15 +160,15 @@ const confirmCancel = async () => {
                     <thead>
                         <tr>
                             <th>Item</th>
-                            <th class="num">Preço/un (com taxa)</th>
-                            <th class="num">Restante</th>
-                            <th class="num">Comprometido</th>
+                            <SortableTh class="num" column="priceCents" label="Preço/un (com taxa)" :sort="sort" @toggle="toggleSort" />
+                            <SortableTh class="num" column="quantityRemaining" label="Restante" :sort="sort" @toggle="toggleSort" />
+                            <SortableTh class="num" column="committedCents" label="Comprometido" :sort="sort" @toggle="toggleSort" />
                             <th>buy_orderid</th>
                             <th />
                         </tr>
                     </thead>
                     <tbody>
-                        <tr v-for="order in orders" :key="order.buyOrderId">
+                        <tr v-for="order in sortedOrders" :key="order.buyOrderId">
                             <td>
                                 <div class="item">
                                     <img v-if="itemImage(order)" :src="itemImage(order)!" alt="" />

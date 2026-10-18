@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import dayjs from 'dayjs'
 import { Icon } from '@iconify/vue'
 import InfoTip from '@/components/common/InfoTip.vue'
+import SortableTh from '@/components/common/SortableTh.vue'
 import Sparkline from '@/components/common/Sparkline.vue'
 import { adminService } from '@/services/admin/admin.service'
 import type {
@@ -15,6 +16,7 @@ import type {
 import { formatCurrency } from '@/utils/formatCurrency'
 import { buildSteamImageUrl } from '@/utils/steamImage'
 import { persistedRef } from '@/utils/persistedRef'
+import { nextSort, sortRows, type SortGetters, type SortState } from '@/utils/tableSort'
 
 type Period = 1 | 7 | 30
 type ItemListKey = 'gainers' | 'losers' | 'volumeSpikes' | 'mostTraded' | 'topSold' | 'mostWanted'
@@ -185,6 +187,8 @@ const errorMessage = ref('')
 const data = ref<MarketTrendsResponse | null>(null)
 const expanded = ref(new Set<string>())
 const brokenImages = ref(new Set<string>())
+/** Ordenação por tabela (chave da seção); sem entrada = ranking que veio do backend. */
+const sorts = ref<Record<string, SortState | undefined>>({})
 
 const itemLists = computed(() => ({ ...data.value?.steam, ...data.value?.site }))
 const periodHint = computed(() => PERIODS.find(option => option.value === period.value)?.hint ?? '')
@@ -252,6 +256,29 @@ const steamUrl = (item: MarketTrendItem) =>
     `https://steamcommunity.com/market/listings/${DOTA_APP_ID}/${encodeURIComponent(item.marketHashName)}`
 
 const zeroRate = (search: MarketTrendSearch) => (search.hits ? Math.round((search.zeroHits / search.hits) * 100) : 0)
+
+const ITEM_SORTS: SortGetters<MarketTrendItem> = {
+    priceNow: item => item.priceNow,
+    changePct: item => item.changePct,
+    sold24h: item => item.sold24h,
+    offerVolume: item => item.offerVolume,
+    siteVsSteam,
+    siteSold: item => item.siteSold,
+    stock: item => item.stock,
+}
+
+const SEARCH_SORTS: SortGetters<MarketTrendSearch> = {
+    hits: search => search.hits,
+    zeroHits: search => search.zeroHits,
+    zeroRate,
+}
+
+const toggleSort = (table: string, column: string) => {
+    sorts.value[table] = nextSort(sorts.value[table], column)
+}
+
+const sortedItems = (key: ItemListKey) => sortRows(itemsOf(key), ITEM_SORTS, sorts.value[key])
+const sortedSearches = (key: SearchListKey) => sortRows(searchesOf(key), SEARCH_SORTS, sorts.value[key])
 
 const showsImage = (item: MarketTrendItem) => Boolean(item.image) && !brokenImages.value.has(item.marketHashName)
 
@@ -512,17 +539,47 @@ onMounted(fetchTrends)
                                     <tr>
                                         <th class="rank-col">#</th>
                                         <th title="Clique na linha pra ver o histórico de preço">Item</th>
-                                        <th :title="TIPS.price">Preço Steam</th>
-                                        <th :title="TIPS.change">Variação</th>
-                                        <th :title="TIPS.volume">Vendas 24h / 7d</th>
-                                        <th :title="TIPS.supply">Mercado</th>
-                                        <th :title="TIPS.sitePrice">Na loja</th>
+                                        <SortableTh
+                                            column="priceNow"
+                                            label="Preço Steam"
+                                            :sort="sorts[section.key]"
+                                            :title="TIPS.price"
+                                            @toggle="toggleSort(section.key, $event)"
+                                        />
+                                        <SortableTh
+                                            column="changePct"
+                                            label="Variação"
+                                            :sort="sorts[section.key]"
+                                            :title="TIPS.change"
+                                            @toggle="toggleSort(section.key, $event)"
+                                        />
+                                        <SortableTh
+                                            column="sold24h"
+                                            label="Vendas 24h / 7d"
+                                            :sort="sorts[section.key]"
+                                            :title="`${TIPS.volume} Ordena pelas vendas 24h.`"
+                                            @toggle="toggleSort(section.key, $event)"
+                                        />
+                                        <SortableTh
+                                            column="offerVolume"
+                                            label="Mercado"
+                                            :sort="sorts[section.key]"
+                                            :title="`${TIPS.supply} Ordena pela quantidade à venda.`"
+                                            @toggle="toggleSort(section.key, $event)"
+                                        />
+                                        <SortableTh
+                                            column="siteVsSteam"
+                                            label="Na loja"
+                                            :sort="sorts[section.key]"
+                                            :title="`${TIPS.sitePrice} Ordena pela diferença vs Steam.`"
+                                            @toggle="toggleSort(section.key, $event)"
+                                        />
                                         <th class="link-col" />
                                     </tr>
                                 </thead>
                                 <tbody>
                                     <tr
-                                        v-for="(item, index) in visibleRows(section.key, itemsOf(section.key))"
+                                        v-for="(item, index) in visibleRows(section.key, sortedItems(section.key))"
                                         :key="item.marketHashName"
                                         class="clickable"
                                         title="Ver histórico de preço"
@@ -663,18 +720,54 @@ onMounted(fetchTrends)
                                     <tr>
                                         <th class="rank-col">#</th>
                                         <th title="Clique na linha pra ver o histórico de preço">Item</th>
-                                        <th :title="TIPS.siteSide">No site</th>
-                                        <th :title="TIPS.sitePrice">Na loja</th>
-                                        <th :title="TIPS.price">Preço Steam</th>
-                                        <th :title="TIPS.change">Variação Steam</th>
-                                        <th :title="TIPS.volume">Vendas Steam 24h / 7d</th>
-                                        <th :title="TIPS.stock">Estoque</th>
+                                        <SortableTh
+                                            column="siteSold"
+                                            label="No site"
+                                            :sort="sorts[section.key]"
+                                            :title="`${TIPS.siteSide} Ordena pelas vendas.`"
+                                            @toggle="toggleSort(section.key, $event)"
+                                        />
+                                        <SortableTh
+                                            column="siteVsSteam"
+                                            label="Na loja"
+                                            :sort="sorts[section.key]"
+                                            :title="`${TIPS.sitePrice} Ordena pela diferença vs Steam.`"
+                                            @toggle="toggleSort(section.key, $event)"
+                                        />
+                                        <SortableTh
+                                            column="priceNow"
+                                            label="Preço Steam"
+                                            :sort="sorts[section.key]"
+                                            :title="TIPS.price"
+                                            @toggle="toggleSort(section.key, $event)"
+                                        />
+                                        <SortableTh
+                                            column="changePct"
+                                            label="Variação Steam"
+                                            :sort="sorts[section.key]"
+                                            :title="TIPS.change"
+                                            @toggle="toggleSort(section.key, $event)"
+                                        />
+                                        <SortableTh
+                                            column="sold24h"
+                                            label="Vendas Steam 24h / 7d"
+                                            :sort="sorts[section.key]"
+                                            :title="`${TIPS.volume} Ordena pelas vendas 24h.`"
+                                            @toggle="toggleSort(section.key, $event)"
+                                        />
+                                        <SortableTh
+                                            column="stock"
+                                            label="Estoque"
+                                            :sort="sorts[section.key]"
+                                            :title="TIPS.stock"
+                                            @toggle="toggleSort(section.key, $event)"
+                                        />
                                         <th class="link-col" />
                                     </tr>
                                 </thead>
                                 <tbody>
                                     <tr
-                                        v-for="(item, index) in visibleRows(section.key, itemsOf(section.key))"
+                                        v-for="(item, index) in visibleRows(section.key, sortedItems(section.key))"
                                         :key="item.marketHashName"
                                         class="clickable"
                                         title="Ver histórico de preço"
@@ -797,14 +890,32 @@ onMounted(fetchTrends)
                                     <tr>
                                         <th class="rank-col">#</th>
                                         <th>Termo</th>
-                                        <th title="Visitantes distintos que buscaram o termo (cada um conta 1x por dia)">Buscas</th>
-                                        <th title="Quantos desses não encontraram nenhum item">Sem resultado</th>
-                                        <th :title="TIPS.zeroRate">% vazias</th>
+                                        <SortableTh
+                                            column="hits"
+                                            label="Buscas"
+                                            :sort="sorts[section.key]"
+                                            title="Visitantes distintos que buscaram o termo (cada um conta 1x por dia)"
+                                            @toggle="toggleSort(section.key, $event)"
+                                        />
+                                        <SortableTh
+                                            column="zeroHits"
+                                            label="Sem resultado"
+                                            :sort="sorts[section.key]"
+                                            title="Quantos desses não encontraram nenhum item"
+                                            @toggle="toggleSort(section.key, $event)"
+                                        />
+                                        <SortableTh
+                                            column="zeroRate"
+                                            label="% vazias"
+                                            :sort="sorts[section.key]"
+                                            :title="TIPS.zeroRate"
+                                            @toggle="toggleSort(section.key, $event)"
+                                        />
                                     </tr>
                                 </thead>
                                 <tbody>
                                     <tr
-                                        v-for="(search, index) in visibleRows(section.key, searchesOf(section.key))"
+                                        v-for="(search, index) in visibleRows(section.key, sortedSearches(section.key))"
                                         :key="search.term"
                                     >
                                         <td class="rank-col">{{ index + 1 }}</td>

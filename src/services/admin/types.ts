@@ -638,6 +638,8 @@ export interface SteamListingsPage {
   } | null
   listings: SteamListing[]
   source: SteamMarketSource
+  /** Quando o dado saiu da Steam (cache do backend: até 30s antes do pedido). */
+  fetchedAt: string
 }
 
 export interface SteamOrderLevel {
@@ -656,6 +658,8 @@ export interface SteamOrderbook {
   /** Do maior lance pro menor. */
   buy: SteamOrderLevel[]
   source: SteamMarketSource
+  /** Quando o dado saiu da Steam (cache do backend: até 30s antes do pedido). */
+  fetchedAt: string
 }
 
 export interface SteamBotWallet {

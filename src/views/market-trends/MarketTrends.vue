@@ -608,7 +608,6 @@ onMounted(fetchTrends)
                                         <td class="link-col">
                                             <div class="row-actions">
                                                 <button
-                                                    v-if="section.key === 'gainers'"
                                                     type="button"
                                                     class="buy-btn"
                                                     title="Abrir no Market ao vivo com a buy order preenchida"
@@ -742,17 +741,28 @@ onMounted(fetchTrends)
                                         </td>
                                         <td :class="item.stock ? 'fw' : 'red'">{{ item.stock || 'sem' }}</td>
                                         <td class="link-col">
-                                            <a
-                                                :href="steamUrl(item)"
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                class="steam-link"
-                                                title="Abrir no Steam Market"
-                                                :aria-label="`Abrir ${item.name} no Steam Market`"
-                                                @click.stop
-                                            >
-                                                <Icon icon="mdi:open-in-new" width="16" />
-                                            </a>
+                                            <div class="row-actions">
+                                                <button
+                                                    type="button"
+                                                    class="buy-btn"
+                                                    title="Abrir no Market ao vivo com a buy order preenchida"
+                                                    :aria-label="`Criar buy order de ${item.name}`"
+                                                    @click.stop="openBuyOrder(item)"
+                                                >
+                                                    <Icon icon="mdi:cart-arrow-down" width="15" /> Comprar
+                                                </button>
+                                                <a
+                                                    :href="steamUrl(item)"
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    class="steam-link"
+                                                    title="Abrir no Steam Market"
+                                                    :aria-label="`Abrir ${item.name} no Steam Market`"
+                                                    @click.stop
+                                                >
+                                                    <Icon icon="mdi:open-in-new" width="16" />
+                                                </a>
+                                            </div>
                                         </td>
                                     </tr>
                                 </tbody>

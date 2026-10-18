@@ -48,7 +48,6 @@ const listingsError = ref<string | null>(null)
 const orderbookError = ref<string | null>(null)
 const loading = ref(false)
 const loadingMore = ref(false)
-const fetchedAt = ref<string | null>(null)
 const showBuyOrder = ref(false)
 
 const errorMessage = (reason: unknown, fallback: string) =>
@@ -85,7 +84,6 @@ const load = async (name: string) => {
     history.value = valueOf(historyResult)
     listingsError.value = reasonOf(listingsResult, 'Erro ao buscar as listings.')
     orderbookError.value = reasonOf(orderbookResult, 'Erro ao buscar o livro de ofertas.')
-    fetchedAt.value = new Date().toISOString()
     loading.value = false
 }
 
@@ -143,6 +141,9 @@ const SOURCE_LABEL: Record<SteamMarketSource, string> = {
     anonymous: 'sem login (moeda pelo IP do servidor)',
 }
 const source = computed(() => orderbook.value?.source ?? listings.value?.source ?? null)
+// Hora em que o dado saiu da Steam: o backend guarda 30s, então "Atualizar" logo em
+// seguida mostra o mesmo horário (sem gastar o limite de consultas do servidor).
+const fetchedAt = computed(() => orderbook.value?.fetchedAt ?? listings.value?.fetchedAt ?? null)
 const foreignCurrencyReason = computed(() =>
     source.value === 'anonymous'
         ? 'A leitura pela conta do bot falhou (TradeBot fora do ar ou sem bot ativo), então a Steam respondeu pelo IP do servidor.'

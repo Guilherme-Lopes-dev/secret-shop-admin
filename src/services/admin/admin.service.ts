@@ -32,6 +32,12 @@ import type {
   SwapTrendsResponse,
   ProfileProgressDto,
   SkinSalesRow,
+  SteamBotWallet,
+  SteamBuyOrderInput,
+  SteamBuyOrderResult,
+  SteamListingsPage,
+  SteamOpenBuyOrders,
+  SteamOrderbook,
   TodayTasks,
   XpBoost,
   XpBoostResponse,
@@ -308,6 +314,14 @@ export interface StoreCreditStatement {
   }>
 }
 
+// Login do bot + confirmação mobile + checagem de execução passam fácil dos 10s padrão.
+const STEAM_BOT_TIMEOUT_MS = 90_000
+// Criar/cancelar passam pela fila do TradeBot; o backend espera até 120s. O admin precisa
+// esperar mais que ele, senão mostra erro enquanto a ordem ainda está sendo criada.
+const STEAM_BOT_WRITE_TIMEOUT_MS = 150_000
+// Leitura do Market: até 25s pelo bot + 8s do plano B anônimo no backend.
+const STEAM_MARKET_READ_TIMEOUT_MS = 45_000
+
 export const adminService = {
   async getSalesStats() {
     return api.get('/dashboard/stats')
@@ -408,7 +422,9 @@ export const adminService = {
       onlyStock: String(filters.onlyStock),
     })
     if (filters.day) params.append('day', filters.day)
-    return api.get<MarketTrendsResponse>(`/admin/market-trends?${params}`)
+    // 1ª abertura do dia recalcula a mediana de ~1 milhão de linhas (Mês ≈ 4s local, mais em
+    // produção); as seguintes vêm do cache de 10 min. Os 10s padrão cortavam no meio.
+    return api.get<MarketTrendsResponse>(`/admin/market-trends?${params}`, { timeout: 60_000 })
   },
 
   /** Sem nomes: os itens com mais peso no trocador. Nome repetido no query (pode ter vírgula). */
@@ -969,6 +985,43 @@ export const adminService = {
   async getMarketPriceHistory(marketHashName: string) {
     const params = new URLSearchParams({ name: marketHashName })
     return api.get<MarketPriceHistoryResponse>(`/skins/admin/market-price-history?${params}`)
+  },
+
+  // Steam Market ao vivo — consulta na hora, sem cache. Lê pela conta do bot (fila do TradeBot
+  // + login na 1ª vez, até 25s) e, se falhar, anônimo: os 10s padrão não cabem.
+  async getSteamListings(marketHashName: string, start = 0) {
+    const params = new URLSearchParams({ name: marketHashName, start: String(start) })
+    return api.get<SteamListingsPage>(`/admin/steam-market/listings?${params}`, { timeout: STEAM_MARKET_READ_TIMEOUT_MS })
+  },
+
+  async getSteamOrderbook(marketHashName: string) {
+    const params = new URLSearchParams({ name: marketHashName })
+    return api.get<SteamOrderbook>(`/admin/steam-market/orderbook?${params}`, { timeout: STEAM_MARKET_READ_TIMEOUT_MS })
+  },
+
+  // Passam pelo TradeBot (pode precisar logar o bot e esperar confirmação mobile): timeout maior.
+  async getSteamBotWallet(botId: string) {
+    const params = new URLSearchParams({ botId })
+    return api.get<SteamBotWallet>(`/admin/steam-market/wallet?${params}`, { timeout: STEAM_BOT_TIMEOUT_MS })
+  },
+
+  async getSteamBuyOrders(botId: string) {
+    const params = new URLSearchParams({ botId })
+    return api.get<SteamOpenBuyOrders>(`/admin/steam-market/buy-orders?${params}`, { timeout: STEAM_BOT_TIMEOUT_MS })
+  },
+
+  async createSteamBuyOrder(payload: SteamBuyOrderInput) {
+    return api.post<SteamBuyOrderResult>('/admin/steam-market/buy-orders', payload, { timeout: STEAM_BOT_WRITE_TIMEOUT_MS })
+  },
+
+  async cancelSteamBuyOrder(botId: string, buyOrderId: string) {
+    return api.post(`/admin/steam-market/buy-orders/${buyOrderId}/cancel`, { botId }, { timeout: STEAM_BOT_WRITE_TIMEOUT_MS })
+  },
+
+  // Autocomplete: só as linhas do catálogo, sem as facetas (que custam ~200ms por busca).
+  async searchPriceCatalog(search: string, limit: number) {
+    const params = new URLSearchParams({ search, limit: String(limit) })
+    return api.get<{ data: SkinPriceCatalogItem[] }>(`/skins/admin/price-catalog/search?${params}`)
   },
 
   // Pass config
@@ -2203,8 +2256,15 @@ export interface PricingConfigInput {
 }
 
 /** `stock`: 'in' = temos unidade viva no bot; 'out' = tudo que não temos. */
-export interface PriceCatalogFilters extends MarketExplorerFilters {
+/**
+ * price = listing mais barata (ruidoso); value = mediano (cai na listing sem mediano);
+ * store = preço que a loja cobra.
+ */
+export type PriceCatalogSort = 'price' | 'value' | 'store' | 'name' | 'rarity' | 'variation'
+
+export interface PriceCatalogFilters extends Omit<MarketExplorerFilters, 'sortBy'> {
   stock?: 'all' | 'in' | 'out'
+  sortBy?: PriceCatalogSort
 }
 
 export interface SkinPriceCatalogItem {

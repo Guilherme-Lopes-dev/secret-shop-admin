@@ -258,6 +258,10 @@ const showsImage = (item: MarketTrendItem) => Boolean(item.image) && !brokenImag
 const openHistory = (item: MarketTrendItem) =>
     router.push({ name: 'market-price-history', params: { name: item.marketHashName } })
 
+// Market ao vivo com o item buscado e o painel de buy order aberto (preço no topo do livro).
+const openBuyOrder = (item: MarketTrendItem) =>
+    router.push({ name: 'steam-market', query: { name: item.marketHashName, buy: '1' } })
+
 // O composer do Instagram lê esses parâmetros e já abre em modo story com o item e a frase.
 const createStory = (pick: MarketTrendStoryPick) =>
     router.push({
@@ -602,17 +606,29 @@ onMounted(fetchTrends)
                                             <span v-else class="muted">fora da loja</span>
                                         </td>
                                         <td class="link-col">
-                                            <a
-                                                :href="steamUrl(item)"
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                class="steam-link"
-                                                title="Abrir no Steam Market"
-                                                :aria-label="`Abrir ${item.name} no Steam Market`"
-                                                @click.stop
-                                            >
-                                                <Icon icon="mdi:open-in-new" width="16" />
-                                            </a>
+                                            <div class="row-actions">
+                                                <button
+                                                    v-if="section.key === 'gainers'"
+                                                    type="button"
+                                                    class="buy-btn"
+                                                    title="Abrir no Market ao vivo com a buy order preenchida"
+                                                    :aria-label="`Criar buy order de ${item.name}`"
+                                                    @click.stop="openBuyOrder(item)"
+                                                >
+                                                    <Icon icon="mdi:cart-arrow-down" width="15" /> Comprar
+                                                </button>
+                                                <a
+                                                    :href="steamUrl(item)"
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    class="steam-link"
+                                                    title="Abrir no Steam Market"
+                                                    :aria-label="`Abrir ${item.name} no Steam Market`"
+                                                    @click.stop
+                                                >
+                                                    <Icon icon="mdi:open-in-new" width="16" />
+                                                </a>
+                                            </div>
                                         </td>
                                     </tr>
                                 </tbody>
@@ -1023,6 +1039,30 @@ onMounted(fetchTrends)
 .link-col
     width 32px
     text-align center
+
+.row-actions
+    display flex
+    align-items center
+    justify-content flex-end
+    gap 0.35rem
+
+.buy-btn
+    display inline-flex
+    align-items center
+    gap 0.25rem
+    white-space nowrap
+    background rgba(99,102,241,0.15)
+    border 1px solid rgba(99,102,241,0.35)
+    color #c7d2fe
+    border-radius 6px
+    padding 0.25rem 0.55rem
+    font-size 0.75rem
+    font-weight 600
+    cursor pointer
+
+    &:hover, &:focus-visible
+        background rgba(99,102,241,0.3)
+        outline none
 
 .steam-link
     display inline-flex

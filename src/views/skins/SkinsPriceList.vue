@@ -1,7 +1,12 @@
 <script setup lang="ts">
 import { ref, nextTick, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { adminService, type SkinPriceCatalogItem, type MarketExplorerFacets } from '@/services/admin/admin.service'
+import {
+    adminService,
+    type MarketExplorerFacets,
+    type PriceCatalogSort,
+    type SkinPriceCatalogItem,
+} from '@/services/admin/admin.service'
 import { formatCurrency } from '@/utils/formatCurrency'
 import { toCents } from '@/utils/toCents'
 import { Icon } from '@iconify/vue'
@@ -53,7 +58,7 @@ const fetchCatalog = async (page: number, append = false) => {
             stock: stockFilter.value,
             priceMin: priceMin.value ? toCents(priceMin.value) : undefined,
             priceMax: priceMax.value ? toCents(priceMax.value) : undefined,
-            sortBy: sortBy === 'update' ? undefined : (sortBy as 'price' | 'name' | 'rarity' | 'variation'),
+            sortBy: sortBy === 'update' ? undefined : (sortBy as PriceCatalogSort),
             sortDir,
         })
         // resposta antiga (filtro mudou no meio) não pode sobrescrever a mais nova
@@ -142,8 +147,13 @@ const sortOptions = [
     { label: 'Última atualização', value: 'update:desc' },
     { label: 'Nome (A→Z)', value: 'name:asc' },
     { label: 'Nome (Z→A)', value: 'name:desc' },
-    { label: 'Menor preço', value: 'price:asc' },
-    { label: 'Maior preço', value: 'price:desc' },
+    // Valor = mediano (preço típico de venda): uma listing absurda não bagunça a ordem.
+    { label: 'Maior valor (mediano)', value: 'value:desc' },
+    { label: 'Menor valor (mediano)', value: 'value:asc' },
+    { label: 'Maior preço na loja', value: 'store:desc' },
+    { label: 'Menor preço na loja', value: 'store:asc' },
+    { label: 'Menor listing', value: 'price:asc' },
+    { label: 'Maior listing', value: 'price:desc' },
     { label: 'Maior variação', value: 'variation:desc' },
     { label: 'Menor variação', value: 'variation:asc' },
     { label: 'Raridade', value: 'rarity:asc' },

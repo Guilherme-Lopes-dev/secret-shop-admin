@@ -118,176 +118,181 @@
           <span class="status-badge" :class="statusClass(detail.status)">{{ statusLabel(detail.status) }}</span>
         </header>
 
-        <p v-if="phaseHint(detail.status)" class="phase-hint">{{ phaseHint(detail.status) }}</p>
+        <!-- Só o meio rola: cabeçalho e botões ficam sempre na tela, por maior que seja a troca. -->
+        <div class="modal-body">
+          <p v-if="phaseHint(detail.status)" class="phase-hint">{{ phaseHint(detail.status) }}</p>
 
-        <div class="trade-grid">
-          <section class="trade-side">
-            <h4>Usuário oferece <span>{{ formatCurrency(detail.user_items_value) }}</span></h4>
-            <ul class="item-list">
-              <li v-for="item in detail.user_items" :key="item.id">
-                <img v-if="item.icon_url" :src="item.icon_url" alt="" />
-                <div>
-                  <span class="item-name">{{ item.market_hash_name }}</span>
-                  <span class="item-price">{{ formatCurrency(item.price_at_time) }}</span>
-                  <span
-                    v-if="item.trend_signal"
-                    class="trend-line"
-                    title="Sinal de tendência e fator gravados quando a troca foi criada: é o que entrou no valor acima."
-                  >
-                    <span class="trend-when">na troca</span>
-                    <span class="trend-tag" :style="signalStyle(item.trend_signal)">
-                      {{ SWAP_TREND_SIGNALS[item.trend_signal as SwapTrendSignal]?.label ?? item.trend_signal }}
-                    </span>
-                    <span class="trend-when">× {{ Number(item.trend_factor).toLocaleString('pt-BR') }}</span>
-                  </span>
-                  <span v-if="trendOf(item)" class="trend-line">
-                    <span class="trend-when">hoje</span>
+          <div class="trade-grid">
+            <section class="trade-side">
+              <h4>Usuário oferece <span>{{ formatCurrency(detail.user_items_value) }}</span></h4>
+              <ul class="item-list">
+                <li v-for="item in detail.user_items" :key="item.id">
+                  <img v-if="item.icon_url" :src="item.icon_url" alt="" />
+                  <div>
+                    <span class="item-name">{{ item.market_hash_name }}</span>
+                    <span class="item-price">{{ formatCurrency(item.price_at_time) }}</span>
                     <span
-                      class="trend-tag"
-                      :style="signalStyle(trendOf(item)!.signal)"
-                      :title="SWAP_TREND_SIGNALS[trendOf(item)!.signal].advice"
+                      v-if="item.trend_signal"
+                      class="trend-line"
+                      title="Sinal de tendência e fator gravados quando a troca foi criada: é o que entrou no valor acima."
                     >
-                      {{ SWAP_TREND_SIGNALS[trendOf(item)!.signal].label }} {{ formatPct(trendOf(item)!.relativePct) }}
+                      <span class="trend-when">na troca</span>
+                      <span class="trend-tag" :style="signalStyle(item.trend_signal)">
+                        {{ SWAP_TREND_SIGNALS[item.trend_signal as SwapTrendSignal]?.label ?? item.trend_signal }}
+                      </span>
+                      <span class="trend-when">× {{ Number(item.trend_factor).toLocaleString('pt-BR') }}</span>
                     </span>
-                    <span v-if="frozenAbovePct(item) !== null" class="trend-warn" title="O preço da troca saiu do snapshot do usuário, que fica congelado até 7 dias.">
-                      preço {{ formatPct(frozenAbovePct(item)) }} acima de hoje
+                    <span v-if="trendOf(item)" class="trend-line">
+                      <span class="trend-when">hoje</span>
+                      <span
+                        class="trend-tag"
+                        :style="signalStyle(trendOf(item)!.signal)"
+                        :title="SWAP_TREND_SIGNALS[trendOf(item)!.signal].advice"
+                      >
+                        {{ SWAP_TREND_SIGNALS[trendOf(item)!.signal].label }} {{ formatPct(trendOf(item)!.relativePct) }}
+                      </span>
+                      <span v-if="frozenAbovePct(item) !== null" class="trend-warn" title="O preço da troca saiu do snapshot do usuário, que fica congelado até 7 dias.">
+                        preço {{ formatPct(frozenAbovePct(item)) }} acima de hoje
+                      </span>
                     </span>
-                  </span>
-                </div>
-              </li>
-            </ul>
-          </section>
+                  </div>
+                </li>
+              </ul>
+            </section>
 
-          <section class="trade-side">
-            <h4 v-if="isSale(detail)">Vira saldo <span>{{ formatCurrency(detail.user_items_value) }}</span></h4>
-            <p v-if="isSale(detail)" class="muted">Venda: o valor entra no saldo de vendas do usuário (não sacável) quando os itens forem conferidos.</p>
-            <h4 v-else>Loja envia <span>{{ formatCurrency(detail.store_items_value) }}</span></h4>
-            <ul class="item-list">
-              <li v-for="item in detail.store_items" :key="item.id">
-                <img v-if="item.bot_inventory?.skins?.icon_url_large" :src="buildSteamImageUrl(item.bot_inventory.skins.icon_url_large) ?? ''" alt="" />
-                <div>
-                  <span class="item-name">{{ item.bot_inventory?.skins?.name || item.bot_inventory?.asset_id }}</span>
-                  <span class="item-price">{{ formatCurrency(item.price_at_time) }}</span>
-                </div>
-              </li>
-            </ul>
-          </section>
-        </div>
+            <section class="trade-side">
+              <h4 v-if="isSale(detail)">Vira saldo <span>{{ formatCurrency(detail.user_items_value) }}</span></h4>
+              <p v-if="isSale(detail)" class="muted">Venda: o valor entra no saldo de vendas do usuário (não sacável) quando os itens forem conferidos.</p>
+              <h4 v-else>Loja envia <span>{{ formatCurrency(detail.store_items_value) }}</span></h4>
+              <ul class="item-list">
+                <li v-for="item in detail.store_items" :key="item.id">
+                  <img v-if="item.bot_inventory?.skins?.icon_url_large" :src="buildSteamImageUrl(item.bot_inventory.skins.icon_url_large) ?? ''" alt="" />
+                  <div>
+                    <span class="item-name">{{ item.bot_inventory?.skins?.name || item.bot_inventory?.asset_id }}</span>
+                    <span class="item-price">{{ formatCurrency(item.price_at_time) }}</span>
+                  </div>
+                </li>
+              </ul>
+            </section>
+          </div>
 
-        <div v-if="!isSale(detail)" class="value-summary">
-          <div class="vs-cell">
-            <span>Usuário oferece</span>
-            <strong class="value-give">{{ formatCurrency(detail.user_items_value) }}</strong>
-          </div>
-          <Icon icon="mdi:arrow-right" width="18" class="vs-arrow" />
-          <div class="vs-cell">
-            <span>Loja envia</span>
-            <strong class="value-get">{{ formatCurrency(detail.store_items_value) }}</strong>
-          </div>
-          <div class="vs-cell vs-diff">
-            <span>Diferença (loja − usuário)</span>
-            <strong>{{ formatCurrency(detail.store_items_value - detail.user_items_value) }}</strong>
-          </div>
-          <div v-if="surplusOf(detail) > 0" class="vs-cell vs-diff" title="Itens do usuário + PIX − itens da loja. Entra no saldo de vendas quando os itens da loja são enviados.">
-            <span>Vira saldo</span>
-            <strong class="value-give">{{ formatCurrency(surplusOf(detail)) }}</strong>
-          </div>
-        </div>
-
-        <div v-if="detail.offers && detail.offers.length > 0" class="offers-block">
-          <h4 class="offers-title">
-            Ofertas por bot
-            <span class="muted">{{ detail.offers.length }} oferta(s) — aceitação tudo-ou-nada</span>
-          </h4>
-          <div v-for="offer in detail.offers" :key="offer.id" class="offer-row">
-            <div class="offer-bot">
-              <Icon icon="mdi:robot-outline" width="16" />
-              {{ offer.steam_bots?.name || 'Bot' }}
+          <div v-if="!isSale(detail)" class="value-summary">
+            <div class="vs-cell">
+              <span>Usuário oferece</span>
+              <strong class="value-give">{{ formatCurrency(detail.user_items_value) }}</strong>
             </div>
-            <span class="muted">{{ offer.store_items?.length || 0 }} item(s) · {{ formatCurrency(offer.store_value) }}</span>
-            <span class="status-badge" :class="statusClass(mapOfferStatus(offer.status))">{{ offerStatusLabel(offer.status) }}</span>
-            <span v-if="offer.trade_offer_id" class="muted offer-tid">#{{ offer.trade_offer_id }}</span>
+            <Icon icon="mdi:arrow-right" width="18" class="vs-arrow" />
+            <div class="vs-cell">
+              <span>Loja envia</span>
+              <strong class="value-get">{{ formatCurrency(detail.store_items_value) }}</strong>
+            </div>
+            <div class="vs-cell vs-diff">
+              <span>Diferença (loja − usuário)</span>
+              <strong>{{ formatCurrency(detail.store_items_value - detail.user_items_value) }}</strong>
+            </div>
+            <div v-if="surplusOf(detail) > 0" class="vs-cell vs-diff" title="Itens do usuário + PIX − itens da loja. Entra no saldo de vendas quando os itens da loja são enviados.">
+              <span>Vira saldo</span>
+              <strong class="value-give">{{ formatCurrency(surplusOf(detail)) }}</strong>
+            </div>
           </div>
-        </div>
 
-        <div v-if="detail.compensation_amount > 0 || detail.value_flag" class="comp-block">
-          <div class="comp-block-head">
-            <h4>Compensação</h4>
-            <span v-if="detail.value_flag" class="flag-badge" :class="'flag-' + detail.value_flag">
-              {{ detail.value_flag === 'green' ? '🟢 Dentro da margem' : '🟡 Abaixo da margem' }}
-            </span>
+          <div v-if="detail.offers && detail.offers.length > 0" class="offers-block">
+            <h4 class="offers-title">
+              Ofertas por bot
+              <span class="muted">{{ detail.offers.length }} oferta(s) — aceitação tudo-ou-nada</span>
+            </h4>
+            <div v-for="offer in detail.offers" :key="offer.id" class="offer-row">
+              <div class="offer-bot">
+                <Icon icon="mdi:robot-outline" width="16" />
+                {{ offer.steam_bots?.name || 'Bot' }}
+              </div>
+              <span class="muted">{{ offer.store_items?.length || 0 }} item(s) · {{ formatCurrency(offer.store_value) }}</span>
+              <span class="status-badge" :class="statusClass(mapOfferStatus(offer.status))">{{ offerStatusLabel(offer.status) }}</span>
+              <span v-if="offer.trade_offer_id" class="muted offer-tid">#{{ offer.trade_offer_id }}</span>
+            </div>
           </div>
 
-          <div class="comp-grid">
-            <div><span>Valor</span> {{ formatCurrency(detail.compensation_amount) }}</div>
-            <div>
-              <span>Status</span>
-              <span class="status-badge" :class="compStatusClass(detail.compensation_status)">
-                {{ compStatusLabel(detail.compensation_status) }}
+          <div v-if="detail.compensation_amount > 0 || detail.value_flag" class="comp-block">
+            <div class="comp-block-head">
+              <h4>Compensação</h4>
+              <span v-if="detail.value_flag" class="flag-badge" :class="'flag-' + detail.value_flag">
+                {{ detail.value_flag === 'green' ? '🟢 Dentro da margem' : '🟡 Abaixo da margem' }}
               </span>
             </div>
-            <div v-if="detail.payment_provider"><span>Gateway</span> {{ detail.payment_provider }}</div>
-            <div v-if="detail.compensation_paid_at">
-              <span>Pago em</span> {{ $dayjs(detail.compensation_paid_at).format('DD/MM/YY HH:mm') }}
+
+            <div class="comp-grid">
+              <div><span>Valor</span> {{ formatCurrency(detail.compensation_amount) }}</div>
+              <div>
+                <span>Status</span>
+                <span class="status-badge" :class="compStatusClass(detail.compensation_status)">
+                  {{ compStatusLabel(detail.compensation_status) }}
+                </span>
+              </div>
+              <div v-if="detail.payment_provider"><span>Gateway</span> {{ detail.payment_provider }}</div>
+              <div v-if="detail.compensation_paid_at">
+                <span>Pago em</span> {{ $dayjs(detail.compensation_paid_at).format('DD/MM/YY HH:mm') }}
+              </div>
+            </div>
+
+            <div v-if="detail.compensation_qr_payload" class="qr-block">
+              <img
+                v-if="detail.compensation_qr_image"
+                :src="'data:image/png;base64,' + detail.compensation_qr_image"
+                alt="QR PIX"
+                class="qr-img"
+              />
+              <div class="qr-copy">
+                <span>Copia e cola</span>
+                <code>{{ detail.compensation_qr_payload }}</code>
+                <button class="btn-view" @click="copyPix(detail.compensation_qr_payload)">Copiar</button>
+              </div>
             </div>
           </div>
 
-          <div v-if="detail.compensation_qr_payload" class="qr-block">
-            <img
-              v-if="detail.compensation_qr_image"
-              :src="'data:image/png;base64,' + detail.compensation_qr_image"
-              alt="QR PIX"
-              class="qr-img"
-            />
-            <div class="qr-copy">
-              <span>Copia e cola</span>
-              <code>{{ detail.compensation_qr_payload }}</code>
-              <button class="btn-view" @click="copyPix(detail.compensation_qr_payload)">Copiar</button>
-            </div>
+          <div class="detail-meta">
+            <div><span>Mult. usuário</span> {{ detail.price_multiplier }}×</div>
+            <div><span>Mult. loja</span> {{ detail.store_price_multiplier ?? 1 }}×</div>
+            <div><span>Steam ID</span> {{ detail.users?.steam_id || '—' }}</div>
+            <div><span>Criada</span> {{ $dayjs(detail.created_at).format('DD/MM/YY HH:mm') }}</div>
+            <div v-if="detail.approved_at"><span>Aprovada</span> {{ $dayjs(detail.approved_at).format('DD/MM/YY HH:mm') }}</div>
+            <div v-if="detail.items_received_at"><span>Itens recebidos</span> {{ $dayjs(detail.items_received_at).format('DD/MM/YY HH:mm') }}</div>
+            <div v-if="detail.expires_at"><span>Reserva até</span> {{ $dayjs(detail.expires_at).format('DD/MM/YY HH:mm') }}</div>
+            <div v-if="detail.rejection_reason" class="reason"><span>Motivo</span> {{ detail.rejection_reason }}</div>
           </div>
         </div>
 
-        <div class="detail-meta">
-          <div><span>Mult. usuário</span> {{ detail.price_multiplier }}×</div>
-          <div><span>Mult. loja</span> {{ detail.store_price_multiplier ?? 1 }}×</div>
-          <div><span>Steam ID</span> {{ detail.users?.steam_id || '—' }}</div>
-          <div><span>Criada</span> {{ $dayjs(detail.created_at).format('DD/MM/YY HH:mm') }}</div>
-          <div v-if="detail.approved_at"><span>Aprovada</span> {{ $dayjs(detail.approved_at).format('DD/MM/YY HH:mm') }}</div>
-          <div v-if="detail.items_received_at"><span>Itens recebidos</span> {{ $dayjs(detail.items_received_at).format('DD/MM/YY HH:mm') }}</div>
-          <div v-if="detail.expires_at"><span>Reserva até</span> {{ $dayjs(detail.expires_at).format('DD/MM/YY HH:mm') }}</div>
-          <div v-if="detail.rejection_reason" class="reason"><span>Motivo</span> {{ detail.rejection_reason }}</div>
-        </div>
+        <footer class="modal-foot">
+          <p v-if="actionError" class="action-error">{{ actionError }}</p>
 
-        <p v-if="actionError" class="action-error">{{ actionError }}</p>
-
-        <div class="modal-actions">
-          <button class="btn-ghost" @click="detail = null">Fechar</button>
-          <button
-            v-if="detail.compensation_amount > 0 && detail.compensation_status !== 'paid'"
-            class="btn-ghost"
-            :disabled="acting"
-            @click="refreshCompensation"
-          >
-            {{ acting ? '...' : 'Reconciliar pagamento' }}
-          </button>
-          <button
-            v-if="detail.compensation_amount > 0 && detail.compensation_status !== 'paid'"
-            class="btn-ghost btn-dev"
-            :disabled="acting"
-            @click="simulatePaid"
-          >
-            DEV: Simular PIX pago
-          </button>
-          <button v-if="canReject(detail.status)" class="btn-danger" :disabled="acting" @click="reject">
-            Rejeitar
-          </button>
-          <button v-if="detail.status === 'pending_admin'" class="btn-primary" :disabled="acting" @click="approve">
-            {{ acting ? 'Processando...' : 'Aprovar (pedir itens)' }}
-          </button>
-          <button v-if="detail.status === 'items_received'" class="btn-primary" :disabled="acting" @click="deliver">
-            {{ acting ? 'Processando...' : isSale(detail) ? 'Creditar saldo' : 'Entregar itens da loja' }}
-          </button>
-        </div>
+          <div class="modal-actions">
+            <button class="btn-ghost" @click="detail = null">Fechar</button>
+            <button
+              v-if="detail.compensation_amount > 0 && detail.compensation_status !== 'paid'"
+              class="btn-ghost"
+              :disabled="acting"
+              @click="refreshCompensation"
+            >
+              {{ acting ? '...' : 'Reconciliar pagamento' }}
+            </button>
+            <button
+              v-if="detail.compensation_amount > 0 && detail.compensation_status !== 'paid'"
+              class="btn-ghost btn-dev"
+              :disabled="acting"
+              @click="simulatePaid"
+            >
+              DEV: Simular PIX pago
+            </button>
+            <button v-if="canReject(detail.status)" class="btn-danger" :disabled="acting" @click="reject">
+              Rejeitar
+            </button>
+            <button v-if="detail.status === 'pending_admin'" class="btn-primary" :disabled="acting" @click="approve">
+              {{ acting ? 'Processando...' : 'Aprovar (pedir itens)' }}
+            </button>
+            <button v-if="detail.status === 'items_received'" class="btn-primary" :disabled="acting" @click="deliver">
+              {{ acting ? 'Processando...' : isSale(detail) ? 'Creditar saldo' : 'Entregar itens da loja' }}
+            </button>
+          </div>
+        </footer>
       </div>
     </div>
   </div>
@@ -599,6 +604,7 @@ onMounted(() => {
 
 .qr-block
   display flex
+  flex-wrap wrap
   gap 1rem
   margin-top 1rem
   align-items flex-start
@@ -894,28 +900,54 @@ tbody tr:hover td
   display flex
   align-items center
   justify-content center
+  padding 1rem
 
+// Coluna com altura limitada à tela: cabeçalho e rodapé fixos, só o corpo rola.
+// Sem isso o overlay centralizava um modal mais alto que a tela e cortava topo e botões.
 .modal
   background #1e1e24
   border 1px solid rgba(255,255,255,0.1)
   border-radius 14px
-  padding 1.75rem
   width 420px
-  max-width 95vw
+  max-width 100%
+  max-height calc(100vh - 2rem)
+  max-height calc(100dvh - 2rem)
+  display flex
+  flex-direction column
+  overflow hidden
 
 .modal-lg
-  width 720px
+  width 760px
 
 .modal-head
   display flex
   align-items center
   justify-content space-between
-  margin-bottom 1.25rem
+  flex-wrap wrap
+  gap 0.5rem 1rem
+  flex-shrink 0
+  padding 1.25rem 1.5rem
+  border-bottom 1px solid rgba(255,255,255,0.06)
 
   h3
     margin 0
     font-size 1.15rem
     font-weight 700
+    min-width 0
+    overflow-wrap anywhere
+
+.modal-body
+  flex 1
+  min-height 0
+  overflow-y auto
+  overscroll-behavior contain
+  padding 1.25rem 1.5rem
+
+.modal-foot
+  flex-shrink 0
+  padding 0.9rem 1.5rem
+  border-top 1px solid rgba(255,255,255,0.06)
+  background #1e1e24
 
 .trade-grid
   display grid
@@ -923,6 +955,7 @@ tbody tr:hover td
   gap 1rem
 
 .trade-side
+  min-width 0
   background #16161a
   border 1px solid rgba(255,255,255,0.06)
   border-radius 10px
@@ -962,13 +995,18 @@ tbody tr:hover td
       border-radius 6px
       background rgba(255,255,255,0.04)
 
+    img
+      flex-shrink 0
+
     div
       display flex
       flex-direction column
+      min-width 0
 
 .item-name
   font-size 0.82rem
   font-weight 500
+  overflow-wrap anywhere
 
 .item-price
   font-size 0.75rem
@@ -1014,7 +1052,8 @@ tbody tr:hover td
 .offer-row
   display flex
   align-items center
-  gap 12px
+  flex-wrap wrap
+  gap 6px 12px
   padding 0.5rem 0.75rem
   background #16161a
   border 1px solid rgba(255,255,255,0.06)
@@ -1099,7 +1138,7 @@ tbody tr:hover td
   font-size 0.82rem
 
 .action-error
-  margin 1rem 0 0
+  margin 0 0 0.75rem
   padding 0.6rem 0.8rem
   background rgba(252,129,129,0.1)
   border 1px solid rgba(252,129,129,0.25)
@@ -1110,6 +1149,65 @@ tbody tr:hover td
 .modal-actions
   display flex
   justify-content flex-end
+  flex-wrap wrap
   gap 8px
-  margin-top 1.5rem
+
+// Celular: página com respiro menor e modal em tela cheia, uma coluna só.
+@media (max-width: 640px)
+  .view-wrap
+    padding 1rem
+
+  .page-header
+    flex-wrap wrap
+
+  .page-title
+    font-size 1.4rem
+
+  .modal-overlay
+    padding 0
+
+  .modal
+    width 100%
+    height 100vh
+    height 100dvh
+    max-height none
+    border-radius 0
+    border none
+
+  .modal-head, .modal-body
+    padding 1rem
+
+  .modal-foot
+    padding 0.75rem 1rem calc(0.75rem + env(safe-area-inset-bottom, 0px))
+
+  .trade-grid
+    grid-template-columns 1fr
+
+  // Uma coluna já rola no corpo do modal: lista com rolagem própria vira rolagem dentro de rolagem.
+  .item-list
+    max-height none
+
+  .value-summary
+    display grid
+    grid-template-columns 1fr 1fr
+    gap 0.75rem
+
+  .vs-arrow
+    display none
+
+  .vs-diff
+    margin-left 0
+    text-align left
+
+  .offer-bot
+    min-width 0
+
+  .offer-tid
+    margin-left 0
+
+  .qr-img
+    margin 0 auto
+
+  .modal-actions button
+    flex 1 1 auto
 </style>

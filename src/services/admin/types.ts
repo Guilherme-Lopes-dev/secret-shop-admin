@@ -604,3 +604,101 @@ export interface MarketTrendStoryPick {
   hook: string
   reasons: string[]
 }
+
+// Steam Market ao vivo. Centavos na moeda que a Steam devolveu (`currency`).
+
+/** bot = lido logado pelo TradeBot (moeda da carteira); anonymous = moeda do IP do servidor. */
+export type SteamMarketSource = 'bot' | 'anonymous'
+
+export interface SteamListing {
+  listingId: string
+  /** O que o comprador paga: vendedor recebe + taxas. */
+  totalCents: number
+  sellerReceivesCents: number
+  steamFeeCents: number
+  publisherFeeCents: number
+  assetId: string | null
+}
+
+export interface SteamListingsPage {
+  marketHashName: string
+  /** null quando não veio nenhuma listing. */
+  currency: string | null
+  totalCount: number
+  start: number
+  more: boolean
+  item: {
+    name: string | null
+    type: string | null
+    /** Hash da imagem na CDN da Steam. */
+    icon: string | null
+    /** Dias sem poder trocar depois de comprar no Market. */
+    tradableAfterDays: number
+    marketableAfterDays: number
+  } | null
+  listings: SteamListing[]
+  source: SteamMarketSource
+}
+
+export interface SteamOrderLevel {
+  priceCents: number
+  quantity: number
+}
+
+export interface SteamOrderbook {
+  currency: string
+  minSellCents: number
+  maxBuyCents: number
+  sellCount: number
+  buyCount: number
+  /** Do mais barato pro mais caro. */
+  sell: SteamOrderLevel[]
+  /** Do maior lance pro menor. */
+  buy: SteamOrderLevel[]
+  source: SteamMarketSource
+}
+
+export interface SteamBotWallet {
+  /** ISO (BRL, USD...) ou STEAM_<id> se a Steam mandar moeda desconhecida. */
+  currency: string
+  balanceCents: number
+}
+
+export interface SteamBuyOrderInput {
+  /** uuid do bot (chega como `id` na lista de bots). */
+  botId: string
+  marketHashName: string
+  /** Por unidade, já com taxa — mesmo valor do livro de buy orders. */
+  priceCents: number
+  quantity: number
+}
+
+export interface SteamBuyOrderResult {
+  buyOrderId: string
+  /**
+   * filled = executou tudo na hora; partial = comprou parte e o resto segue aberto;
+   * open = esperando vendedor; unknown = criada, mas a Steam não deixou conferir (ex.: 429).
+   */
+  status: 'filled' | 'partial' | 'open' | 'unknown'
+  purchases: { appid: number; contextid: string; assetid: string }[]
+  wallet: SteamBotWallet | null
+}
+
+export interface SteamOpenBuyOrder {
+  buyOrderId: string
+  appid: number
+  marketHashName: string | null
+  name: string | null
+  /** Hash da imagem na CDN da Steam. */
+  icon: string | null
+  currency: string
+  /** Por unidade, já com taxa. */
+  priceCents: number
+  quantity: number
+  quantityRemaining: number
+}
+
+export interface SteamOpenBuyOrders {
+  orders: SteamOpenBuyOrder[]
+  wallet: SteamBotWallet | null
+}

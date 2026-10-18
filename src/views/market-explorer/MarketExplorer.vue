@@ -246,11 +246,9 @@ const savingName = ref<string | null>(null)
 const livePrice = (item: MarketExplorerItem) => item.manualPrice ?? item.salePrice ?? item.priceLatest
 const isEditable = (item: MarketExplorerItem) => source.value === 'db' && !!item.skinUuid
 
-// "1.250,50" → 125050. `toCents` cru trata o ponto de milhar como decimal.
-const draftToCents = (draft: string) => toCents(draft.split('.').join(''))
 // Preview do que a vitrine vai mostrar enquanto digita.
 const draftPreview = computed(() => {
-  const cents = draftToCents(priceDraft.value)
+  const cents = toCents(priceDraft.value)
   return cents ? formatCurrency(cents) : null
 })
 
@@ -281,7 +279,7 @@ const applyLock = async (item: MarketExplorerItem, locked: boolean, manualPrice?
 }
 
 const commitPriceEdit = async (item: MarketExplorerItem) => {
-  const cents = draftToCents(priceDraft.value)
+  const cents = toCents(priceDraft.value)
   if (!cents) { toast.error('Preço inválido.'); return }
   await applyLock(item, true, cents)
   editingName.value = null

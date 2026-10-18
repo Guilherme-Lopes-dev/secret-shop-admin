@@ -106,6 +106,16 @@ const routes = [
         component: () => import('@/views/pricing/PricingConfig.vue'),
       },
       {
+        path: 'steam-market',
+        name: 'steam-market',
+        component: () => import('@/views/steam-market/SteamMarketLive.vue'),
+      },
+      {
+        path: 'steam-market/buy-orders',
+        name: 'steam-buy-orders',
+        component: () => import('@/views/steam-market/SteamBuyOrders.vue'),
+      },
+      {
         path: 'market-explorer',
         name: 'market-explorer',
         component: () => import('@/views/market-explorer/MarketExplorer.vue'),

@@ -87,7 +87,7 @@ const navGroups: NavGroup[] = [
             { label: 'Evolução de Preços', icon: 'mdi:chart-line', to: '/skins/prices', name: 'skins-prices' },
             { label: 'Tendências', icon: 'mdi:fire', to: '/market-trends', name: 'market-trends' },
             { label: 'Market ao vivo', icon: 'mdi:chart-timeline-variant', to: '/steam-market', name: 'steam-market' },
-            { label: 'Buy orders', icon: 'mdi:cart-arrow-down', to: '/steam-market/buy-orders', name: 'steam-buy-orders' },
+            { label: 'Minhas ordens', icon: 'mdi:cart-arrow-down', to: '/steam-market/buy-orders', name: 'steam-buy-orders' },
             { label: 'Config de Preços', icon: 'mdi:cash-edit', to: '/pricing-config', name: 'pricing-config' },
             { label: 'Market Explorer', icon: 'mdi:cloud-search-outline', to: '/market-explorer', name: 'market-explorer' },
         ],

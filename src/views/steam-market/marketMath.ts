@@ -21,6 +21,18 @@ export const formatPct = (pct: number | null) => {
     return `${pct > 0 ? '+' : ''}${pct.toFixed(1)}%`
 }
 
+// Taxas da Steam em cima do que o vendedor recebe: 5% Steam + 10% Dota, cada uma arredondada pra baixo, mínimo 1 centavo.
+const fee = (sellerCents: number, rate: number) => Math.max(1, Math.floor(sellerCents * rate))
+export const buyerPays = (sellerCents: number) => sellerCents + fee(sellerCents, 0.05) + fee(sellerCents, 0.1)
+
+/** Quanto o vendedor recebe de um preço com taxa (inverso do buyerPays, como a Steam faz). */
+export const sellerReceives = (totalCents: number) => {
+    let seller = Math.floor(totalCents / 1.15)
+    while (seller > 0 && buyerPays(seller) > totalCents) seller--
+    while (buyerPays(seller + 1) <= totalCents) seller++
+    return seller
+}
+
 const orLowest = (value: number | null, lowest: number) => (value ? value : lowest)
 const median3 = (a: number, b: number, c: number) => Math.max(Math.min(a, b), Math.min(Math.max(a, b), c))
 

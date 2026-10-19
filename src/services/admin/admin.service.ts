@@ -35,9 +35,11 @@ import type {
   SteamBotWallet,
   SteamBuyOrderInput,
   SteamBuyOrderResult,
-  SteamListingsPage,
+  SteamInventoryItem,
   SteamOpenBuyOrders,
   SteamOrderbook,
+  SteamSellInput,
+  SteamSellResult,
   TodayTasks,
   XpBoost,
   XpBoostResponse,
@@ -987,13 +989,8 @@ export const adminService = {
     return api.get<MarketPriceHistoryResponse>(`/skins/admin/market-price-history?${params}`)
   },
 
-  // Steam Market ao vivo — consulta na hora, sem cache. Lê pela conta do bot (fila do TradeBot
-  // + login na 1ª vez, até 25s) e, se falhar, anônimo: os 10s padrão não cabem.
-  async getSteamListings(marketHashName: string, start = 0) {
-    const params = new URLSearchParams({ name: marketHashName, start: String(start) })
-    return api.get<SteamListingsPage>(`/admin/steam-market/listings?${params}`, { timeout: STEAM_MARKET_READ_TIMEOUT_MS })
-  },
-
+  // Steam Market ao vivo — o backend guarda 30s. Lê pela conta do bot (login na 1ª vez,
+  // até 25s) e, se falhar, anônimo: os 10s padrão não cabem.
   async getSteamOrderbook(marketHashName: string) {
     const params = new URLSearchParams({ name: marketHashName })
     return api.get<SteamOrderbook>(`/admin/steam-market/orderbook?${params}`, { timeout: STEAM_MARKET_READ_TIMEOUT_MS })
@@ -1016,6 +1013,20 @@ export const adminService = {
 
   async cancelSteamBuyOrder(botId: string, buyOrderId: string) {
     return api.post(`/admin/steam-market/buy-orders/${buyOrderId}/cancel`, { botId }, { timeout: STEAM_BOT_WRITE_TIMEOUT_MS })
+  },
+
+  async getSteamInventory(botId: string, marketHashName: string) {
+    const params = new URLSearchParams({ botId, name: marketHashName })
+    return api.get<{ items: SteamInventoryItem[] }>(`/admin/steam-market/inventory?${params}`, { timeout: STEAM_BOT_TIMEOUT_MS })
+  },
+
+  // As vendas abertas vêm junto no getSteamBuyOrders.
+  async sellSteamItem(payload: SteamSellInput) {
+    return api.post<SteamSellResult>('/admin/steam-market/sell-listings', payload, { timeout: STEAM_BOT_WRITE_TIMEOUT_MS })
+  },
+
+  async cancelSteamSellListing(botId: string, listingId: string) {
+    return api.post(`/admin/steam-market/sell-listings/${listingId}/cancel`, { botId }, { timeout: STEAM_BOT_WRITE_TIMEOUT_MS })
   },
 
   // Autocomplete: só as linhas do catálogo, sem as facetas (que custam ~200ms por busca).

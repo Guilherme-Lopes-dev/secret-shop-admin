@@ -3,17 +3,18 @@ import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import dayjs from 'dayjs'
 import { Icon } from '@iconify/vue'
-import { toast } from 'vue3-toastify'
 import InfoTip from '@/components/common/InfoTip.vue'
-import SortableTh from '@/components/common/SortableTh.vue'
 import { adminService, type MarketPriceHistoryResponse } from '@/services/admin/admin.service'
-import type { SteamListing, SteamListingsPage, SteamMarketSource, SteamOrderbook } from '@/services/admin/types'
+import type { SteamMarketSource, SteamOrderbook } from '@/services/admin/types'
 import { buildSteamImageUrl } from '@/utils/steamImage'
-import { nextSort, sortRows, type SortGetters, type SortState } from '@/utils/tableSort'
 import BuyOrderPanel from './BuyOrderPanel.vue'
 import MarketItemSearch from './MarketItemSearch.vue'
 import OrderbookSide from './OrderbookSide.vue'
-import { consensusCents, formatMoney, formatPct, pctChange } from './marketMath'
+import SellPanel from './SellPanel.vue'
+import { consensusCents, formatMoney, formatPct, pctChange, sellerReceives } from './marketMath'
+
+// ponytail: fixo pro Dota (market_tradable_restriction da Steam); vinha das listings, que saíram pra poupar consulta.
+const TRADABLE_AFTER_DAYS = 7
 
 const TIPS = {
     page:
@@ -33,9 +34,6 @@ const TIPS = {
         'Embaixo: quanto a listing mais barata está acima (+) ou abaixo (−) dele.',
     sell: 'Listings agrupadas por preço, da mais barata pra mais cara. Acumulado = quantos itens você compraria até aquele preço.',
     buy: 'Buy orders agrupadas por preço, do maior lance pro menor. Acumulado = quantos itens dá pra vender até aquele preço.',
-    listings:
-        'Cada linha é um item à venda, que pode ser comprado individualmente pelo listing ID. ' +
-        'Taxa Steam = 5%, taxa Dota = 10%, cobradas em cima do que o vendedor recebe.',
 }
 
 const route = useRoute()
@@ -43,14 +41,12 @@ const router = useRouter()
 
 const marketHashName = computed(() => String(route.query.name ?? '').trim())
 
-const listings = ref<SteamListingsPage | null>(null)
 const orderbook = ref<SteamOrderbook | null>(null)
 const history = ref<MarketPriceHistoryResponse | null>(null)
-const listingsError = ref<string | null>(null)
 const orderbookError = ref<string | null>(null)
 const loading = ref(false)
-const loadingMore = ref(false)
 const showBuyOrder = ref(false)
+const showSell = ref(false)
 
 const errorMessage = (reason: unknown, fallback: string) =>
     (reason as { response?: { data?: { message?: string } } })?.response?.data?.message ?? fallback
@@ -64,51 +60,26 @@ const reasonOf = (result: PromiseSettledResult<unknown>, fallback: string) =>
 const reset = () => {
     loading.value = false
     showBuyOrder.value = false
-    listings.value = null
+    showSell.value = false
     orderbook.value = null
     history.value = null
-    listingsError.value = null
     orderbookError.value = null
 }
 
-// O histórico do banco dá 404 pra item que nunca foi sincronizado: só fica sem referência.
+// Só o livro vai à Steam (1 consulta por item). O histórico do banco dá 404 pra item
+// que nunca foi sincronizado: só fica sem referência.
 const load = async (name: string) => {
     loading.value = true
-    const [listingsResult, orderbookResult, historyResult] = await Promise.allSettled([
-        adminService.getSteamListings(name),
+    const [orderbookResult, historyResult] = await Promise.allSettled([
         adminService.getSteamOrderbook(name),
         adminService.getMarketPriceHistory(name),
     ])
     if (name !== marketHashName.value) return
 
-    listings.value = valueOf(listingsResult)
     orderbook.value = valueOf(orderbookResult)
     history.value = valueOf(historyResult)
-    listingsError.value = reasonOf(listingsResult, 'Erro ao buscar as listings.')
     orderbookError.value = reasonOf(orderbookResult, 'Erro ao buscar o livro de ofertas.')
     loading.value = false
-}
-
-const loadMore = async () => {
-    const page = listings.value
-    if (!page?.more || loadingMore.value) return
-
-    loadingMore.value = true
-    try {
-        const { data } = await adminService.getSteamListings(page.marketHashName, page.listings.length)
-        if (data.marketHashName !== marketHashName.value) return
-        // Cada página é uma leitura: se esta caiu no anônimo (USD) e a 1ª veio pelo bot (BRL),
-        // juntar formataria as linhas em BRL como dólar.
-        if (page.currency && data.currency && data.currency !== page.currency) {
-            toast.error(`A próxima página veio em ${data.currency}, não em ${page.currency}. Clique em Atualizar.`)
-            return
-        }
-        listings.value = { ...data, item: page.item ?? data.item, listings: [...page.listings, ...data.listings] }
-    } catch (error) {
-        toast.error(errorMessage(error, 'Erro ao carregar mais listings.'))
-    } finally {
-        loadingMore.value = false
-    }
 }
 
 const refresh = () => marketHashName.value && load(marketHashName.value)
@@ -126,15 +97,8 @@ watch(marketHashName, name => {
     if (name) load(name)
 }, { immediate: true })
 
-const currency = computed(() => orderbook.value?.currency ?? listings.value?.currency ?? null)
+const currency = computed(() => orderbook.value?.currency ?? null)
 const isForeignCurrency = computed(() => currency.value != null && currency.value !== 'BRL')
-// Listings e livro são leituras separadas: uma pode vir pelo bot (BRL) e a outra cair no
-// anônimo (USD). Aí margem (listing − livro) e comparação misturariam moedas.
-const currencyConflict = computed(() => {
-    const listingsCurrency = listings.value?.currency
-    const bookCurrency = orderbook.value?.currency
-    return Boolean(listingsCurrency && bookCurrency && listingsCurrency !== bookCurrency)
-})
 
 // Produção roda fora do Brasil: anônima, a Steam responde na moeda do IP (USD). Pela conta
 // do bot vem na moeda da carteira — o backend só cai no anônimo se o TradeBot falhar.
@@ -142,23 +106,18 @@ const SOURCE_LABEL: Record<SteamMarketSource, string> = {
     bot: 'pela conta do bot',
     anonymous: 'sem login (moeda pelo IP do servidor)',
 }
-const source = computed(() => orderbook.value?.source ?? listings.value?.source ?? null)
+const source = computed(() => orderbook.value?.source ?? null)
 // Hora em que o dado saiu da Steam: o backend guarda 30s, então "Atualizar" logo em
 // seguida mostra o mesmo horário (sem gastar o limite de consultas do servidor).
-const fetchedAt = computed(() => orderbook.value?.fetchedAt ?? listings.value?.fetchedAt ?? null)
+const fetchedAt = computed(() => orderbook.value?.fetchedAt ?? null)
 const foreignCurrencyReason = computed(() =>
     source.value === 'anonymous'
         ? 'A leitura pela conta do bot falhou (TradeBot fora do ar ou sem bot ativo), então a Steam respondeu pelo IP do servidor.'
         : 'A carteira do bot que fez a leitura não está em BRL.',
 )
-const notFound = computed(() =>
-    !loading.value && listings.value?.totalCount === 0 && !orderbook.value && !history.value,
-)
-
-const item = computed(() => listings.value?.item ?? null)
-const itemName = computed(() => item.value?.name ?? history.value?.item.name ?? marketHashName.value)
+const itemName = computed(() => history.value?.item.name ?? marketHashName.value)
 const itemImage = computed(() =>
-    buildSteamImageUrl(item.value?.icon ?? history.value?.item.icon_url_large ?? history.value?.item.image_url, '128fx128f'),
+    buildSteamImageUrl(history.value?.item.icon_url_large ?? history.value?.item.image_url, '128fx128f'),
 )
 const steamUrl = computed(() => `https://steamcommunity.com/market/listings/570/${encodeURIComponent(marketHashName.value)}`)
 const evolutionRoute = computed(() => {
@@ -167,15 +126,13 @@ const evolutionRoute = computed(() => {
     return { name: 'market-price-history', params: { name: marketHashName.value } }
 })
 
-const cheapest = computed(() => listings.value?.listings[0] ?? null)
-const minSell = computed(() => orderbook.value?.minSellCents ?? cheapest.value?.totalCents ?? null)
+const minSell = computed(() => orderbook.value?.minSellCents ?? null)
 const maxBuy = computed(() => orderbook.value?.maxBuyCents ?? null)
 const spread = computed(() => (minSell.value != null && maxBuy.value != null ? minSell.value - maxBuy.value : null))
 const spreadPct = computed(() => (spread.value != null && minSell.value ? (spread.value / minSell.value) * 100 : null))
+// Sem ninguém vendendo (minSell 0) não há revenda pra comparar.
 const margin = computed(() =>
-    cheapest.value && maxBuy.value != null && !currencyConflict.value
-        ? cheapest.value.sellerReceivesCents - maxBuy.value
-        : null,
+    minSell.value && maxBuy.value != null ? sellerReceives(minSell.value) - maxBuy.value : null,
 )
 const marginPct = computed(() => (margin.value != null && maxBuy.value ? (margin.value / maxBuy.value) * 100 : null))
 
@@ -192,20 +149,6 @@ const signClass = (value: number | null) => {
     if (value == null || value === 0) return ''
     return value > 0 ? 'up' : 'down'
 }
-
-const LISTING_SORTS: SortGetters<SteamListing> = {
-    totalCents: listing => listing.totalCents,
-    sellerReceivesCents: listing => listing.sellerReceivesCents,
-    steamFeeCents: listing => listing.steamFeeCents,
-    publisherFeeCents: listing => listing.publisherFeeCents,
-    vsReference: listing => vsReference(listing.totalCents, listings.value?.currency),
-}
-
-const listingSort = ref<SortState>()
-const sortedListings = computed(() => sortRows(listings.value?.listings ?? [], LISTING_SORTS, listingSort.value))
-const toggleListingSort = (column: string) => {
-    listingSort.value = nextSort(listingSort.value, column)
-}
 </script>
 
 <template>
@@ -213,14 +156,14 @@ const toggleListingSort = (column: string) => {
         <header class="page-header">
             <div>
                 <h1 class="page-title">Market ao vivo <InfoTip :text="TIPS.page" align="left" /></h1>
-                <p class="page-sub">Listings, livro de ofertas e taxas direto da Steam.</p>
+                <p class="page-sub">Livro de ofertas e taxas direto da Steam.</p>
             </div>
             <div class="header-actions">
                 <span v-if="fetchedAt && marketHashName" class="fetched">
                     Consultado às {{ dayjs(fetchedAt).format('HH:mm:ss') }}<template v-if="source"> · {{ SOURCE_LABEL[source] }}</template>
                 </span>
                 <router-link :to="{ name: 'steam-buy-orders' }" class="btn">
-                    <Icon icon="mdi:cart-arrow-down" /> Minhas buy orders
+                    <Icon icon="mdi:cart-arrow-down" /> Minhas ordens
                 </router-link>
                 <button class="btn" :disabled="!marketHashName || loading" @click="refresh">
                     <Icon icon="mdi:refresh" :class="{ spin: loading }" /> Atualizar
@@ -235,18 +178,9 @@ const toggleListingSort = (column: string) => {
             <p>Busque um item pra ver quem está vendendo, quem está comprando e por quanto.</p>
         </div>
 
-        <div v-else-if="loading && !listings && !orderbook" class="empty-state">Consultando a Steam...</div>
-
-        <div v-else-if="notFound" class="empty-state">
-            <p>Nada no Market pra <strong>{{ marketHashName }}</strong>.</p>
-            <p class="muted">O nome precisa ser o market_hash_name exato (maiúsculas e acentos contam).</p>
-        </div>
+        <div v-else-if="loading && !orderbook" class="empty-state">Consultando a Steam...</div>
 
         <template v-else>
-            <p v-if="currencyConflict" class="banner">
-                <Icon icon="mdi:alert-outline" /> As listings vieram em {{ listings?.currency }} e o livro em {{ orderbook?.currency }}:
-                uma das leituras pela conta do bot falhou. A margem ficou desligada — clique em Atualizar.
-            </p>
             <p v-if="isForeignCurrency" class="banner">
                 <Icon icon="mdi:alert-outline" /> A Steam respondeu em {{ currency }}, não em BRL. {{ foreignCurrencyReason }}
                 A comparação com o banco e a buy order ficam desligadas.
@@ -258,9 +192,8 @@ const toggleListingSort = (column: string) => {
                     <h2 class="item-title">{{ itemName }}</h2>
                     <p class="item-sub mono">{{ marketHashName }}</p>
                     <div class="badges">
-                        <span v-if="item?.type" class="badge">{{ item.type }}</span>
-                        <span v-if="item?.tradableAfterDays" class="badge badge-warn">
-                            <Icon icon="mdi:lock-clock" /> Comprou → {{ item.tradableAfterDays }} dias sem poder trocar
+                        <span class="badge badge-warn">
+                            <Icon icon="mdi:lock-clock" /> Comprou → {{ TRADABLE_AFTER_DAYS }} dias sem poder trocar
                         </span>
                         <a :href="steamUrl" target="_blank" rel="noopener" class="badge badge-link">
                             <Icon icon="mdi:steam" /> Ver na Steam
@@ -270,9 +203,14 @@ const toggleListingSort = (column: string) => {
                         </router-link>
                     </div>
                 </div>
-                <button class="btn btn-buy" :class="{ active: showBuyOrder }" @click="showBuyOrder = !showBuyOrder">
-                    <Icon icon="mdi:cart-arrow-down" /> {{ showBuyOrder ? 'Fechar buy order' : 'Criar buy order' }}
-                </button>
+                <div class="item-actions">
+                    <button class="btn btn-buy" :class="{ active: showBuyOrder }" @click="showBuyOrder = !showBuyOrder">
+                        <Icon icon="mdi:cart-arrow-down" /> {{ showBuyOrder ? 'Fechar buy order' : 'Criar buy order' }}
+                    </button>
+                    <button class="btn btn-sell" :class="{ active: showSell }" @click="showSell = !showSell">
+                        <Icon icon="mdi:tag-outline" /> {{ showSell ? 'Fechar venda' : 'Vender' }}
+                    </button>
+                </div>
             </section>
 
             <BuyOrderPanel
@@ -284,7 +222,18 @@ const toggleListingSort = (column: string) => {
                 :min-sell-cents="minSell"
                 :max-buy-cents="maxBuy"
                 :reference-cents="reference"
-                :tradable-after-days="item?.tradableAfterDays ?? 0"
+                :tradable-after-days="TRADABLE_AFTER_DAYS"
+            />
+
+            <SellPanel
+                v-if="showSell"
+                :key="marketHashName"
+                :market-hash-name="marketHashName"
+                :item-name="itemName"
+                :currency="currency"
+                :min-sell-cents="minSell"
+                :max-buy-cents="maxBuy"
+                :reference-cents="reference"
             />
 
             <section class="kpis">
@@ -345,52 +294,6 @@ const toggleListingSort = (column: string) => {
                     :count="orderbook.buyCount"
                     :currency="orderbook.currency"
                 />
-            </section>
-
-            <section class="section">
-                <h2 class="section-title">
-                    Listings
-                    <small v-if="listings">{{ listings.listings.length }} de {{ listings.totalCount }}</small>
-                    <InfoTip :text="TIPS.listings" align="left" />
-                </h2>
-
-                <p v-if="listingsError" class="panel-error">{{ listingsError }}</p>
-                <p v-else-if="!listings?.listings.length" class="muted">Ninguém vendendo agora.</p>
-
-                <div v-else class="table-wrap">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th class="num">#</th>
-                                <SortableTh class="num" column="totalCents" label="Comprador paga" :sort="listingSort" @toggle="toggleListingSort" />
-                                <SortableTh class="num" column="sellerReceivesCents" label="Vendedor recebe" :sort="listingSort" @toggle="toggleListingSort" />
-                                <SortableTh class="num" column="steamFeeCents" label="Taxa Steam" :sort="listingSort" @toggle="toggleListingSort" />
-                                <SortableTh class="num" column="publisherFeeCents" label="Taxa Dota" :sort="listingSort" @toggle="toggleListingSort" />
-                                <SortableTh class="num" column="vsReference" label="vs referência" :sort="listingSort" @toggle="toggleListingSort" />
-                                <th>Listing ID</th>
-                                <th>Asset ID</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr v-for="(listing, index) in sortedListings" :key="listing.listingId">
-                                <td class="num muted">{{ index + 1 }}</td>
-                                <td class="num strong">{{ formatMoney(listing.totalCents, listings.currency) }}</td>
-                                <td class="num">{{ formatMoney(listing.sellerReceivesCents, listings.currency) }}</td>
-                                <td class="num muted">{{ formatMoney(listing.steamFeeCents, listings.currency) }}</td>
-                                <td class="num muted">{{ formatMoney(listing.publisherFeeCents, listings.currency) }}</td>
-                                <td class="num" :class="signClass(vsReference(listing.totalCents, listings.currency))">
-                                    {{ formatPct(vsReference(listing.totalCents, listings.currency)) }}
-                                </td>
-                                <td class="mono muted">{{ listing.listingId }}</td>
-                                <td class="mono muted">{{ listing.assetId ?? '—' }}</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-
-                <button v-if="listings?.more" class="btn btn-more" :disabled="loadingMore" @click="loadMore">
-                    {{ loadingMore ? 'Carregando...' : 'Carregar mais 20' }}
-                </button>
             </section>
         </template>
     </div>
@@ -478,9 +381,6 @@ const toggleListingSort = (column: string) => {
     font-size 2.5rem
     color #475569
 
-.muted
-    color #64748b
-
 .banner
     display flex
     align-items center
@@ -514,8 +414,13 @@ const toggleListingSort = (column: string) => {
     min-width 0
     flex 1
 
-.btn-buy
+.item-actions
     align-self flex-start
+    display flex
+    flex-wrap wrap
+    gap 0.5rem
+
+.btn-buy
     background rgba(99,102,241,0.15)
     border-color rgba(99,102,241,0.4)
     color #c7d2fe
@@ -523,6 +428,15 @@ const toggleListingSort = (column: string) => {
 
     &.active, &:hover:not(:disabled)
         background rgba(99,102,241,0.28)
+
+.btn-sell
+    background rgba(74,222,128,0.12)
+    border-color rgba(74,222,128,0.4)
+    color #bbf7d0
+    white-space nowrap
+
+    &.active, &:hover:not(:disabled)
+        background rgba(74,222,128,0.24)
 
 .item-title
     font-size 1.3rem
@@ -626,60 +540,7 @@ const toggleListingSort = (column: string) => {
     gap 0.75rem
     margin-bottom 1rem
 
-.section
-    background #1a1a1e
-    border 1px solid rgba(255,255,255,0.05)
-    border-radius 12px
-    padding 1.25rem
-
-.section-title
-    font-size 0.95rem
-    font-weight 600
-    color #e2e8f0
-    margin-bottom 0.85rem
-    display flex
-    align-items center
-    gap 0.5rem
-
-    small
-        color #64748b
-        font-weight 500
-
-.table-wrap
-    overflow-x auto
-
-table
-    width 100%
-    border-collapse collapse
-    font-size 0.85rem
-
-th
-    text-align left
-    color #64748b
-    font-weight 500
-    font-size 0.72rem
-    padding 0.45rem 0.6rem
-    border-bottom 1px solid rgba(255,255,255,0.06)
-    white-space nowrap
-
-td
-    padding 0.45rem 0.6rem
-    color #cbd5e1
-    border-bottom 1px solid rgba(255,255,255,0.03)
-    white-space nowrap
-
-.num
-    text-align right
-    font-variant-numeric tabular-nums
-
-.strong
-    color #fff
-    font-weight 600
-
 .mono
     font-family monospace
     font-size 0.78rem
-
-.btn-more
-    margin-top 1rem
 </style>

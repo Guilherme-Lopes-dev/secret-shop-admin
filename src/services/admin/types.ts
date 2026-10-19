@@ -610,38 +610,6 @@ export interface MarketTrendStoryPick {
 /** bot = lido logado pelo TradeBot (moeda da carteira); anonymous = moeda do IP do servidor. */
 export type SteamMarketSource = 'bot' | 'anonymous'
 
-export interface SteamListing {
-  listingId: string
-  /** O que o comprador paga: vendedor recebe + taxas. */
-  totalCents: number
-  sellerReceivesCents: number
-  steamFeeCents: number
-  publisherFeeCents: number
-  assetId: string | null
-}
-
-export interface SteamListingsPage {
-  marketHashName: string
-  /** null quando não veio nenhuma listing. */
-  currency: string | null
-  totalCount: number
-  start: number
-  more: boolean
-  item: {
-    name: string | null
-    type: string | null
-    /** Hash da imagem na CDN da Steam. */
-    icon: string | null
-    /** Dias sem poder trocar depois de comprar no Market. */
-    tradableAfterDays: number
-    marketableAfterDays: number
-  } | null
-  listings: SteamListing[]
-  source: SteamMarketSource
-  /** Quando o dado saiu da Steam (cache do backend: até 30s antes do pedido). */
-  fetchedAt: string
-}
-
 export interface SteamOrderLevel {
   priceCents: number
   quantity: number
@@ -702,7 +670,57 @@ export interface SteamOpenBuyOrder {
   quantityRemaining: number
 }
 
+export interface SteamSellListing {
+  listingId: string
+  /** awaiting_confirmation = falta a confirmação mobile; on_hold = segurada pela Steam. */
+  status: 'active' | 'awaiting_confirmation' | 'on_hold'
+  assetId: string | null
+  marketHashName: string | null
+  name: string | null
+  /** Hash da imagem na CDN da Steam. */
+  icon: string | null
+  /** null = a Steam não mandou e a carteira do bot ainda não carregou. */
+  currency: string | null
+  /** O que o bot recebe se vender. */
+  receiveCents: number
+  /** O que o comprador paga (recebe + taxas). */
+  buyerPaysCents: number
+  createdAt: string | null
+}
+
+/** O mylistings da Steam traz buy orders e vendas juntas: uma consulta pras duas listas. */
 export interface SteamOpenBuyOrders {
   orders: SteamOpenBuyOrder[]
+  listings: SteamSellListing[]
   wallet: SteamBotWallet | null
+}
+
+/**
+ * on_sale = está no estoque do site; committed = reservado ou vendido no site, esperando
+ * entrega (o backend recusa a venda); null = o site não conhece o item.
+ */
+export type SteamSiteStatus = 'on_sale' | 'committed' | null
+
+export interface SteamInventoryItem {
+  assetId: string
+  name: string
+  icon: string | null
+  /** false = comprado no Market há menos de 7 dias. */
+  marketable: boolean
+  siteStatus: SteamSiteStatus
+}
+
+export interface SteamSellInput {
+  /** uuid do bot (chega como `id` na lista de bots). */
+  botId: string
+  assetId: string
+  /** O que o bot recebe, sem taxa. */
+  receiveCents: number
+}
+
+export interface SteamSellResult {
+  /** awaiting_confirmation = o checker do bot aprova em ~10s (sem identity secret, no celular). */
+  status: 'listed' | 'awaiting_confirmation'
+  /** A venda foi feita, mas o item do estoque do site não saiu da vitrine: o admin precisa agir. */
+  siteWarning: string | null
 }

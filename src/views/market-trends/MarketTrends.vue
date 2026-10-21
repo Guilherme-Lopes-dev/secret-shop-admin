@@ -317,7 +317,9 @@ const fetchTrends = async () => {
     } catch (requestError: any) {
         if (token !== requestToken) return
 
-        errorMessage.value = requestError?.response?.data?.message ?? 'Não foi possível carregar as tendências.'
+        errorMessage.value = requestError?.code === 'ECONNABORTED'
+            ? 'O servidor ainda está calculando este período. Tente de novo em 1 minuto.'
+            : requestError?.response?.data?.message ?? 'Não foi possível carregar as tendências.'
         data.value = null
     } finally {
         if (token === requestToken) loading.value = false

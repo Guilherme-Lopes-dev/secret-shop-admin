@@ -383,6 +383,11 @@ const routes = [
         component: () => import('@/views/feedbacks/FeedbacksList.vue'),
       },
       {
+        path: 'exit-surveys',
+        name: 'exit-surveys',
+        component: () => import('@/views/feedbacks/ExitSurveysList.vue'),
+      },
+      {
         path: 'media',
         name: 'media',
         component: () => import('@/views/media/MediaLibrary.vue'),

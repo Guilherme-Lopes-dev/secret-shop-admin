@@ -1787,6 +1787,16 @@ export const adminService = {
     return api.patch(`/admin/feedbacks/${uuid}/visibility`, { is_visible: isVisible })
   },
 
+  async getExitSurveys(params: { days: number; page: number; limit: number; reason?: string }) {
+    const query = new URLSearchParams({
+      days: String(params.days),
+      page: String(params.page),
+      limit: String(params.limit),
+    })
+    if (params.reason) query.append('reason', params.reason)
+    return api.get(`/admin/exit-surveys?${query}`)
+  },
+
   async getSwaps(status?: string) {
     const query = status ? `?status=${status}` : ''
     return api.get(`/swaps${query}`)

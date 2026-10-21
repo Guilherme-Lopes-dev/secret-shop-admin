@@ -134,6 +134,7 @@ const navGroups: NavGroup[] = [
             { label: 'Sorteios', icon: 'mdi:ticket-confirmation-outline', to: '/raffles', name: 'raffles' },
             { label: 'Novidades', icon: 'mdi:bullhorn-outline', to: '/news', name: 'news' },
             { label: 'Feedbacks', icon: 'mdi:comment-quote-outline', to: '/feedbacks', name: 'feedbacks' },
+            { label: 'Pesquisa de saída', icon: 'mdi:exit-run', to: '/exit-surveys', name: 'exit-surveys' },
             { label: 'Brindes', icon: 'mdi:gift-outline', to: '/rewards', name: 'rewards' },
             { label: 'Discord', icon: 'mdi:discord', to: '/discord', name: 'discord' },
         ],

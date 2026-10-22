@@ -403,6 +403,11 @@ const routes = [
         component: () => import('@/views/physical-products/PhysicalProductsList.vue'),
       },
       {
+        path: 'kits',
+        name: 'kits',
+        component: () => import('@/views/kits/KitsBuilder.vue'),
+      },
+      {
         path: 'physical-orders',
         name: 'physical-orders',
         component: () => import('@/views/physical-orders/PhysicalOrdersList.vue'),

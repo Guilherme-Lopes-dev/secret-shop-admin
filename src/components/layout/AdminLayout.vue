@@ -77,6 +77,7 @@ const navGroups: NavGroup[] = [
             { label: 'Catálogo Collectors', icon: 'mdi:trophy-variant-outline', to: '/collectors/catalog', name: 'collectors-catalog' },
             { label: 'Preços por Set', icon: 'mdi:treasure-chest', to: '/collectors/sets', name: 'collectors-sets' },
             { label: 'Produtos Físicos', icon: 'mdi:trophy-award', to: '/physical-products', name: 'physical-products' },
+            { label: 'Kits', icon: 'mdi:package-variant-plus', to: '/kits', name: 'kits' },
         ],
     },
     {

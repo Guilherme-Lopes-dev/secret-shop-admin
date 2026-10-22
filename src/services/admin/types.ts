@@ -724,3 +724,48 @@ export interface SteamSellResult {
   /** A venda foi feita, mas o item do estoque do site não saiu da vitrine: o admin precisa agir. */
   siteWarning: string | null
 }
+
+/** Skin da vitrine (GET /skins) — mesma busca e filtros que o cliente usa. `id` = uuid da skin. */
+export interface StoreSkin {
+  id: string
+  name: string
+  market_hash_name: string
+  hero: string | null
+  rarity: string | null
+  icon_url_large: string | null
+  effective_price: number
+  quantity: number
+}
+
+export interface KitItem {
+  /** uuid da skin */
+  id: string
+  name: string
+  market_hash_name: string
+  hero: string | null
+  rarity: string | null
+  icon_url_large: string | null
+  /** Preço avulso ao vivo: unidade mais barata vendável. */
+  price: number
+  is_available: boolean
+}
+
+export interface Kit {
+  id: string
+  name: string
+  is_active: boolean
+  /** Preço configurado do combo. */
+  price: number
+  /** O que o cliente paga: min(price, items_total). */
+  sale_price: number
+  items_total: number
+  is_available: boolean
+  items: KitItem[]
+}
+
+export interface KitPayload {
+  name: string
+  price: number
+  is_active: boolean
+  skin_uuids: string[]
+}

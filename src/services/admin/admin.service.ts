@@ -43,6 +43,9 @@ import type {
   TodayTasks,
   XpBoost,
   XpBoostResponse,
+  StoreSkin,
+  Kit,
+  KitPayload,
 } from './types'
 
 export type CrmCampaign =
@@ -1285,6 +1288,27 @@ export const adminService = {
 
   async deletePhysicalProduct(uuid: string) {
     return api.delete(`/physical-products/admin/${uuid}`)
+  },
+
+  // Kits — busca usa o mesmo /skins da vitrine, com os mesmos filtros
+  async searchStoreSkins(params: Record<string, string | number>) {
+    return api.get<{ data: StoreSkin[]; meta: { total: number } }>('/skins', { params })
+  },
+
+  async listKits() {
+    return api.get<Kit[]>('/kits/admin')
+  },
+
+  async createKit(dto: KitPayload) {
+    return api.post<{ id: string }>('/kits/admin', dto)
+  },
+
+  async updateKit(uuid: string, dto: Partial<KitPayload>) {
+    return api.patch<{ id: string }>(`/kits/admin/${uuid}`, dto)
+  },
+
+  async deleteKit(uuid: string) {
+    return api.delete(`/kits/admin/${uuid}`)
   },
 
   // Pedidos de Produto Físico

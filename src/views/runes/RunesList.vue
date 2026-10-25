@@ -15,6 +15,8 @@
       </div>
     </header>
 
+    <RuneStoryPanel />
+
     <div v-if="routines.length" class="section section--routines">
       <h2 class="section-heading">
         <Icon icon="mdi:calendar-sync" width="16" /> Rotinas
@@ -186,6 +188,7 @@ import { Icon } from '@iconify/vue'
 import dayjs from 'dayjs'
 import { adminService } from '@/services/admin/admin.service'
 import { isPerUserType, runeInfo, runePageLabel, runeTypeLabel, weekdaysLabel } from '@/utils/runes'
+import RuneStoryPanel from './RuneStoryPanel.vue'
 
 const router = useRouter()
 const runes = ref<any[]>([])

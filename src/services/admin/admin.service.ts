@@ -1545,6 +1545,22 @@ export const adminService = {
     return api.delete(`/rune-routines/${uuid}`)
   },
 
+  /** Story automático das runas: config (fundo, posição, ligado) + stories montados hoje. */
+  async getRuneStory() {
+    return api.get<RuneStory>('/rune-story')
+  },
+
+  /** Salvar refaz os stories de hoje que ainda não saíram. */
+  async updateRuneStory(data: { layout?: FinishLayout; is_active?: boolean }) {
+    return api.put<RuneStory>('/rune-story', data)
+  },
+
+  async uploadRuneStoryBackground(file: File) {
+    const formData = new FormData()
+    formData.append('file', file)
+    return api.put<RuneStory>('/rune-story/background', formData)
+  },
+
   // ── Instagram ───────────────────────────────────────────────────────────────
 
   async getInstagramAccount() {
@@ -1957,6 +1973,22 @@ export interface RewardClaimFilters {
 export type GiftSource = 'reward' | 'rune'
 
 /** Vira a ORDEM DE STORY do prompt mestre no backend. */
+export type RuneStoryItem = {
+  id: string
+  image_url: string
+  status: 'DRAFT' | 'PUBLISHING' | 'PUBLISHED' | 'FAILED'
+  error: string | null
+  published_at: string | null
+  rune: { id: string; name: string | null; type: string; spawn_time: string; visible_minutes: number } | null
+}
+
+export type RuneStory = {
+  image_url: string | null
+  layout: FinishLayout | null
+  is_active: boolean
+  stories: RuneStoryItem[]
+}
+
 export type InstagramPostOrder = {
   kind: 'FEED' | 'STORY'
   skin_uuid?: string

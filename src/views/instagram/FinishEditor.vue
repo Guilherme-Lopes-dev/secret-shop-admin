@@ -40,7 +40,7 @@
           </label>
 
           <p class="hint">Setas do teclado movem o elemento selecionado (Shift = passo maior).</p>
-          <p v-if="price == null" class="hint">Sem preço: marca um valor no painel pra ele aparecer.</p>
+          <p v-if="price == null && !logoSrc" class="hint">Sem preço: marca um valor no painel pra ele aparecer.</p>
           <p v-if="!note" class="hint">Sem frase: escreve no painel pra ela aparecer.</p>
 
           <span class="panel__spacer" />
@@ -84,10 +84,13 @@ const props = defineProps<{
   /** Padrão salvo do formato (ou o de fábrica); "Voltar ao padrão" usa ele. */
   defaultLayout: FinishLayout
   applying: boolean
+  /** Imagem no lugar do logo da loja (story de runa usa a arte do tipo). */
+  logoSrc?: string
+  logoLabel?: string
 }>()
 const emit = defineEmits<{ close: []; apply: [layout: FinishLayout]; saveDefault: [layout: FinishLayout] }>()
 
-const LABEL: Record<ElementKey, string> = { logo: 'Logo', note: 'Frase', price: 'Preço' }
+const LABEL: Record<ElementKey, string> = { logo: props.logoLabel ?? 'Logo', note: 'Frase', price: 'Preço' }
 const NUDGE = 0.002
 const NUDGE_BIG = 0.01
 
@@ -229,7 +232,7 @@ const loadImage = (image: HTMLImageElement, src: string) =>
 
 // Canvas no tamanho real da arte: posições em fração batem com o que o backend renderiza.
 const setup = async () => {
-  await Promise.all([loadFont(), loadImage(base, props.baseUrl), loadImage(logo, logoUrl)])
+  await Promise.all([loadFont(), loadImage(base, props.baseUrl), loadImage(logo, props.logoSrc ?? logoUrl)])
   canvas.value!.width = base.naturalWidth
   canvas.value!.height = base.naturalHeight
   ready.value = true

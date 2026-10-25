@@ -166,7 +166,7 @@
 
         <article v-for="p in visiblePosts" :key="p.id" class="post-card">
           <div class="post-card__image" :class="p.kind === 'STORY' ? 'ratio-story' : 'ratio-feed'">
-            <label v-if="canPublish(p)" class="post-card__select" :class="{ 'post-card__select--on': p.id in selected }">
+            <label v-if="canSelect(p)" class="post-card__select" :class="{ 'post-card__select--on': p.id in selected }">
               <input type="checkbox" :checked="p.id in selected" @change="toggleSelect(p)" />
               Selecionar
             </label>
@@ -655,7 +655,9 @@ const matchesFilter = (p: any) =>
   matchesSkin(p)
 
 const visiblePosts = computed(() => posts.value.filter(matchesFilter))
-const selectablePosts = computed(() => visiblePosts.value.filter(canPublish))
+// Story de runa já sai montado (fundo + runa + horário): acabamento por cima duplicaria logo e frase.
+const canSelect = (p: any) => canPublish(p) && !p.rune_date
+const selectablePosts = computed(() => visiblePosts.value.filter(canSelect))
 
 // Mantém o preço já digitado de quem já estava marcado.
 const selectVisible = () => {

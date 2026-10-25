@@ -107,7 +107,7 @@ const noteInput = ref<HTMLInputElement | null>(null)
 
 const canActivate = computed(() => !!story.value?.image_url && !!story.value?.layout)
 const fillNote = (template: string) =>
-  (story.value?.note_variables ?? []).reduce((text, variable) => text.replaceAll(variable.marker, variable.sample), template)
+  (story.value?.note_variables ?? []).reduce((text, variable) => text.split(variable.marker).join(variable.sample), template)
 
 const sampleNote = computed(() => fillNote(noteDraft.value.trim() || story.value?.note || ''))
 const noteChanged = computed(() => !!noteDraft.value.trim() && noteDraft.value.trim() !== story.value?.note)

@@ -129,20 +129,40 @@ const blockInk = (ctx: CanvasRenderingContext2D, lines: string[], size: number) 
   }
 }
 
-const noteLines = (note: string) => note.toUpperCase().split(/\r?\n/)
+// Quebra antes da borda direita da arte, deixando o mesmo respiro do padding da etiqueta (= noteWrapWidth do backend).
+const noteWrapWidth = (layout: FinishLayout, width: number, size: number, padX: number) =>
+  Math.max(size * 3, Math.floor(width * (1 - layout.note.x)) - padX * 3)
+
+// Quebra por palavra como o Pango (wrap 'word'): palavra que não cabe sozinha fica inteira na linha.
+const wrapParagraph = (ctx: CanvasRenderingContext2D, paragraph: string, maxWidth: number) =>
+  paragraph.split(' ').reduce<string[]>((lines, word) => {
+    const current = lines[lines.length - 1]
+    if (current === undefined) return [word]
+    const candidate = `${current} ${word}`
+    if (ctx.measureText(candidate).width <= maxWidth) return [...lines.slice(0, -1), candidate]
+    return [...lines, word]
+  }, [])
+
+const noteLines = (ctx: CanvasRenderingContext2D, note: string, maxWidth: number) =>
+  note
+    .toUpperCase()
+    .split(/\r?\n/)
+    .flatMap((paragraph) => wrapParagraph(ctx, paragraph, maxWidth))
 
 const noteRect = (ctx: CanvasRenderingContext2D, layout: FinishLayout, note: string, width: number, height: number) => {
   const size = Math.round(layout.note.size * width)
   withFont(ctx, size, size * NOTE_SPACING)
-  const ink = blockInk(ctx, noteLines(note), size)
   const padX = Math.round(size * NOTE_PAD_X)
   const padY = Math.round(size * NOTE_PAD_Y)
+  const lines = noteLines(ctx, note, noteWrapWidth(layout, width, size, padX))
+  const ink = blockInk(ctx, lines, size)
   return {
     left: Math.round(layout.note.x * width),
     top: Math.round(layout.note.y * height),
     width: ink.width + padX * 2,
     height: ink.height + padY * 2,
     ink,
+    lines,
     padX,
     padY,
     size,
@@ -186,9 +206,9 @@ const drawPrice = (ctx: CanvasRenderingContext2D, layout: FinishLayout, price: n
 }
 
 // Uma linha = pílula; várias = canto de raio da fonte (pílula alta cortaria o texto no canto).
-const noteRadius = (note: string, tagHeight: number, size: number) => {
+const noteRadius = (lineCount: number, tagHeight: number, size: number) => {
   const pill = (tagHeight - 2) / 2
-  if (!note.includes('\n')) return pill
+  if (lineCount === 1) return pill
   return Math.min(pill, size)
 }
 
@@ -196,7 +216,7 @@ const drawNote = (ctx: CanvasRenderingContext2D, layout: FinishLayout, note: str
   const { width, height } = ctx.canvas
   const rect = noteRect(ctx, layout, note, width, height)
   ctx.beginPath()
-  ctx.roundRect(rect.left + 1, rect.top + 1, rect.width - 2, rect.height - 2, noteRadius(note, rect.height, rect.size))
+  ctx.roundRect(rect.left + 1, rect.top + 1, rect.width - 2, rect.height - 2, noteRadius(rect.lines.length, rect.height, rect.size))
   ctx.fillStyle = 'rgba(0,0,0,0.6)'
   ctx.fill()
   ctx.lineWidth = 2
@@ -205,7 +225,7 @@ const drawNote = (ctx: CanvasRenderingContext2D, layout: FinishLayout, note: str
   ctx.fillStyle = '#fff'
   const x = rect.left + rect.padX + rect.ink.left
   const firstBaseline = rect.top + rect.padY + rect.ink.ascent
-  noteLines(note).forEach((line, index) => ctx.fillText(line, x, firstBaseline + index * rect.ink.lineHeight))
+  rect.lines.forEach((line, index) => ctx.fillText(line, x, firstBaseline + index * rect.ink.lineHeight))
 }
 
 export const drawFinish = (ctx: CanvasRenderingContext2D, base: HTMLImageElement, layout: FinishLayout, content: FinishContent) => {

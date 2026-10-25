@@ -16,6 +16,19 @@
             {{ story.image_url ? 'Trocar fundo' : 'Subir fundo' }}
             <input type="file" accept="image/png,image/jpeg,image/webp" hidden :disabled="uploading" @change="uploadBackground" />
           </label>
+          <div class="note-field">
+            <label for="rune-story-note">Frase</label>
+            <div class="note-row">
+              <input id="rune-story-note" ref="noteInput" v-model="noteDraft" type="text" :maxlength="NOTE_MAX_LENGTH" class="note-input" />
+              <button type="button" class="btn-ghost" :disabled="!noteChanged || saving" @click="saveNote">Salvar</button>
+            </div>
+            <div class="variables">
+              <button v-for="variable in story.note_variables" :key="variable.marker" type="button" class="variable" :title="`Exemplo: ${variable.sample}`" @mousedown.prevent @click="insertVariable(variable.marker)">
+                <code>{{ variable.marker }}</code> {{ variable.label }}
+              </button>
+            </div>
+            <span class="hint">Prévia: {{ sampleNote }}</span>
+          </div>
           <button type="button" class="btn-ghost" :disabled="!story.image_url" @click="editorOpen = true">
             <Icon icon="mdi:cursor-move" width="15" /> Posicionar runa e texto
           </button>
@@ -51,7 +64,7 @@
       :base-url="mediaUrl(story.image_url)"
       subject="story da runa"
       :price="null"
-      :note="SAMPLE_NOTE"
+      :note="sampleNote"
       :initial-layout="story.layout ?? DEFAULT_LAYOUT.STORY"
       :default-layout="DEFAULT_LAYOUT.STORY"
       :applying="saving"
@@ -65,7 +78,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 import { toast } from 'vue3-toastify'
 import { adminService, type RuneStory } from '@/services/admin/admin.service'
@@ -74,8 +87,8 @@ import { runeInfo } from '@/utils/runes'
 import FinishEditor from '@/views/instagram/FinishEditor.vue'
 import { DEFAULT_LAYOUT, type FinishLayout } from '@/views/instagram/finishCanvas'
 
-// espelha `storyNote` do backend (rune-story.ts)
-const SAMPLE_NOTE = 'Spawnou às 18:00 · some em 15 min'
+// mesmo limite do UpdateRuneStoryDto
+const NOTE_MAX_LENGTH = 120
 
 const STATUS: Record<string, string> = {
   DRAFT: 'Pronto, sai no spawn',
@@ -89,16 +102,27 @@ const editorOpen = ref(false)
 const saving = ref(false)
 const uploading = ref(false)
 
-const canActivate = computed(() => !!story.value?.image_url && !!story.value?.layout)
+const noteDraft = ref('')
+const noteInput = ref<HTMLInputElement | null>(null)
 
-const apiMessage = (err: any, fallback: string) => err?.response?.data?.message ?? fallback
+const canActivate = computed(() => !!story.value?.image_url && !!story.value?.layout)
+const fillNote = (template: string) =>
+  (story.value?.note_variables ?? []).reduce((text, variable) => text.replaceAll(variable.marker, variable.sample), template)
+
+const sampleNote = computed(() => fillNote(noteDraft.value.trim() || story.value?.note || ''))
+const noteChanged = computed(() => !!noteDraft.value.trim() && noteDraft.value.trim() !== story.value?.note)
+
+watch(() => story.value?.note, (note) => { noteDraft.value = note ?? '' })
+
+// class-validator manda `message` como lista
+const apiMessage = (err: any, fallback: string) => [err?.response?.data?.message ?? fallback].flat().join(' ')
 
 const load = async () => {
   const res = await adminService.getRuneStory()
   story.value = res.data
 }
 
-const save = async (data: { layout?: FinishLayout; is_active?: boolean }) => {
+const save = async (data: { layout?: FinishLayout; is_active?: boolean; note?: string }) => {
   saving.value = true
   try {
     const res = await adminService.updateRuneStory(data)
@@ -113,6 +137,21 @@ const save = async (data: { layout?: FinishLayout; is_active?: boolean }) => {
 
 const applyLayout = (layout: FinishLayout) => save({ layout })
 const toggleActive = () => save({ is_active: !story.value?.is_active })
+const saveNote = () => save({ note: noteDraft.value.trim() })
+
+// Sem foco o selectionStart é 0: aí a variável vai pro fim, não pro começo.
+const cursorPosition = (input: HTMLInputElement | null) =>
+  input && document.activeElement === input ? (input.selectionStart ?? noteDraft.value.length) : noteDraft.value.length
+
+const insertVariable = async (marker: string) => {
+  if (noteDraft.value.length + marker.length > NOTE_MAX_LENGTH) return
+  const input = noteInput.value
+  const at = cursorPosition(input)
+  noteDraft.value = noteDraft.value.slice(0, at) + marker + noteDraft.value.slice(at)
+  await nextTick()
+  input?.focus()
+  input?.setSelectionRange(at + marker.length, at + marker.length)
+}
 
 const uploadBackground = async (event: Event) => {
   const input = event.target as HTMLInputElement
@@ -190,6 +229,46 @@ onMounted(load)
   flex-direction column
   align-items flex-start
   gap 8px
+
+.note-field
+  display flex
+  flex-direction column
+  gap 4px
+  width 100%
+  font-size 0.8rem
+  color rgba(255,255,255,0.6)
+  code
+    color rgba(255,255,255,0.75)
+
+.note-row
+  display flex
+  gap 6px
+
+.variables
+  display flex
+  flex-wrap wrap
+  gap 4px
+
+.variable
+  padding 2px 8px
+  background rgba(255,255,255,0.05)
+  border 1px solid rgba(255,255,255,0.1)
+  border-radius 999px
+  color rgba(255,255,255,0.6)
+  font-size 0.72rem
+  cursor pointer
+  &:hover
+    background rgba(255,255,255,0.1)
+
+.note-input
+  flex 1
+  min-width 0
+  padding 4px 8px
+  background rgba(0,0,0,0.25)
+  border 1px solid rgba(255,255,255,0.12)
+  border-radius 6px
+  color #fff
+  font-size 0.85rem
 
 .today h3
   margin 0 0 8px

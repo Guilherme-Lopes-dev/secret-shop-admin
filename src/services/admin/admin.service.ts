@@ -1551,7 +1551,7 @@ export const adminService = {
   },
 
   /** Salvar refaz os stories de hoje que ainda não saíram. */
-  async updateRuneStory(data: { layout?: FinishLayout; is_active?: boolean }) {
+  async updateRuneStory(data: { layout?: FinishLayout; is_active?: boolean; note?: string }) {
     return api.put<RuneStory>('/rune-story', data)
   },
 
@@ -1986,6 +1986,8 @@ export type RuneStory = {
   image_url: string | null
   layout: FinishLayout | null
   is_active: boolean
+  note: string
+  note_variables: Array<{ marker: string; label: string; sample: string }>
   stories: RuneStoryItem[]
 }
 

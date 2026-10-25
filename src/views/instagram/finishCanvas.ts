@@ -104,10 +104,37 @@ const priceRect = (ctx: CanvasRenderingContext2D, layout: FinishLayout, price: n
   return { left: Math.round(layout.price.x * width), top: Math.round(layout.price.y * height), width: ink.width, height: ink.height, ink }
 }
 
+// Tirado do hhea do Anton-Regular.ttf (2409 e 674 em 2048 por em). Trocou a fonte: mede de novo.
+const ANTON_ASCENT = 2409 / 2048
+const ANTON_DESCENT = 674 / 2048
+
+// Várias linhas como o Pango: alinhadas à esquerda, baseline a baseline = ascendente + descendente
+// da fonte, cada uma arredondada pra cima. Medido no sharp 0.35.4 / Pango 1.58.2 (versão fixada no
+// package.json do backend): 20px→31, 37px→57, 61px→93, 100px→151. Subiu o sharp: mede de novo.
+const pangoLineHeight = (size: number) => Math.ceil(size * ANTON_ASCENT) + Math.ceil(size * ANTON_DESCENT)
+
+const blockInk = (ctx: CanvasRenderingContext2D, lines: string[], size: number) => {
+  const metrics = lines.map((line) => ctx.measureText(line))
+  const first = metrics[0] ?? ctx.measureText('')
+  const last = metrics[metrics.length - 1] ?? first
+  const lineHeight = pangoLineHeight(size)
+  const left = Math.max(...metrics.map((m) => m.actualBoundingBoxLeft))
+  const right = Math.max(...metrics.map((m) => m.actualBoundingBoxRight))
+  return {
+    left,
+    ascent: first.actualBoundingBoxAscent,
+    width: left + right,
+    height: first.actualBoundingBoxAscent + (lines.length - 1) * lineHeight + last.actualBoundingBoxDescent,
+    lineHeight,
+  }
+}
+
+const noteLines = (note: string) => note.toUpperCase().split(/\r?\n/)
+
 const noteRect = (ctx: CanvasRenderingContext2D, layout: FinishLayout, note: string, width: number, height: number) => {
   const size = Math.round(layout.note.size * width)
   withFont(ctx, size, size * NOTE_SPACING)
-  const ink = inkOf(ctx, note.toUpperCase())
+  const ink = blockInk(ctx, noteLines(note), size)
   const padX = Math.round(size * NOTE_PAD_X)
   const padY = Math.round(size * NOTE_PAD_Y)
   return {
@@ -158,18 +185,27 @@ const drawPrice = (ctx: CanvasRenderingContext2D, layout: FinishLayout, price: n
   ctx.restore()
 }
 
+// Uma linha = pílula; várias = canto de raio da fonte (pílula alta cortaria o texto no canto).
+const noteRadius = (note: string, tagHeight: number, size: number) => {
+  const pill = (tagHeight - 2) / 2
+  if (!note.includes('\n')) return pill
+  return Math.min(pill, size)
+}
+
 const drawNote = (ctx: CanvasRenderingContext2D, layout: FinishLayout, note: string) => {
   const { width, height } = ctx.canvas
   const rect = noteRect(ctx, layout, note, width, height)
   ctx.beginPath()
-  ctx.roundRect(rect.left + 1, rect.top + 1, rect.width - 2, rect.height - 2, (rect.height - 2) / 2)
+  ctx.roundRect(rect.left + 1, rect.top + 1, rect.width - 2, rect.height - 2, noteRadius(note, rect.height, rect.size))
   ctx.fillStyle = 'rgba(0,0,0,0.6)'
   ctx.fill()
   ctx.lineWidth = 2
   ctx.strokeStyle = 'rgba(251,191,36,0.7)'
   ctx.stroke()
   ctx.fillStyle = '#fff'
-  ctx.fillText(note.toUpperCase(), rect.left + rect.padX + rect.ink.left, rect.top + rect.padY + rect.ink.ascent)
+  const x = rect.left + rect.padX + rect.ink.left
+  const firstBaseline = rect.top + rect.padY + rect.ink.ascent
+  noteLines(note).forEach((line, index) => ctx.fillText(line, x, firstBaseline + index * rect.ink.lineHeight))
 }
 
 export const drawFinish = (ctx: CanvasRenderingContext2D, base: HTMLImageElement, layout: FinishLayout, content: FinishContent) => {

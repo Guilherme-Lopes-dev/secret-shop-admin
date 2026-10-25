@@ -19,15 +19,16 @@
           <div class="note-field">
             <label for="rune-story-note">Frase</label>
             <div class="note-row">
-              <input id="rune-story-note" ref="noteInput" v-model="noteDraft" type="text" :maxlength="NOTE_MAX_LENGTH" class="note-input" />
-              <button type="button" class="btn-ghost" :disabled="!noteChanged || saving" @click="saveNote">Salvar</button>
+              <textarea id="rune-story-note" ref="noteInput" v-model="noteDraft" rows="2" :maxlength="NOTE_MAX_LENGTH" class="note-input" />
+              <button type="button" class="btn-ghost" :disabled="!noteChanged || tooManyLines || saving" @click="saveNote">Salvar</button>
             </div>
             <div class="variables">
               <button v-for="variable in story.note_variables" :key="variable.marker" type="button" class="variable" :title="`Exemplo: ${variable.sample}`" @mousedown.prevent @click="insertVariable(variable.marker)">
                 <code>{{ variable.marker }}</code> {{ variable.label }}
               </button>
             </div>
-            <span class="hint">Prévia: {{ sampleNote }}</span>
+            <span class="hint" :class="{ 'hint--warn': tooManyLines }">Enter quebra a linha no story (até {{ NOTE_MAX_LINES }} linhas).</span>
+            <span class="hint note-preview">Prévia:<br />{{ sampleNote }}</span>
           </div>
           <button type="button" class="btn-ghost" :disabled="!story.image_url" @click="editorOpen = true">
             <Icon icon="mdi:cursor-move" width="15" /> Posicionar runa e texto
@@ -87,8 +88,9 @@ import { runeInfo } from '@/utils/runes'
 import FinishEditor from '@/views/instagram/FinishEditor.vue'
 import { DEFAULT_LAYOUT, type FinishLayout } from '@/views/instagram/finishCanvas'
 
-// mesmo limite do UpdateRuneStoryDto
+// mesmos limites do UpdateRuneStoryDto
 const NOTE_MAX_LENGTH = 120
+const NOTE_MAX_LINES = 3
 
 const STATUS: Record<string, string> = {
   DRAFT: 'Pronto, sai no spawn',
@@ -103,7 +105,7 @@ const saving = ref(false)
 const uploading = ref(false)
 
 const noteDraft = ref('')
-const noteInput = ref<HTMLInputElement | null>(null)
+const noteInput = ref<HTMLTextAreaElement | null>(null)
 
 const canActivate = computed(() => !!story.value?.image_url && !!story.value?.layout)
 const fillNote = (template: string) =>
@@ -111,6 +113,7 @@ const fillNote = (template: string) =>
 
 const sampleNote = computed(() => fillNote(noteDraft.value.trim() || story.value?.note || ''))
 const noteChanged = computed(() => !!noteDraft.value.trim() && noteDraft.value.trim() !== story.value?.note)
+const tooManyLines = computed(() => noteDraft.value.trim().split('\n').length > NOTE_MAX_LINES)
 
 watch(() => story.value?.note, (note) => { noteDraft.value = note ?? '' })
 
@@ -140,7 +143,7 @@ const toggleActive = () => save({ is_active: !story.value?.is_active })
 const saveNote = () => save({ note: noteDraft.value.trim() })
 
 // Sem foco o selectionStart é 0: aí a variável vai pro fim, não pro começo.
-const cursorPosition = (input: HTMLInputElement | null) =>
+const cursorPosition = (input: HTMLTextAreaElement | null) =>
   input && document.activeElement === input ? (input.selectionStart ?? noteDraft.value.length) : noteDraft.value.length
 
 const insertVariable = async (marker: string) => {
@@ -242,7 +245,11 @@ onMounted(load)
 
 .note-row
   display flex
+  align-items flex-start
   gap 6px
+
+.note-preview
+  white-space pre-line
 
 .variables
   display flex
@@ -269,6 +276,9 @@ onMounted(load)
   border-radius 6px
   color #fff
   font-size 0.85rem
+  font-family inherit
+  resize vertical
+  min-height 3.2em
 
 .today h3
   margin 0 0 8px

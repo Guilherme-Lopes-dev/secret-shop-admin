@@ -1561,6 +1561,46 @@ export const adminService = {
     return api.put<RuneStory>('/rune-story/background', formData)
   },
 
+  // ── Google Ads ──────────────────────────────────────────────────────────────
+
+  async getGoogleAdsStatus() {
+    return api.get<GoogleAdsStatus>('/google-ads/status')
+  },
+
+  /** Puxa os últimos N dias do Google Ads em background; o status mostra quando termina. */
+  async syncGoogleAds(days: number) {
+    return api.post('/google-ads/sync', null, { params: { days } })
+  },
+
+  async getGoogleAdsOverview(days: number) {
+    return api.get<GoogleAdsOverview>('/google-ads/overview', { params: { days } })
+  },
+
+  async getGoogleAdsEntities(level: GoogleAdsLevel, days: number) {
+    return api.get<GoogleAdsEntity[]>('/google-ads/entities', { params: { level, days } })
+  },
+
+  async getGoogleAdsAnalyses() {
+    return api.get<GoogleAdsAnalysisItem[]>('/google-ads/analyses')
+  },
+
+  /** Roda a análise do Claude em background (status RUNNING até virar DONE/FAILED). */
+  async startGoogleAdsAnalysis() {
+    return api.post<GoogleAdsAnalysisItem>('/google-ads/analyses')
+  },
+
+  async getGoogleAdsAnalysis(id: string) {
+    return api.get<GoogleAdsAnalysis>(`/google-ads/analyses/${id}`)
+  },
+
+  async approveGoogleAdsSuggestion(id: string, note?: string) {
+    return api.post(`/google-ads/suggestions/${id}/approve`, { note })
+  },
+
+  async rejectGoogleAdsSuggestion(id: string, note?: string) {
+    return api.post(`/google-ads/suggestions/${id}/reject`, { note })
+  },
+
   // ── Instagram ───────────────────────────────────────────────────────────────
 
   async getInstagramAccount() {
@@ -2030,6 +2070,81 @@ export type InstagramStory = {
   published_at: string
   insights: InstagramMetrics | null
   insights_at: string | null
+}
+
+export type GoogleAdsLevel = 'campaign' | 'ad_group' | 'ad' | 'keyword' | 'search_term'
+
+export type GoogleAdsStatus = {
+  missing_env: string[]
+  syncing: boolean
+  last_sync_error: string | null
+  last_synced_at: string | null
+  max_budget_change_pct: number
+}
+
+/** Métricas somadas no período; status/atributos vêm do dia mais recente. */
+export type GoogleAdsEntity = {
+  resource_name: string
+  name: string
+  campaign_name: string | null
+  ad_group_name: string | null
+  status: string | null
+  attributes: Record<string, unknown>
+  impressions: number
+  clicks: number
+  cost_brl: number
+  conversions: number
+  conversions_value: number
+  ctr: number | null
+  cpc_brl: number | null
+  cpa_brl: number | null
+  roas: number | null
+}
+
+export type GoogleAdsOverview = {
+  period: { from: string; to: string }
+  daily: { date: string; cost_brl: number; clicks: number; conversions: number }[]
+  campaigns: GoogleAdsEntity[]
+  store_sales: { orders: number; revenue_brl: number }
+}
+
+export type GoogleAdsAnalysisStatus = 'RUNNING' | 'DONE' | 'FAILED'
+export type GoogleAdsSuggestionStatus = 'PENDING' | 'APPROVED' | 'REJECTED'
+
+export type GoogleAdsAnalysisItem = {
+  id: string
+  status: GoogleAdsAnalysisStatus
+  period_start: string
+  period_end: string
+  model: string
+  error: string | null
+  created_at: string
+  finished_at: string | null
+  summary_preview: string | null
+  suggestions_total: number
+  suggestions_pending: number
+}
+
+export type GoogleAdsSuggestion = {
+  id: string
+  action_type: string
+  target_level: GoogleAdsLevel
+  target_resource: string
+  target_name: string
+  current_value: Record<string, unknown> | null
+  proposed_value: Record<string, unknown> | null
+  rationale: string
+  risk: 'low' | 'medium' | 'high'
+  status: GoogleAdsSuggestionStatus
+  decided_at: string | null
+  decision_note: string | null
+  decider: { username: string | null } | null
+}
+
+export type GoogleAdsAnalysis = Omit<GoogleAdsAnalysisItem, 'summary_preview' | 'suggestions_total' | 'suggestions_pending'> & {
+  summary: string | null
+  discarded: { suggestion: { action_type: string; target_resource: string; rationale: string }; reason: string }[]
+  suggestions: GoogleAdsSuggestion[]
 }
 
 /** totals/reach_by_day vazios + insights_error quando o token não tem instagram_business_manage_insights. */

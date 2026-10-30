@@ -32,6 +32,15 @@
           <button type="button" class="tab" :class="{ 'tab--on': kind === 'STORY' }" @click="setKind('STORY')">Story</button>
         </div>
 
+        <div class="kind-tabs">
+          <button type="button" class="tab" :class="{ 'tab--on': format === 'IMAGE' }" @click="format = 'IMAGE'">
+            <Icon icon="mdi:image-outline" width="15" /> Imagem
+          </button>
+          <button type="button" class="tab" :class="{ 'tab--on': format === 'VIDEO' }" @click="format = 'VIDEO'">
+            <Icon icon="mdi:movie-open-outline" width="15" /> Vídeo
+          </button>
+        </div>
+
         <div class="field">
           <label>Produto <span class="text-muted">(opcional; vira PRODUCT_LOCKED na arte)</span></label>
           <div v-if="subject" class="subject-chip">
@@ -81,7 +90,7 @@
         </div>
 
         <div v-if="kind === 'FEED'" class="field">
-          <label>Legenda</label>
+          <label>Legenda <span v-if="format === 'VIDEO'" class="text-muted">(vazia: o Opus escreve)</span></label>
           <textarea v-model="caption" class="form-input" rows="5" placeholder="Legenda do post" />
         </div>
         <p v-else class="field-hint">Story não tem legenda. O texto vai na própria arte.</p>
@@ -89,9 +98,14 @@
         <p v-if="composerError" class="error-msg">{{ composerError }}</p>
 
         <button class="btn-primary" :disabled="!canCreate || creating" @click="createPost">
-          <Icon icon="mdi:creation" width="16" /> {{ creating ? 'Enviando...' : 'Gerar imagem' }}
+          <Icon :icon="format === 'VIDEO' ? 'mdi:movie-open-play-outline' : 'mdi:creation'" width="16" />
+          {{ creating ? 'Enviando...' : format === 'VIDEO' ? 'Gerar vídeo' : 'Gerar imagem' }}
         </button>
-        <p class="field-hint">Prompt mestre v3 decide template e composição. Leva 1–2 min; depois marca a arte ao lado pra aplicar logo, preço e frase.</p>
+        <p v-if="format === 'VIDEO'" class="field-hint">
+          O Opus escreve o roteiro (cenas, texto, efeitos sonoros e música livre) a partir da mensagem; o servidor monta o vídeo 9:16
+          com a foto real da skin, logo e preço do estoque. Feed sai como Reels. Leva ~1 min; não tem acabamento depois.
+        </p>
+        <p v-else class="field-hint">Prompt mestre v3 decide template e composição. Leva 1–2 min; depois marca a arte ao lado pra aplicar logo, preço e frase.</p>
       </section>
 
       <section v-if="selectedPosts.length" class="section composer finish">
@@ -165,22 +179,30 @@
         </div>
 
         <article v-for="p in visiblePosts" :key="p.id" class="post-card">
-          <div class="post-card__image" :class="p.kind === 'STORY' ? 'ratio-story' : 'ratio-feed'">
+          <div class="post-card__image" :class="p.kind === 'STORY' || p.video_url ? 'ratio-story' : 'ratio-feed'">
             <label v-if="canSelect(p)" class="post-card__select" :class="{ 'post-card__select--on': p.id in selected }">
               <input type="checkbox" :checked="p.id in selected" @change="toggleSelect(p)" />
               Selecionar
             </label>
-            <img v-if="p.image_url" referrerpolicy="no-referrer" :src="mediaUrl(p.image_url)" alt="" />
+            <video
+              v-if="p.video_url"
+              :src="mediaUrl(p.video_url)"
+              :poster="p.image_url ? mediaUrl(p.image_url) : undefined"
+              controls
+              playsinline
+              preload="none"
+            />
+            <img v-else-if="p.image_url" referrerpolicy="no-referrer" :src="mediaUrl(p.image_url)" alt="" />
             <div v-else class="post-card__placeholder">
               <Icon v-if="p.status === 'GENERATING'" icon="mdi:loading" width="28" class="spin" />
               <Icon v-else icon="mdi:image-off-outline" width="28" />
-              <span>{{ p.status === 'GENERATING' ? 'Gerando imagem...' : 'Sem imagem' }}</span>
+              <span>{{ p.status === 'GENERATING' ? 'Gerando...' : 'Sem mídia' }}</span>
             </div>
           </div>
 
           <div class="post-card__body">
             <div class="post-card__meta">
-              <span class="kind-badge">{{ p.kind === 'STORY' ? 'Story' : 'Feed' }}</span>
+              <span class="kind-badge">{{ kindLabel(p) }}</span>
               <span class="status-badge" :class="statusClass(p.status)">{{ statusLabel(p.status) }}</span>
               <span v-if="p.cost_usd != null" class="text-muted" :title="tokensOf(p)">≈ US$ {{ p.cost_usd.toFixed(2) }}</span>
               <span class="text-muted post-card__date">{{ when(p.published_at ?? p.created_at) }}</span>
@@ -208,7 +230,7 @@
               <button v-if="canPublish(p)" class="btn-primary btn-sm" :disabled="busy === p.id" @click="publish(p)">
                 <Icon icon="mdi:send" width="14" /> {{ p.status === 'FAILED' ? 'Tentar de novo' : 'Publicar' }}
               </button>
-              <button v-if="p.status === 'PUBLISHED'" class="btn-ghost btn-sm" :disabled="busy === p.id" title="Novo rascunho com a arte original, pra pôr outro preço e publicar de novo" @click="reuse(p)">
+              <button v-if="p.status === 'PUBLISHED' && !p.video_url" class="btn-ghost btn-sm" :disabled="busy === p.id" title="Novo rascunho com a arte original, pra pôr outro preço e publicar de novo" @click="reuse(p)">
                 <Icon icon="mdi:recycle" width="14" /> Reutilizar arte
               </button>
               <a v-if="p.permalink" :href="p.permalink" target="_blank" rel="noopener" class="btn-view">Ver no Instagram</a>
@@ -313,6 +335,8 @@ import FinishEditor from './FinishEditor.vue'
 import { KIND_LABEL, readSavedLayout, saveLayout, type FinishLayout } from './finishCanvas'
 
 type Kind = 'FEED' | 'STORY'
+// IMAGE: OpenAI gera a arte (prompt mestre). VIDEO: Opus escreve o roteiro e o backend monta o mp4.
+type Format = 'IMAGE' | 'VIDEO'
 
 const BUSY_STATUSES = ['GENERATING', 'PUBLISHING']
 const POLL_MS = 4000
@@ -406,6 +430,7 @@ const resetPrompt = async () => {
 
 // ── Composer ──────────────────────────────────────────────────────────────────
 const kind = ref<Kind>('FEED')
+const format = ref<Format>('IMAGE')
 const subject = ref('')
 const couponCode = ref('')
 const couponRule = ref('')
@@ -463,7 +488,8 @@ const onSkinQuery = () => {
 const pickSkin = (unit: any) => {
   pickedUnit.value = unit
   subject.value = unit.skins?.name ?? ''
-  caption.value = captionFor(unit)
+  // Vídeo deixa a legenda vazia pro Opus escrever junto com o roteiro.
+  if (format.value === 'IMAGE') caption.value = captionFor(unit)
   skinQuery.value = ''
   skinResults.value = []
 }
@@ -478,7 +504,8 @@ const createPost = async () => {
   creating.value = true
   composerError.value = ''
   try {
-    const res = await adminService.createInstagramPost({
+    const create = format.value === 'VIDEO' ? adminService.createInstagramVideo : adminService.createInstagramPost
+    const res = await create({
       kind: kind.value,
       skin_uuid: pickedUnit.value?.skins?.id || undefined,
       coupon_code: couponCode.value.trim() || undefined,
@@ -490,7 +517,7 @@ const createPost = async () => {
     })
     posts.value = [res.data, ...posts.value]
     schedulePoll()
-    toast.info('Gerando imagem...')
+    toast.info(format.value === 'VIDEO' ? 'Gerando vídeo...' : 'Gerando imagem...')
   } catch (err: any) {
     composerError.value = err.response?.data?.message ?? 'Não deu pra criar o post.'
   } finally {
@@ -514,10 +541,13 @@ const tokensOf = (p: any) =>
 
 const isBusyStatus = (status: string) => BUSY_STATUSES.includes(status)
 const isEditable = (p: any) => p.status === 'DRAFT' || p.status === 'FAILED'
-const canPublish = (p: any) => isEditable(p) && !!p.image_url
+const canPublish = (p: any) => isEditable(p) && !!(p.image_url || p.video_url)
+
+const KIND_BADGE: Record<Kind, string> = { FEED: 'Feed', STORY: 'Story' }
+const kindLabel = (p: any) => (p.video_url ? `${p.kind === 'STORY' ? 'Story' : 'Reels'} · vídeo` : KIND_BADGE[p.kind as Kind])
 
 const STATUS_LABEL: Record<string, string> = {
-  GENERATING: 'Gerando imagem',
+  GENERATING: 'Gerando',
   DRAFT: 'Rascunho',
   PUBLISHING: 'Publicando',
   PUBLISHED: 'Publicado',
@@ -655,8 +685,8 @@ const matchesFilter = (p: any) =>
   matchesSkin(p)
 
 const visiblePosts = computed(() => posts.value.filter(matchesFilter))
-// Story de runa já sai montado (fundo + runa + horário): acabamento por cima duplicaria logo e frase.
-const canSelect = (p: any) => canPublish(p) && !p.rune_date
+// Story de runa e vídeo já saem montados: acabamento por cima duplicaria logo e frase.
+const canSelect = (p: any) => canPublish(p) && !p.rune_date && !p.video_url
 const selectablePosts = computed(() => visiblePosts.value.filter(canSelect))
 
 // Mantém o preço já digitado de quem já estava marcado.
@@ -1291,7 +1321,7 @@ onBeforeUnmount(() => {
   background #0f0f12
   display grid
   place-items center
-  img
+  img, video
     width 100%
     height 100%
     object-fit cover

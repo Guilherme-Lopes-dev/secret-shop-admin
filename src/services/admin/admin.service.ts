@@ -1631,6 +1631,11 @@ export const adminService = {
     return api.post('/instagram/posts', data)
   },
 
+  /** Mesma ORDEM do post de imagem; o Opus escreve o roteiro e o backend monta o mp4 (feed vira Reels). */
+  async createInstagramVideo(data: InstagramPostOrder) {
+    return api.post('/instagram/videos', data)
+  },
+
   async updateInstagramPost(uuid: string, data: { caption?: string }) {
     return api.patch(`/instagram/posts/${uuid}`, data)
   },

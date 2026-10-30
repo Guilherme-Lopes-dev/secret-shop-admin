@@ -46,6 +46,8 @@
       </template>
     </section>
 
+    <GoogleAdsAccess v-if="overview" :days="days" :daily="overview.daily" />
+
     <section class="section">
       <div class="section-head">
         <h2 class="section-title">Detalhe por nível</h2>
@@ -103,6 +105,7 @@ import {
   type GoogleAdsStatus,
 } from '@/services/admin/admin.service'
 import { persistedRef } from '@/utils/persistedRef'
+import GoogleAdsAccess from './GoogleAdsAccess.vue'
 import GoogleAdsAnalyses from './GoogleAdsAnalyses.vue'
 
 const PERIODS = [7, 30, 90]

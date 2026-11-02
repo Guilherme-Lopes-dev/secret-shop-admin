@@ -15,7 +15,15 @@ const pageTitle = computed(() => (isGifts.value ? 'Presentes' : 'Vendas'))
 const subtitleNoun = computed(() => (isGifts.value ? 'presentes' : 'pedidos'))
 const loadingText = computed(() => (isGifts.value ? 'Carregando presentes...' : 'Carregando vendas...'))
 const emptyText = computed(() => (isGifts.value ? 'Nenhum presente encontrado.' : 'Nenhuma venda encontrada.'))
-const emptyColspan = computed(() => (isGifts.value ? 6 : 7))
+const emptyColspan = computed(() => (isGifts.value ? 7 : 8))
+
+/** Sem cobrança ainda não tem gateway; coluna sem valor = Asaas (default do banco). */
+const gatewayOf = (sale: any) => {
+    if (!sale.payment_id) return null
+    return sale.payment_provider === 'mercadopago'
+        ? { label: 'Mercado Pago', class: 'gateway-mp' }
+        : { label: 'Asaas', class: 'gateway-asaas' }
+}
 
 const router = useRouter()
 const route = useRoute()
@@ -204,6 +212,7 @@ onMounted(() => fetchSales(1))
                                 <th>Data</th>
                                 <th>Valor Total</th>
                                 <th v-if="!isGifts">Cupom</th>
+                                <th>Gateway</th>
                                 <th>Status</th>
                                 <th>Ações</th>
                             </tr>
@@ -226,6 +235,12 @@ onMounted(() => fetchSales(1))
                                 <td class="price">{{ formatCurrency(sale.total_amount) }}</td>
                                 <td v-if="!isGifts">
                                     <span v-if="sale.coupon?.code" class="coupon-badge">{{ sale.coupon.code }}</span>
+                                    <span v-else class="muted">-</span>
+                                </td>
+                                <td>
+                                    <span v-if="gatewayOf(sale)" class="gateway-badge" :class="gatewayOf(sale)!.class">
+                                        {{ gatewayOf(sale)!.label }}
+                                    </span>
                                     <span v-else class="muted">-</span>
                                 </td>
                                 <td>
@@ -405,6 +420,20 @@ table
     font-weight 600
     background rgba(99,102,241,0.1)
     color #818cf8
+
+.gateway-badge
+    padding 3px 8px
+    border-radius 5px
+    font-size 0.72rem
+    font-weight 600
+
+.gateway-mp
+    background rgba(0,177,234,0.12)
+    color #38bdf8
+
+.gateway-asaas
+    background rgba(139,92,246,0.12)
+    color #a78bfa
 
 .status-badge
     padding 3px 8px

@@ -293,6 +293,11 @@ const routes = [
         component: () => import('@/views/instagram/InstagramInteractions.vue'),
       },
       {
+        path: 'instagram/skills',
+        name: 'instagram-skills',
+        component: () => import('@/views/instagram/InstagramSkills.vue'),
+      },
+      {
         path: 'runes/:uuid/edit',
         name: 'rune-edit',
         component: () => import('@/views/runes/RuneForm.vue'),

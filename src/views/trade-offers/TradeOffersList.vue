@@ -183,6 +183,14 @@ onMounted(() => fetchOffers(1))
                                     >
                                         {{ offer.sales.order_number }}
                                     </router-link>
+                                    <router-link
+                                        v-else-if="offer.swaps"
+                                        :to="`/swaps?swap=${offer.swaps.id}`"
+                                        class="order-link"
+                                        @click.stop
+                                    >
+                                        Ver troca
+                                    </router-link>
                                     <span v-else class="muted">—</span>
                                 </td>
                                 <td>{{ offer.steam_bots?.name || '—' }}</td>

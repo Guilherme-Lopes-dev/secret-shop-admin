@@ -111,7 +111,7 @@
       </div>
     </div>
 
-    <div v-if="detail" class="modal-overlay" @click.self="detail = null">
+    <div v-if="detail" class="modal-overlay" @click.self="closeDetail">
       <div class="modal modal-lg">
         <header class="modal-head">
           <h3>Troca de {{ detail.users?.username || 'usuário' }}</h3>
@@ -212,6 +212,25 @@
             </div>
           </div>
 
+          <div v-if="detail.trade_offers?.length" class="offers-block">
+            <h4 class="offers-title">
+              Trade offers
+              <span class="muted">status sincronizado com a Steam</span>
+            </h4>
+            <div v-for="trade in detail.trade_offers" :key="trade.id" class="offer-row">
+              <div class="offer-bot">
+                <Icon icon="mdi:swap-horizontal" width="16" />
+                {{ tradePhase(trade) }}
+              </div>
+              <span class="muted">
+                {{ trade.steam_bots?.name || 'Bot' }}
+                <template v-if="trade.sent_at"> · {{ $dayjs(trade.sent_at).format('DD/MM/YY HH:mm') }}</template>
+              </span>
+              <span class="status-badge" :class="tradeStatusClass(trade.offer_status)">{{ trade.offer_status || '—' }}</span>
+              <router-link :to="`/trade-offers/${trade.id}`" class="btn-view">Ver trade</router-link>
+            </div>
+          </div>
+
           <div v-if="detail.compensation_amount > 0 || detail.value_flag" class="comp-block">
             <div class="comp-block-head">
               <h4>Compensação</h4>
@@ -265,7 +284,7 @@
           <p v-if="actionError" class="action-error">{{ actionError }}</p>
 
           <div class="modal-actions">
-            <button class="btn-ghost" @click="detail = null">Fechar</button>
+            <button class="btn-ghost" @click="closeDetail">Fechar</button>
             <button
               v-if="detail.compensation_amount > 0 && detail.compensation_status !== 'paid'"
               class="btn-ghost"
@@ -387,6 +406,19 @@ const surplusOf = (swap: any) =>
   Math.max(0, (swap?.user_items_value ?? 0) + (swap?.compensation_amount ?? 0) - (swap?.store_items_value ?? 0))
 
 const offerStatusLabel = (status: string) => offerStatusMeta[status] ?? status
+
+// A fase vem no 1º item do histórico (SWAP_TRADE_PHASES no backend).
+const tradePhaseLabels: Record<string, string> = {
+  request: 'Pedido dos itens do usuário',
+  delivery: 'Entrega dos itens da loja',
+}
+const tradePhase = (trade: any) => tradePhaseLabels[trade.offer_status_history?.[0]?.phase] ?? 'Trade'
+
+const tradeStatusClasses: Record<string, string> = {
+  ACCEPTED: 'status-active',
+  PENDING: 'status-info',
+}
+const tradeStatusClass = (status: string | null) => tradeStatusClasses[status ?? ''] ?? 'status-inactive'
 const mapOfferStatus = (status: string) => {
   if (status === 'completed') return 'completed'
   if (status === 'cancelled') return 'cancelled'
@@ -449,6 +481,14 @@ const openDetail = (swap: any) => {
   actionError.value = ''
   detail.value = swap
   loadItemTrends(swap)
+}
+
+// Tira o ?swap= do link da trade, senão recarregar a página reabre a troca.
+const closeDetail = () => {
+  detail.value = null
+  if (!route.query.swap) return
+
+  router.replace({ query: { ...route.query, swap: undefined } })
 }
 
 // Tendência dos itens do usuário pra decidir a aprovação. É apoio: falhou, o detalhe abre igual.
@@ -529,9 +569,23 @@ const applyUpdate = (updated: any) => {
   detail.value = updated
 }
 
+// Link vindo da tela da trade (?swap=...): abre a troca mesmo fora do filtro atual.
+const openSwapFromQuery = async () => {
+  const swapId = route.query.swap
+  if (!swapId) return
+
+  try {
+    const res = await adminService.getSwap(String(swapId))
+    openDetail(res.data)
+  } catch {
+    toast.error('Troca não encontrada.')
+  }
+}
+
 onMounted(() => {
   fetchSwaps()
   fetchPendings()
+  openSwapFromQuery()
 })
 </script>
 

@@ -344,6 +344,8 @@ export const adminService = {
     return api.get<{
       revenueToday: number
       ordersToday: number
+      /** Pedidos pagos de hoje (loja + collector) por gateway. */
+      ordersTodayByProvider: { mercadopago: number; asaas: number }
       revenueYesterday: number
       ordersYesterday: number
       pendingPaymentsToday: number

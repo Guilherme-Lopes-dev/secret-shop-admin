@@ -153,6 +153,12 @@ onMounted(fetchOffer)
                                     {{ offer.sales.order_number }}
                                 </router-link>
                             </span>
+                            <span v-if="offer.swaps">
+                                &nbsp;·
+                                <router-link :to="`/swaps?swap=${offer.swaps.id}`" class="link" @click.stop>
+                                    Ver troca
+                                </router-link>
+                            </span>
                         </p>
                     </div>
                 </div>

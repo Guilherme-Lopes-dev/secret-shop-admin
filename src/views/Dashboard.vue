@@ -15,6 +15,7 @@ const loading = ref(true)
 const today = ref({
     revenueToday: 0,
     ordersToday: 0,
+    ordersTodayByProvider: { mercadopago: 0, asaas: 0 },
     revenueYesterday: 0,
     ordersYesterday: 0,
     pendingPaymentsToday: 0,
@@ -107,6 +108,13 @@ const todayCards = computed(() => [
         deltaClass: '',
         to: ONLINE_NOW_USERS_LINK,
     },
+])
+
+/** Pedidos pagos de hoje (loja + collector) por gateway de pagamento. */
+const gatewayCards = computed(() => [
+    { label: 'Pedidos totais hoje', value: String(today.value.ordersToday), icon: 'mdi:cart-check', color: '#2196f3' },
+    { label: 'Pedidos Mercado Pago', value: String(today.value.ordersTodayByProvider?.mercadopago ?? 0), icon: 'mdi:handshake-outline', color: '#00b1ea' },
+    { label: 'Pedidos Asaas', value: String(today.value.ordersTodayByProvider?.asaas ?? 0), icon: 'mdi:bank-outline', color: '#8b5cf6' },
 ])
 
 type StatCard = { label: string; value: string; icon: string; color: string }
@@ -262,6 +270,20 @@ onUnmounted(() => clearInterval(todayPoll))
                     <span v-if="card.delta" class="stat-delta" :class="card.deltaClass">{{ card.delta }}</span>
                 </div>
             </component>
+        </div>
+
+        <!-- Pedidos de hoje por gateway -->
+        <h2 class="section-title gateway-title">Pedidos de hoje por gateway</h2>
+        <div class="stats-grid">
+            <div v-for="card in gatewayCards" :key="card.label" class="stat-card">
+                <div class="stat-icon" :style="{ backgroundColor: card.color + '20', color: card.color }">
+                    <Icon :icon="card.icon" width="24" />
+                </div>
+                <div class="stat-info">
+                    <span class="stat-label">{{ card.label }}</span>
+                    <span class="stat-value">{{ card.value }}</span>
+                </div>
+            </div>
         </div>
 
         <!-- Pendências -->
@@ -438,6 +460,9 @@ onUnmounted(() => clearInterval(todayPoll))
     align-items center
     gap 1rem
     border 1px solid rgba(255,255,255,0.05)
+
+.gateway-title
+    margin -0.75rem 0 0.75rem
 
 .stat-card--link
     color inherit

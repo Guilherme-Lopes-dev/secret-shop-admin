@@ -35,18 +35,27 @@
       <p v-if="error" class="error-msg">{{ error }}</p>
       <p v-else-if="!overview" class="hint">Carregando...</p>
       <template v-else>
-        <p v-if="measurementWarning" class="warn">{{ measurementWarning }}</p>
-        <div class="totals">
-          <div v-for="total in totals" :key="total.label" class="total">
-            <span class="total__value">{{ total.value }}</span>
-            <span class="total__label">{{ total.label }}</span>
+        <p v-if="smallSample" class="note">
+          Amostra pequena: {{ number(sum('clicks')) }} cliques e {{ number(sum('conversions')) }} compra(s) atribuída(s)
+          ao anúncio no período. Com esse volume uma venda muda CPA e ROAS inteiros: use pra tendência, não pra cortar
+          campanha. O Ads põe a compra no dia do clique e só conta quem clicou no anúncio.
+        </p>
+        <div v-for="group in totalGroups" :key="group.title" class="group">
+          <h3 class="group-title">{{ group.title }}</h3>
+          <div class="totals">
+            <div v-for="total in group.totals" :key="total.label" class="total">
+              <span class="total__value">{{ total.value }}</span>
+              <span class="total__label">{{ total.label }}</span>
+            </div>
           </div>
         </div>
         <div class="canvas-wrap"><canvas ref="canvas"></canvas></div>
       </template>
     </section>
 
-    <GoogleAdsAccess v-if="overview" :days="days" :daily="overview.daily" />
+    <GoogleAdsCustomers v-if="overview" :customers="overview.new_customers" />
+
+    <GoogleAdsAccess v-if="overview" :daily="overview.daily" :access="overview.site_access" />
 
     <section class="section">
       <div class="section-head">
@@ -70,7 +79,15 @@
             <tr>
               <th>Nome</th>
               <th>Status</th>
-              <th v-for="column in COLUMNS" :key="column.key" class="num">{{ column.label }}</th>
+              <th
+                v-for="column in COLUMNS"
+                :key="column.key"
+                class="num"
+                :class="{ muted: isMuted(column) }"
+                :title="isMuted(column) ? 'Menos de 10 compras no período: não decide nada' : undefined"
+              >
+                {{ column.label }}
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -80,7 +97,9 @@
                 <span v-if="parentOf(entity)" class="hint">{{ parentOf(entity) }}</span>
               </td>
               <td><span class="status" :class="entity.status?.toLowerCase()">{{ entity.status ?? '-' }}</span></td>
-              <td v-for="column in COLUMNS" :key="column.key" class="num">{{ column.format(entity[column.key]) }}</td>
+              <td v-for="column in COLUMNS" :key="column.key" class="num" :class="{ muted: isMuted(column) }">
+                {{ column.format(entity[column.key]) }}
+              </td>
             </tr>
           </tbody>
         </table>
@@ -107,11 +126,12 @@ import {
 import { persistedRef } from '@/utils/persistedRef'
 import GoogleAdsAccess from './GoogleAdsAccess.vue'
 import GoogleAdsAnalyses from './GoogleAdsAnalyses.vue'
+import GoogleAdsCustomers from './GoogleAdsCustomers.vue'
 
 const PERIODS = [7, 30, 90]
 const SYNC_POLL_MS = 4000
-// Abaixo disso o "valor" da conversão não é venda real (a ação PURCHASE antiga manda R$1).
-const MIN_REAL_TICKET_BRL = 5
+// Abaixo disso uma venda a mais ou a menos vira o CPA/ROAS do avesso.
+const MIN_CONVERSIONS_TO_DECIDE = 10
 
 const LEVELS: { value: GoogleAdsLevel; label: string }[] = [
   { value: 'campaign', label: 'Campanhas' },
@@ -129,19 +149,22 @@ const multiple = (value: unknown) => (value == null ? '-' : `${Number(value).toL
 
 type NumericKey = 'impressions' | 'clicks' | 'ctr' | 'cost_brl' | 'cpc_brl' | 'conversions' | 'cpa_brl' | 'roas'
 
-const COLUMNS: { key: NumericKey; label: string; format: (value: unknown) => string }[] = [
+type Column = { key: NumericKey; label: string; format: (value: unknown) => string; needsSample?: boolean }
+
+const COLUMNS: Column[] = [
   { key: 'impressions', label: 'Impr.', format: number },
   { key: 'clicks', label: 'Cliques', format: number },
   { key: 'ctr', label: 'CTR', format: percent },
   { key: 'cost_brl', label: 'Custo', format: brl },
   { key: 'cpc_brl', label: 'CPC', format: brl },
-  { key: 'conversions', label: 'Conv.', format: number },
-  { key: 'cpa_brl', label: 'CPA', format: brl },
-  { key: 'roas', label: 'ROAS', format: multiple },
+  { key: 'conversions', label: 'Compras', format: number, needsSample: true },
+  { key: 'cpa_brl', label: 'CPA', format: brl, needsSample: true },
+  { key: 'roas', label: 'ROAS', format: multiple, needsSample: true },
 ]
 
 const days = persistedRef('google-ads:days', 30)
-const level = persistedRef<GoogleAdsLevel>('google-ads:level', 'campaign')
+// Termo de busca é onde se corta desperdício; campanha, com uma só ativa, repete o topo.
+const level = persistedRef<GoogleAdsLevel>('google-ads:level', 'search_term')
 const status = ref<GoogleAdsStatus | null>(null)
 const overview = ref<GoogleAdsOverview | null>(null)
 const entities = ref<GoogleAdsEntity[]>([])
@@ -158,36 +181,56 @@ const syncLabel = computed(() => {
   return `Último sync: ${dayjs(last).format('DD/MM HH:mm')} · sync automático todo dia às 6h`
 })
 
-const sum = (key: 'cost_brl' | 'clicks' | 'conversions' | 'conversions_value') =>
+const sum = (key: 'cost_brl' | 'clicks' | 'impressions' | 'conversions' | 'conversions_value') =>
   (overview.value?.campaigns ?? []).reduce((total, campaign) => total + campaign[key], 0)
 
-const totals = computed(() => {
-  const cost = sum('cost_brl')
-  const conversions = sum('conversions')
-  const sales = overview.value?.store_sales
-  return [
-    { label: 'Custo', value: brl(cost) },
-    { label: 'Cliques', value: number(sum('clicks')) },
-    { label: 'Conversões (Ads)', value: number(conversions) },
-    { label: 'CPA (Ads)', value: conversions ? brl(cost / conversions) : '-' },
-    { label: 'Valor conv. (Ads)', value: brl(sum('conversions_value')) },
-    { label: 'Vendas pagas (loja)', value: number(sales?.orders) },
-    { label: 'Receita (loja)', value: brl(sales?.revenue_brl) },
-  ]
+const ratioText = (part: number, whole: number) =>
+  whole ? `${((part / whole) * 100).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%` : '-'
+
+const smallSample = computed(() => sum('conversions') < MIN_CONVERSIONS_TO_DECIDE)
+
+const isMuted = (column: Column) => !!column.needsSample && smallSample.value
+
+// Dia sem visitante registrado (antes de site_visits existir) inflaria a fatia com cliques sem denominador.
+const trafficShare = computed(() => {
+  const clicksByDay = new Map((overview.value?.daily ?? []).map((point) => [point.date, point.clicks]))
+  const measured = (overview.value?.site_access ?? []).filter((day) => day.visitors > 0)
+  const visitors = measured.reduce((total, day) => total + day.visitors, 0)
+  const clicks = measured.reduce((total, day) => total + (clicksByDay.get(day.day) ?? 0), 0)
+  return ratioText(clicks, visitors)
 })
 
-// Mesma régua que o prompt do Claude usa pra desconfiar da medição.
-const measurementWarning = computed(() => {
-  const conversions = sum('conversions')
-  const orders = overview.value?.store_sales.orders ?? 0
-  if (!conversions) return ''
-  if (conversions > orders) {
-    return `O Ads registrou ${number(conversions)} conversões, mas a loja teve ${number(orders)} vendas pagas no período inteiro. A conversão está contando outra coisa: CPA e ROAS daqui não valem.`
-  }
-  if (sum('conversions_value') / conversions < MIN_REAL_TICKET_BRL) {
-    return 'O valor por conversão está perto de R$1: o Ads não recebe o valor da venda. ROAS daqui não vale.'
-  }
-  return ''
+const trafficTotals = () => {
+  const clicks = sum('clicks')
+  return [
+    { label: 'Gasto', value: brl(sum('cost_brl')) },
+    { label: 'Cliques', value: number(clicks) },
+    { label: 'CPC médio', value: clicks ? brl(sum('cost_brl') / clicks) : '-' },
+    { label: 'CTR', value: ratioText(clicks, sum('impressions')) },
+    { label: 'Fatia do tráfego do site', value: trafficShare.value },
+  ]
+}
+
+const fromAdsText = (customers: GoogleAdsOverview['new_customers']) =>
+  customers.tracked ? number(customers.from_ads) : 'sem registro ainda'
+
+const resultTotals = () => {
+  const { store_sales: sales, new_customers: customers } = overview.value!
+  return [
+    { label: 'Compras do anúncio', value: `${number(sum('conversions'))} · ${brl(sum('conversions_value'))}` },
+    { label: 'Clientes novos (loja, todos os canais)', value: number(customers.count) },
+    { label: 'Clientes novos que clicaram no anúncio', value: fromAdsText(customers) },
+    { label: 'Gasto ÷ clientes novos', value: customers.count ? brl(sum('cost_brl') / customers.count) : '-' },
+    { label: 'Vendas na loja', value: `${number(sales.orders)} · ${brl(sales.revenue_brl)}` },
+  ]
+}
+
+const totalGroups = computed(() => {
+  if (!overview.value) return []
+  return [
+    { title: 'O que o anúncio trouxe', totals: trafficTotals() },
+    { title: 'Resultado', totals: resultTotals() },
+  ]
 })
 
 const parentOf = (entity: GoogleAdsEntity) => [entity.campaign_name, entity.ad_group_name].filter(Boolean).join(' › ')
@@ -250,7 +293,8 @@ const renderChart = () => {
       labels: points.map((point) => dayjs(point.date).format('DD/MM')),
       datasets: [
         { type: 'bar', label: 'Custo (R$)', data: points.map((point) => point.cost_brl), backgroundColor: '#6366f1', borderRadius: 4, yAxisID: 'cost' },
-        { type: 'line', label: 'Conversões', data: points.map((point) => point.conversions), borderColor: '#34d399', yAxisID: 'conversions' },
+        { type: 'line', label: 'Cliques', data: points.map((point) => point.clicks), borderColor: '#fbbf24', yAxisID: 'counts' },
+        { type: 'line', label: 'Compras do anúncio', data: points.map((point) => point.conversions), borderColor: '#34d399', yAxisID: 'counts' },
       ],
     },
     options: {
@@ -259,7 +303,7 @@ const renderChart = () => {
       plugins: { legend: { labels: { color: '#94a3b8' } } },
       scales: {
         cost: { position: 'left', beginAtZero: true, grid: { color: 'rgba(255,255,255,0.07)' }, ticks: { color: '#94a3b8' } },
-        conversions: { position: 'right', beginAtZero: true, grid: { display: false }, ticks: { color: '#94a3b8', precision: 0 } },
+        counts: { position: 'right', beginAtZero: true, grid: { display: false }, ticks: { color: '#94a3b8', precision: 0 } },
         x: { grid: { display: false }, ticks: { color: '#94a3b8' } },
       },
     },
@@ -422,6 +466,31 @@ onUnmounted(() => {
   &.paused
     background rgba(251,191,36,0.12)
     color #fbbf24
+
+.note
+  margin 0
+  padding 10px 14px
+  background rgba(99,102,241,0.08)
+  border 1px solid rgba(99,102,241,0.3)
+  border-radius 8px
+  color rgba(255,255,255,0.75)
+  font-size 0.85rem
+
+.group
+  display flex
+  flex-direction column
+  gap 8px
+
+.group-title
+  margin 0
+  font-size 0.75rem
+  font-weight 600
+  text-transform uppercase
+  letter-spacing 0.04em
+  color rgba(255,255,255,0.45)
+
+.muted
+  opacity 0.35
 
 .warn
   margin 0

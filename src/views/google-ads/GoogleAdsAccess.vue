@@ -12,50 +12,46 @@
     </div>
 
     <template v-if="open">
-      <p v-if="error" class="error-msg">{{ error }}</p>
-      <p v-else-if="!access" class="hint">Carregando...</p>
-      <template v-else>
-        <div class="totals">
-          <div v-for="total in totals" :key="total.label" class="total">
-            <span class="total__value">{{ total.value }}</span>
-            <span class="total__label">{{ total.label }}</span>
-          </div>
+      <div class="totals">
+        <div v-for="total in totals" :key="total.label" class="total">
+          <span class="total__value">{{ total.value }}</span>
+          <span class="total__label">{{ total.label }}</span>
         </div>
-        <div class="canvas-wrap"><canvas ref="canvas"></canvas></div>
-        <!-- ponytail: sem gclid guardado não dá pra ligar clique a visitante; a razão é só ordem de grandeza -->
-        <span class="hint">
-          Cliques do Ads ÷ visitantes únicos do dia. Uma pessoa pode clicar mais de uma vez, então é estimativa da fatia
-          do tráfego que veio do anúncio, não atribuição.
-        </span>
-        <div class="table-wrap">
-          <table class="table">
-            <thead>
-              <tr>
-                <th>Dia</th>
-                <th class="num">Cliques Ads</th>
-                <th class="num">Custo Ads</th>
-                <th class="num">Conv. Ads</th>
-                <th class="num">Visitantes</th>
-                <th class="num">Logados</th>
-                <th class="num">Cliques/visit.</th>
-                <th class="num">Custo/visit.</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="row in rows" :key="row.day">
-                <td>{{ dayjs(row.day).format('DD/MM ddd') }}</td>
-                <td class="num">{{ number(row.clicks) }}</td>
-                <td class="num">{{ brl(row.cost_brl) }}</td>
-                <td class="num">{{ number(row.conversions) }}</td>
-                <td class="num">{{ number(row.visitors) }}</td>
-                <td class="num">{{ number(row.users) }}</td>
-                <td class="num">{{ ratio(row.clicks, row.visitors) }}</td>
-                <td class="num">{{ row.visitors ? brl(row.cost_brl / row.visitors) : '-' }}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </template>
+      </div>
+      <div class="canvas-wrap"><canvas ref="canvas"></canvas></div>
+      <!-- ponytail: gclid só vira dado no login; visitante anônimo não liga a clique, a razão é ordem de grandeza -->
+      <span class="hint">
+        Cliques do Ads ÷ visitantes únicos do dia. Uma pessoa pode clicar mais de uma vez, então é estimativa da fatia
+        do tráfego que veio do anúncio, não atribuição.
+      </span>
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Dia</th>
+              <th class="num">Cliques Ads</th>
+              <th class="num">Custo Ads</th>
+              <th class="num">Conv. Ads</th>
+              <th class="num">Visitantes</th>
+              <th class="num">Logados</th>
+              <th class="num">Cliques/visit.</th>
+              <th class="num">Custo/visit.</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="row in rows" :key="row.day">
+              <td>{{ dayjs(row.day).format('DD/MM ddd') }}</td>
+              <td class="num">{{ number(row.clicks) }}</td>
+              <td class="num">{{ brl(row.cost_brl) }}</td>
+              <td class="num">{{ number(row.conversions) }}</td>
+              <td class="num">{{ number(row.visitors) }}</td>
+              <td class="num">{{ number(row.users) }}</td>
+              <td class="num">{{ ratio(row.clicks, row.visitors) }}</td>
+              <td class="num">{{ row.visitors ? brl(row.cost_brl / row.visitors) : '-' }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </template>
   </section>
 </template>
@@ -65,14 +61,12 @@ import { computed, onUnmounted, ref, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 import Chart from 'chart.js/auto'
 import dayjs from 'dayjs'
-import { adminService, type DashboardAccess, type GoogleAdsOverview } from '@/services/admin/admin.service'
+import type { GoogleAdsOverview } from '@/services/admin/admin.service'
 import { persistedRef } from '@/utils/persistedRef'
 
-const props = defineProps<{ days: number; daily: GoogleAdsOverview['daily'] }>()
+const props = defineProps<{ daily: GoogleAdsOverview['daily']; access: GoogleAdsOverview['site_access'] }>()
 
 const open = persistedRef('google-ads:access-open', false)
-const access = ref<DashboardAccess | null>(null)
-const error = ref('')
 const canvas = ref<HTMLCanvasElement | null>(null)
 let chart: Chart | undefined
 
@@ -85,7 +79,7 @@ const ratio = (part: number, whole: number) =>
 const series = computed(() => {
   const adsByDay = new Map(props.daily.map((point) => [point.date, point]))
   const noAds = { clicks: 0, cost_brl: 0, conversions: 0 }
-  return (access.value?.byDay ?? []).map((point) => ({ ...point, ...noAds, ...adsByDay.get(point.day) }))
+  return props.access.map((point) => ({ ...point, ...noAds, ...adsByDay.get(point.day) }))
 })
 
 // Tabela do mais recente pro mais antigo; gráfico na ordem do tempo.
@@ -107,19 +101,6 @@ const totals = computed(() => {
     { label: 'Custo por visitante', value: visitors ? brl(sumOf('cost_brl') / visitors) : '-' },
   ]
 })
-
-const fetchAccess = async () => {
-  access.value = null
-  try {
-    const { data } = await adminService.getDashboardAccess(props.days)
-    // Troca rápida de período: resposta atrasada de outra janela não sobrescreve a atual.
-    if (data.days !== props.days) return
-    access.value = data
-    error.value = ''
-  } catch (err: any) {
-    error.value = err.response?.data?.message ?? 'Não carregou os acessos do site.'
-  }
-}
 
 const renderChart = () => {
   chart?.destroy()
@@ -148,11 +129,6 @@ const renderChart = () => {
   })
 }
 
-watch(
-  () => [open.value, props.days] as const,
-  ([isOpen]) => isOpen && fetchAccess(),
-  { immediate: true },
-)
 watch([series, canvas], renderChart)
 onUnmounted(() => chart?.destroy())
 </script>
@@ -244,9 +220,4 @@ onUnmounted(() => chart?.destroy())
   margin 0
   font-size 0.75rem
   color rgba(255,255,255,0.45)
-
-.error-msg
-  color #fc8181
-  font-size 0.85rem
-  margin 0
 </style>

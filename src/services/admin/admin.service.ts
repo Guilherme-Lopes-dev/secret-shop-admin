@@ -2108,11 +2108,24 @@ export type GoogleAdsEntity = {
   roas: number | null
 }
 
+export type GoogleAdsNewCustomer = {
+  username: string | null
+  first_purchase_at: string
+  revenue_brl: number
+  source: string | null
+  medium: string | null
+  campaign: string | null
+  tracked: boolean
+  from_ads: boolean
+}
+
 export type GoogleAdsOverview = {
   period: { from: string; to: string }
   daily: { date: string; cost_brl: number; clicks: number; conversions: number }[]
   campaigns: GoogleAdsEntity[]
   store_sales: { orders: number; revenue_brl: number }
+  new_customers: { count: number; revenue_brl: number; tracked: number; from_ads: number; list: GoogleAdsNewCustomer[] }
+  site_access: DashboardAccess['byDay']
 }
 
 export type GoogleAdsAnalysisStatus = 'RUNNING' | 'DONE' | 'FAILED'

@@ -293,6 +293,11 @@ const routes = [
         component: () => import('@/views/instagram/InstagramInteractions.vue'),
       },
       {
+        path: 'instagram/voz',
+        name: 'instagram-voice',
+        component: () => import('@/views/instagram/InstagramVoice.vue'),
+      },
+      {
         path: 'instagram/skills',
         name: 'instagram-skills',
         component: () => import('@/views/instagram/InstagramSkills.vue'),

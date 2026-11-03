@@ -43,13 +43,22 @@
 
             <div v-if="suggestion.status === 'PENDING'" class="decision">
               <input v-model="notes[suggestion.id]" class="note" placeholder="Observação (opcional)" maxlength="500" />
-              <button type="button" class="btn-approve" :disabled="deciding" @click="decide(suggestion, 'approve')">Aprovar</button>
+              <button
+                type="button"
+                class="btn-approve"
+                :disabled="deciding"
+                :title="applyEnabled ? 'Aplica na conta do Google Ads na hora' : 'Aplicação desligada: só registra a decisão'"
+                @click="decide(suggestion, 'approve')"
+              >
+                {{ applyEnabled ? 'Aprovar e aplicar' : 'Aprovar' }}
+              </button>
               <button type="button" class="btn-reject" :disabled="deciding" @click="decide(suggestion, 'reject')">Rejeitar</button>
             </div>
             <p v-else class="hint">
               <span class="badge" :class="suggestion.status.toLowerCase()">{{ STATUS_LABELS[suggestion.status] }}</span>
               por {{ suggestion.decider?.username ?? '?' }} em {{ when(suggestion.decided_at) }}
               <template v-if="suggestion.decision_note"> · "{{ suggestion.decision_note }}"</template>
+              <template v-if="suggestion.status === 'APPROVED'"> · {{ applyStatus(suggestion) }}</template>
             </p>
           </article>
 
@@ -78,7 +87,7 @@ import {
   type GoogleAdsSuggestion,
 } from '@/services/admin/admin.service'
 
-defineProps<{ disabled: boolean }>()
+defineProps<{ disabled: boolean; applyEnabled: boolean }>()
 
 const POLL_MS = 5000
 
@@ -129,6 +138,17 @@ const day = (date: string) => dayjs(date.slice(0, 10)).format('DD/MM')
 const describeChange = (suggestion: GoogleAdsSuggestion) =>
   CHANGE_DESCRIPTIONS[suggestion.action_type]?.(suggestion) ?? suggestion.action_type
 
+const applyStatus = (suggestion: GoogleAdsSuggestion) => {
+  if (!suggestion.applied_at) return 'não aplicada na conta'
+  if (suggestion.apply_log?.result === 'already_done') return `a conta já estava assim (${when(suggestion.applied_at)})`
+  return `aplicada na conta em ${when(suggestion.applied_at)}`
+}
+
+const APPLY_TOASTS: Record<string, string> = {
+  applied: 'Aplicada na conta do Google Ads.',
+  already_done: 'A conta já estava assim: só registrei a aprovação.',
+}
+
 const fetchSelected = async () => {
   if (!selectedId.value) return
   const { data } = await adminService.getGoogleAdsAnalysis(selectedId.value)
@@ -176,7 +196,9 @@ const DECISIONS = {
 const decide = async (suggestion: GoogleAdsSuggestion, decision: keyof typeof DECISIONS) => {
   deciding.value = true
   try {
-    await DECISIONS[decision](suggestion.id, notes[suggestion.id])
+    const { data } = await DECISIONS[decision](suggestion.id, notes[suggestion.id])
+    const applied = APPLY_TOASTS[data?.applied]
+    if (applied) toast.success(applied)
     await Promise.all([fetchSelected(), fetchAnalyses()])
   } catch (err: any) {
     toast.error(err.response?.data?.message ?? 'Não registrou a decisão.')

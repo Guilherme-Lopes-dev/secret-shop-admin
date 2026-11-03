@@ -1691,6 +1691,22 @@ export const adminService = {
     return api.patch(`/instagram/comments/${commentId}`, { hidden })
   },
 
+  // Voz da loja: falas que o Opus pode usar nos vídeos
+  async getInstagramVoices() {
+    return api.get<InstagramVoice[]>('/instagram/voices')
+  },
+
+  async addInstagramVoice(text: string, audio: Blob) {
+    const formData = new FormData()
+    formData.append('text', text)
+    formData.append('file', audio)
+    return api.post<InstagramVoice>('/instagram/voices', formData)
+  },
+
+  async deleteInstagramVoice(id: string) {
+    return api.delete(`/instagram/voices/${id}`)
+  },
+
   // ── Sorteios ────────────────────────────────────────────────────────────────
 
   /** Preview ao vivo da tela 2. Não grava nada — o snapshot só nasce no save. */
@@ -2087,6 +2103,8 @@ export type GoogleAdsStatus = {
   last_sync_error: string | null
   last_synced_at: string | null
   max_budget_change_pct: number
+  /** Aprovar aplica na conta (GOOGLE_ADS_APPLY_ENABLED=true no backend). */
+  apply_enabled: boolean
 }
 
 /** Métricas somadas no período; status/atributos vêm do dia mais recente. */
@@ -2159,6 +2177,9 @@ export type GoogleAdsSuggestion = {
   decided_at: string | null
   decision_note: string | null
   decider: { username: string | null } | null
+  /** Null = aprovada só no registro (aplicação desligada) ou ainda não decidida. */
+  applied_at: string | null
+  apply_log: { result: 'applied' | 'already_done' } | null
 }
 
 export type GoogleAdsAnalysis = Omit<GoogleAdsAnalysisItem, 'summary_preview' | 'suggestions_total' | 'suggestions_pending'> & {
@@ -2179,6 +2200,13 @@ export type InstagramOverview = {
   reach_by_day: { day: string; value: number }[]
   totals: InstagramMetrics | null
   insights_error: string | null
+}
+
+export type InstagramVoice = {
+  id: string
+  text: string
+  duration: number
+  url: string
 }
 
 export type InstagramComment = {

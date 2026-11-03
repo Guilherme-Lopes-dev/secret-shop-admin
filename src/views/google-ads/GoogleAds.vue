@@ -106,7 +106,7 @@
       </div>
     </section>
 
-    <GoogleAdsAnalyses :disabled="!configured" />
+    <GoogleAdsAnalyses :disabled="!configured" :apply-enabled="!!status?.apply_enabled" />
   </div>
 </template>
 

@@ -1638,6 +1638,17 @@ export const adminService = {
     return api.post('/instagram/videos', data)
   },
 
+  /** Vídeo enviado + pedido; o Opus planeja os cortes e o backend monta o mp4. */
+  async editInstagramVideo(data: { kind: 'FEED' | 'STORY'; instruction: string; skin_uuid?: string; caption?: string }, video: File) {
+    const formData = new FormData()
+    formData.append('kind', data.kind)
+    formData.append('instruction', data.instruction)
+    if (data.skin_uuid) formData.append('skin_uuid', data.skin_uuid)
+    if (data.caption) formData.append('caption', data.caption)
+    formData.append('file', video)
+    return api.post('/instagram/video-edits', formData, { timeout: 0 })
+  },
+
   async updateInstagramPost(uuid: string, data: { caption?: string }) {
     return api.patch(`/instagram/posts/${uuid}`, data)
   },

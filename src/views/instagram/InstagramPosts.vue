@@ -39,10 +39,24 @@
           <button type="button" class="tab" :class="{ 'tab--on': format === 'VIDEO' }" @click="format = 'VIDEO'">
             <Icon icon="mdi:movie-open-outline" width="15" /> Vídeo
           </button>
+          <button type="button" class="tab" :class="{ 'tab--on': format === 'EDIT' }" @click="format = 'EDIT'">
+            <Icon icon="mdi:movie-edit-outline" width="15" /> Editar vídeo
+          </button>
         </div>
 
+        <template v-if="format === 'EDIT'">
+          <div class="field">
+            <label>Vídeo <span class="text-muted">(até 300 MB e 10 min)</span></label>
+            <input type="file" accept="video/mp4,video/webm,video/quicktime,video/x-matroska,.mkv" class="form-input" @change="pickVideo" />
+          </div>
+          <div class="field">
+            <label>O que fazer</label>
+            <textarea v-model="instruction" class="form-input" rows="4" maxlength="1000" placeholder="ex: corta os silêncios, deixa só as partes com o gancho e escreve CHEGOU NO ESTOQUE no começo" />
+          </div>
+        </template>
+
         <div class="field">
-          <label>Produto <span class="text-muted">(opcional; vira PRODUCT_LOCKED na arte)</span></label>
+          <label>Produto <span class="text-muted">{{ format === 'EDIT' ? '(opcional; de onde vem o preço)' : '(opcional; vira PRODUCT_LOCKED na arte)' }}</span></label>
           <div v-if="subject" class="subject-chip">
             <Icon icon="mdi:sword" width="14" /> {{ subject }}
             <button type="button" class="subject-chip__clear" @click="clearSubject"><Icon icon="mdi:close" width="14" /></button>
@@ -63,34 +77,36 @@
           </ul>
         </div>
 
-        <div class="field">
-          <label>Cupom</label>
-          <input v-model="couponCode" class="form-input" placeholder="ex: RUNA10" />
-        </div>
-
-        <div v-if="couponCode.trim()" class="field">
-          <label>Regra do cupom</label>
-          <input v-model="couponRule" class="form-input" placeholder="ex: 10% em qualquer skin até domingo" />
-        </div>
-
-        <div class="field">
-          <label>Mensagem <span class="text-muted">(o que a arte precisa dizer)</span></label>
-          <textarea v-model="message" class="form-input" rows="3" placeholder="ex: chegou no estoque, poucas unidades confirmadas" />
-        </div>
-
-        <div class="field-row">
+        <template v-if="format !== 'EDIT'">
           <div class="field">
-            <label>CTA</label>
-            <input v-model="cta" class="form-input" placeholder="VER NO SITE" />
+            <label>Cupom</label>
+            <input v-model="couponCode" class="form-input" placeholder="ex: RUNA10" />
           </div>
+
+          <div v-if="couponCode.trim()" class="field">
+            <label>Regra do cupom</label>
+            <input v-model="couponRule" class="form-input" placeholder="ex: 10% em qualquer skin até domingo" />
+          </div>
+
           <div class="field">
-            <label>Link</label>
-            <input v-model="ctaUrl" class="form-input" placeholder="https://secretshopgg.com" />
+            <label>Mensagem <span class="text-muted">(o que a arte precisa dizer)</span></label>
+            <textarea v-model="message" class="form-input" rows="3" placeholder="ex: chegou no estoque, poucas unidades confirmadas" />
           </div>
-        </div>
+
+          <div class="field-row">
+            <div class="field">
+              <label>CTA</label>
+              <input v-model="cta" class="form-input" placeholder="VER NO SITE" />
+            </div>
+            <div class="field">
+              <label>Link</label>
+              <input v-model="ctaUrl" class="form-input" placeholder="https://secretshopgg.com" />
+            </div>
+          </div>
+        </template>
 
         <div v-if="kind === 'FEED'" class="field">
-          <label>Legenda <span v-if="format === 'VIDEO'" class="text-muted">(vazia: o Opus escreve)</span></label>
+          <label>Legenda <span v-if="format !== 'IMAGE'" class="text-muted">(vazia: o Opus escreve)</span></label>
           <textarea v-model="caption" class="form-input" rows="5" placeholder="Legenda do post" />
         </div>
         <p v-else class="field-hint">Story não tem legenda. O texto vai na própria arte.</p>
@@ -98,10 +114,26 @@
         <p v-if="composerError" class="error-msg">{{ composerError }}</p>
 
         <button class="btn-primary" :disabled="!canCreate || creating" @click="createPost">
-          <Icon :icon="format === 'VIDEO' ? 'mdi:movie-open-play-outline' : 'mdi:creation'" width="16" />
-          {{ creating ? 'Enviando...' : format === 'VIDEO' ? 'Gerar vídeo' : 'Gerar imagem' }}
+          <Icon :icon="format === 'IMAGE' ? 'mdi:creation' : 'mdi:movie-open-play-outline'" width="16" />
+          {{ creating ? 'Enviando...' : CREATE_LABEL[format] }}
         </button>
-        <p v-if="format === 'VIDEO'" class="field-hint">
+        <template v-if="format === 'EDIT'">
+          <p class="field-hint">
+            <strong>O que dá pra pedir:</strong> escolher e reordenar trechos, cortar silêncios, escrever textos e mostrar o preço do estoque.
+            O vídeo sai em 9:16, com o logo, e o som original é mantido.
+          </p>
+          <p class="field-hint">
+            <strong>O que não dá:</strong> colocar música ou efeitos, mudar a velocidade ou alterar a imagem. O que não puder ser feito aparece no rascunho.
+          </p>
+          <p class="field-hint">
+            <strong>Fique de olho:</strong> o Opus vê só alguns quadros do vídeo e não entende o que é falado, então pode errar em ações rápidas e não corta por uma fala específica.
+            Confira o resultado antes de publicar.
+          </p>
+          <p class="field-hint">
+            <strong>Limites:</strong> o resultado tem até 60s. O vídeo enviado não fica salvo, então pra refazer a edição é preciso enviar o arquivo de novo.
+          </p>
+        </template>
+        <p v-else-if="format === 'VIDEO'" class="field-hint">
           O Opus escreve o roteiro (cenas, texto, efeitos sonoros e música livre) a partir da mensagem; o servidor monta o vídeo 9:16
           com a foto real da skin, logo e preço do estoque. Feed sai como Reels. Leva ~1 min; não tem acabamento depois.
         </p>
@@ -221,6 +253,7 @@
             <p v-else-if="p.caption" class="post-card__caption">{{ p.caption }}</p>
 
             <p v-if="p.error" class="error-msg">{{ p.error }}</p>
+            <p v-if="p.video_script?.notes" class="field-hint">{{ p.video_script.notes }}</p>
             <details v-if="p.revised_prompt" class="prompt-details">
               <summary>Prompt usado</summary>
               <p>{{ p.revised_prompt }}</p>
@@ -336,7 +369,7 @@ import { KIND_LABEL, readSavedLayout, saveLayout, type FinishLayout } from './fi
 
 type Kind = 'FEED' | 'STORY'
 // IMAGE: OpenAI gera a arte (prompt mestre). VIDEO: Opus escreve o roteiro e o backend monta o mp4.
-type Format = 'IMAGE' | 'VIDEO'
+type Format = 'IMAGE' | 'VIDEO' | 'EDIT'
 
 const BUSY_STATUSES = ['GENERATING', 'PUBLISHING']
 const POLL_MS = 4000
@@ -438,6 +471,8 @@ const message = ref('')
 const cta = ref('VER NO SITE')
 const ctaUrl = ref('https://secretshopgg.com')
 const caption = ref('')
+const instruction = ref('')
+const sourceVideo = shallowRef<File | null>(null)
 const creating = ref(false)
 const composerError = ref('')
 
@@ -464,7 +499,53 @@ const captionFor = (unit: any) => {
 const setKind = (k: Kind) => { kind.value = k }
 
 // Precisa de algo pra peça dizer: produto, cupom ou mensagem.
-const canCreate = computed(() => !!subject.value || !!couponCode.value.trim() || !!message.value.trim())
+// Editar vídeo precisa do arquivo e do pedido.
+const canCreate = computed(() => {
+  if (format.value === 'EDIT') return !!sourceVideo.value && !!instruction.value.trim()
+  return !!subject.value || !!couponCode.value.trim() || !!message.value.trim()
+})
+
+const MAX_VIDEO_BYTES = 300 * 1024 * 1024
+
+const pickVideo = (event: Event) => {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0] ?? null
+  const tooBig = !!file && file.size > MAX_VIDEO_BYTES
+  composerError.value = tooBig ? 'Vídeo maior que 300 MB.' : ''
+  sourceVideo.value = tooBig ? null : file
+  if (tooBig) input.value = ''
+}
+
+// O campo de arquivo some ao trocar de aba; sem isso, o botão enviaria um arquivo que não aparece.
+watch(format, () => { sourceVideo.value = null })
+
+const CREATE_LABEL: Record<Format, string> = { IMAGE: 'Gerar imagem', VIDEO: 'Gerar vídeo', EDIT: 'Editar vídeo' }
+const CREATE_TOAST: Record<Format, string> = { IMAGE: 'Gerando imagem...', VIDEO: 'Gerando vídeo...', EDIT: 'Editando vídeo...' }
+
+const submitEdit = () =>
+  adminService.editInstagramVideo(
+    {
+      kind: kind.value,
+      instruction: instruction.value.trim(),
+      skin_uuid: pickedUnit.value?.skins?.id || undefined,
+      caption: kind.value === 'FEED' ? caption.value.trim() || undefined : undefined,
+    },
+    sourceVideo.value!,
+  )
+
+const submitOrder = () => {
+  const create = format.value === 'VIDEO' ? adminService.createInstagramVideo : adminService.createInstagramPost
+  return create({
+    kind: kind.value,
+    skin_uuid: pickedUnit.value?.skins?.id || undefined,
+    coupon_code: couponCode.value.trim() || undefined,
+    coupon_rule: couponRule.value.trim() || undefined,
+    message: message.value.trim() || undefined,
+    cta: cta.value.trim() || undefined,
+    cta_url: ctaUrl.value.trim() || undefined,
+    caption: kind.value === 'FEED' ? caption.value.trim() || undefined : undefined,
+  })
+}
 
 const searchSkins = async () => {
   const search = skinQuery.value.trim()
@@ -504,20 +585,10 @@ const createPost = async () => {
   creating.value = true
   composerError.value = ''
   try {
-    const create = format.value === 'VIDEO' ? adminService.createInstagramVideo : adminService.createInstagramPost
-    const res = await create({
-      kind: kind.value,
-      skin_uuid: pickedUnit.value?.skins?.id || undefined,
-      coupon_code: couponCode.value.trim() || undefined,
-      coupon_rule: couponRule.value.trim() || undefined,
-      message: message.value.trim() || undefined,
-      cta: cta.value.trim() || undefined,
-      cta_url: ctaUrl.value.trim() || undefined,
-      caption: kind.value === 'FEED' ? caption.value.trim() || undefined : undefined,
-    })
+    const res = await (format.value === 'EDIT' ? submitEdit() : submitOrder())
     posts.value = [res.data, ...posts.value]
     schedulePoll()
-    toast.info(format.value === 'VIDEO' ? 'Gerando vídeo...' : 'Gerando imagem...')
+    toast.info(CREATE_TOAST[format.value])
   } catch (err: any) {
     composerError.value = err.response?.data?.message ?? 'Não deu pra criar o post.'
   } finally {

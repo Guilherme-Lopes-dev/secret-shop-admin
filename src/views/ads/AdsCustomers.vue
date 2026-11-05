@@ -3,8 +3,8 @@
     <div>
       <h2 class="section-title">Clientes novos no período</h2>
       <span class="hint">
-        1ª compra paga da vida dentro do período, de qualquer canal (skins, collectors e físicos). "Anúncio" = clicou num
-        anúncio do Google antes da 1ª compra. A origem é gravada desde 03/11/2026; antes disso aparece "sem registro".
+        1ª compra paga da vida dentro do período, de qualquer canal (skins, collectors e físicos). {{ clickNote }}
+        A origem é gravada desde 03/11/2026; antes disso aparece "sem registro".
       </span>
     </div>
     <p v-if="!customers.list.length" class="hint">Nenhum cliente novo no período.</p>
@@ -35,13 +35,13 @@
 
 <script setup lang="ts">
 import dayjs from 'dayjs'
-import type { GoogleAdsNewCustomer, GoogleAdsOverview } from '@/services/admin/admin.service'
+import type { AdsNewCustomer, AdsOverview } from '@/services/admin/admin.service'
 
-defineProps<{ customers: GoogleAdsOverview['new_customers'] }>()
+defineProps<{ customers: AdsOverview['new_customers']; clickNote: string }>()
 
 const brl = (value: number) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 
-const originOf = (customer: GoogleAdsNewCustomer) => {
+const originOf = (customer: AdsNewCustomer) => {
   if (!customer.source) return customer.tracked ? '-' : 'sem registro'
   const channel = `${customer.source} / ${customer.medium ?? '-'}`
   if (!customer.campaign) return channel

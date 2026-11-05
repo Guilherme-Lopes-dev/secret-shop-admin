@@ -135,6 +135,7 @@ const navGroups: NavGroup[] = [
             { label: 'Voz da loja', icon: 'mdi:microphone-outline', to: '/instagram/voz', name: 'instagram-voice' },
             { label: 'Skills Instagram', icon: 'mdi:robot-outline', to: '/instagram/skills', name: 'instagram-skills' },
             { label: 'Google Ads', icon: 'mdi:google-ads', to: '/google-ads', name: 'google-ads' },
+            { label: 'Meta Ads', icon: 'mdi:facebook', to: '/meta-ads', name: 'meta-ads' },
             { label: 'Sorteios', icon: 'mdi:ticket-confirmation-outline', to: '/raffles', name: 'raffles' },
             { label: 'Novidades', icon: 'mdi:bullhorn-outline', to: '/news', name: 'news' },
             { label: 'Feedbacks', icon: 'mdi:comment-quote-outline', to: '/feedbacks', name: 'feedbacks' },

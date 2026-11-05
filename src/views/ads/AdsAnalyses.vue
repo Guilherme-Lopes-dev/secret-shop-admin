@@ -3,7 +3,7 @@
     <div class="section-head">
       <div>
         <h2 class="section-title">Análises do Claude</h2>
-        <p class="hint">Toda segunda às 6h30 com os últimos 30 dias. Aprovar só registra a decisão: nada é aplicado no Google Ads ainda.</p>
+        <p class="hint">{{ network.analysisSchedule }} com os últimos 30 dias. {{ applyEnabled ? `Aprovar aplica na conta do ${network.title} na hora.` : `Aplicação desligada: aprovar só registra a decisão, nada vai pro ${network.title}.` }}</p>
       </div>
       <button type="button" class="btn-primary" :disabled="disabled || hasRunning || starting" @click="start">
         <Icon icon="mdi:robot-outline" width="16" />
@@ -37,7 +37,7 @@
             <header class="suggestion__head">
               <span class="badge" :class="`risk-${suggestion.risk}`">risco {{ RISK_LABELS[suggestion.risk] }}</span>
               <strong>{{ describeChange(suggestion) }}</strong>
-              <span class="hint">{{ LEVEL_LABELS[suggestion.target_level] }}: {{ suggestion.target_name }}</span>
+              <span class="hint">{{ network.levelLabels[suggestion.target_level] }}: {{ suggestion.target_name }}</span>
             </header>
             <p class="suggestion__why">{{ suggestion.rationale }}</p>
 
@@ -47,7 +47,7 @@
                 type="button"
                 class="btn-approve"
                 :disabled="deciding"
-                :title="applyEnabled ? 'Aplica na conta do Google Ads na hora' : 'Aplicação desligada: só registra a decisão'"
+                :title="applyEnabled ? `Aplica na conta do ${network.title} na hora` : 'Aplicação desligada: só registra a decisão'"
                 @click="decide(suggestion, 'approve')"
               >
                 {{ applyEnabled ? 'Aprovar e aplicar' : 'Aprovar' }}
@@ -79,15 +79,10 @@ import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 import dayjs from 'dayjs'
 import { toast } from 'vue3-toastify'
-import {
-  adminService,
-  type GoogleAdsAnalysis,
-  type GoogleAdsAnalysisItem,
-  type GoogleAdsLevel,
-  type GoogleAdsSuggestion,
-} from '@/services/admin/admin.service'
+import type { AdsAnalysis, AdsAnalysisItem, AdsSuggestion } from '@/services/admin/admin.service'
+import type { AdsNetwork } from './networks'
 
-defineProps<{ disabled: boolean; applyEnabled: boolean }>()
+const { network } = defineProps<{ network: AdsNetwork; disabled: boolean; applyEnabled: boolean }>()
 
 const POLL_MS = 5000
 
@@ -102,29 +97,9 @@ const STATUS_LABELS: Record<string, string> = {
 
 const RISK_LABELS = { low: 'baixo', medium: 'médio', high: 'alto' }
 
-const LEVEL_LABELS: Record<GoogleAdsLevel, string> = {
-  campaign: 'Campanha',
-  ad_group: 'Grupo',
-  ad: 'Anúncio',
-  keyword: 'Palavra-chave',
-  search_term: 'Termo',
-}
-
-const brl = (value: unknown) => Number(value).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
-
-const CHANGE_DESCRIPTIONS: Record<string, (suggestion: GoogleAdsSuggestion) => string> = {
-  set_campaign_budget: ({ current_value, proposed_value }) =>
-    `Orçamento diário ${brl(current_value?.daily_budget_brl)} → ${brl(proposed_value?.daily_budget_brl)}`,
-  pause_campaign: () => 'Pausar campanha',
-  pause_ad_group: () => 'Pausar grupo',
-  pause_ad: () => 'Pausar anúncio',
-  pause_keyword: () => 'Pausar palavra-chave',
-  add_negative_keyword: ({ proposed_value }) => `Negativar "${proposed_value?.text}" (${proposed_value?.match_type})`,
-}
-
-const analyses = ref<GoogleAdsAnalysisItem[]>([])
+const analyses = ref<AdsAnalysisItem[]>([])
 const selectedId = ref<string | null>(null)
-const selected = ref<GoogleAdsAnalysis | null>(null)
+const selected = ref<AdsAnalysis | null>(null)
 const notes = reactive<Record<string, string>>({})
 const starting = ref(false)
 const deciding = ref(false)
@@ -135,28 +110,28 @@ const hasRunning = computed(() => analyses.value.some((item) => item.status === 
 const when = (date: string | null) => (date ? dayjs(date).format('DD/MM HH:mm') : '-')
 const day = (date: string) => dayjs(date.slice(0, 10)).format('DD/MM')
 
-const describeChange = (suggestion: GoogleAdsSuggestion) =>
-  CHANGE_DESCRIPTIONS[suggestion.action_type]?.(suggestion) ?? suggestion.action_type
+const describeChange = (suggestion: AdsSuggestion) =>
+  network.changeDescriptions[suggestion.action_type]?.(suggestion) ?? suggestion.action_type
 
-const applyStatus = (suggestion: GoogleAdsSuggestion) => {
+const applyStatus = (suggestion: AdsSuggestion) => {
   if (!suggestion.applied_at) return 'não aplicada na conta'
   if (suggestion.apply_log?.result === 'already_done') return `a conta já estava assim (${when(suggestion.applied_at)})`
   return `aplicada na conta em ${when(suggestion.applied_at)}`
 }
 
 const APPLY_TOASTS: Record<string, string> = {
-  applied: 'Aplicada na conta do Google Ads.',
+  applied: `Aplicada na conta do ${network.title}.`,
   already_done: 'A conta já estava assim: só registrei a aprovação.',
 }
 
 const fetchSelected = async () => {
   if (!selectedId.value) return
-  const { data } = await adminService.getGoogleAdsAnalysis(selectedId.value)
+  const { data } = await network.api.analysis(selectedId.value)
   selected.value = data
 }
 
 const fetchAnalyses = async () => {
-  const { data } = await adminService.getGoogleAdsAnalyses()
+  const { data } = await network.api.analyses()
   analyses.value = data
   selectedId.value ??= data[0]?.id ?? null
 }
@@ -177,7 +152,7 @@ const schedulePoll = () => {
 const start = async () => {
   starting.value = true
   try {
-    const { data } = await adminService.startGoogleAdsAnalysis()
+    const { data } = await network.api.startAnalysis()
     selectedId.value = data.id
     await fetchAnalyses()
     schedulePoll()
@@ -189,11 +164,11 @@ const start = async () => {
 }
 
 const DECISIONS = {
-  approve: adminService.approveGoogleAdsSuggestion,
-  reject: adminService.rejectGoogleAdsSuggestion,
+  approve: network.api.approve,
+  reject: network.api.reject,
 }
 
-const decide = async (suggestion: GoogleAdsSuggestion, decision: keyof typeof DECISIONS) => {
+const decide = async (suggestion: AdsSuggestion, decision: keyof typeof DECISIONS) => {
   deciding.value = true
   try {
     const { data } = await DECISIONS[decision](suggestion.id, notes[suggestion.id])

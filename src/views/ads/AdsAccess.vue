@@ -61,12 +61,12 @@ import { computed, onUnmounted, ref, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 import Chart from 'chart.js/auto'
 import dayjs from 'dayjs'
-import type { GoogleAdsOverview } from '@/services/admin/admin.service'
+import type { AdsOverview } from '@/services/admin/admin.service'
 import { persistedRef } from '@/utils/persistedRef'
 
-const props = defineProps<{ daily: GoogleAdsOverview['daily']; access: GoogleAdsOverview['site_access'] }>()
+const props = defineProps<{ slug: string; daily: AdsOverview['daily']; access: AdsOverview['site_access'] }>()
 
-const open = persistedRef('google-ads:access-open', false)
+const open = persistedRef(`${props.slug}:access-open`, false)
 const canvas = ref<HTMLCanvasElement | null>(null)
 let chart: Chart | undefined
 

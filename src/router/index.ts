@@ -288,6 +288,11 @@ const routes = [
         component: () => import('@/views/google-ads/GoogleAds.vue'),
       },
       {
+        path: 'meta-ads',
+        name: 'meta-ads',
+        component: () => import('@/views/meta-ads/MetaAds.vue'),
+      },
+      {
         path: 'instagram/interacoes',
         name: 'instagram-interactions',
         component: () => import('@/views/instagram/InstagramInteractions.vue'),

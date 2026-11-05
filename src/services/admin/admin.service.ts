@@ -2525,6 +2525,8 @@ export type EntryPriceSource = 'lowest' | 'median' | 'least'
 
 export interface PricingConfigBase {
   priceSyncDiscount: number
+  priceSyncRisingMultiplier: number
+  priceSyncFallingMultiplier: number
   dropshipPriceMultiplier: number
   arcanaLevelMultipliers: Record<1 | 2 | 3, number>
   entryPriceSource: EntryPriceSource
@@ -2541,6 +2543,8 @@ export interface PricingConfig extends PricingConfigBase {
 
 export interface PricingConfigInput {
   priceSyncDiscount?: number
+  priceSyncRisingMultiplier?: number
+  priceSyncFallingMultiplier?: number
   dropshipPriceMultiplier?: number
   arcanaLevel1Multiplier?: number
   arcanaLevel2Multiplier?: number

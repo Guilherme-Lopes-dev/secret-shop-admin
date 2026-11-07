@@ -27,6 +27,9 @@ import type {
   SwapNotificationsResponse,
   PassProgressDto,
   DemandRow,
+  MarketTraderConfig,
+  MarketTraderEvent,
+  MarketTraderOverview,
   MarketTrendsResponse,
   SwapTrendFactors,
   SwapTrendsResponse,
@@ -1032,6 +1035,27 @@ export const adminService = {
 
   async cancelSteamSellListing(botId: string, listingId: string) {
     return api.post(`/admin/steam-market/sell-listings/${listingId}/cancel`, { botId }, { timeout: STEAM_BOT_WRITE_TIMEOUT_MS })
+  },
+
+  async getMarketTrader() {
+    return api.get<MarketTraderOverview>('/admin/market-trader', { timeout: STEAM_BOT_TIMEOUT_MS })
+  },
+
+  async getMarketTraderEvents() {
+    return api.get<MarketTraderEvent[]>('/admin/market-trader/events')
+  },
+
+  // Desligar o modo real cancela os lances abertos na Steam, um por um.
+  async updateMarketTraderConfig(patch: Partial<MarketTraderConfig>) {
+    return api.post<MarketTraderConfig>('/admin/market-trader/config', patch, { timeout: STEAM_BOT_WRITE_TIMEOUT_MS })
+  },
+
+  async selectMarketTraderBot(botId: string) {
+    return api.post('/admin/market-trader/bot', { botId })
+  },
+
+  async runMarketTrader() {
+    return api.post('/admin/market-trader/run')
   },
 
   // Autocomplete: só as linhas do catálogo, sem as facetas (que custam ~200ms por busca).

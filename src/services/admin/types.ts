@@ -698,6 +698,10 @@ export interface MarketTraderEvent {
   kind: string
   message: string
   marketHashName: string | null
+  /** Hash da CDN da Steam ou URL. */
+  image: string | null
+  /** Números da decisão: chave *Cents = dinheiro, *Pct = %. null em evento antigo. */
+  data: Record<string, unknown> | null
   createdAt: string
 }
 

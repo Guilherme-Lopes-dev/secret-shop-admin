@@ -4,6 +4,16 @@ import dayjs from 'dayjs'
 import { Icon } from '@iconify/vue'
 import { adminService } from '@/services/admin/admin.service'
 import type { MarketTraderEvent } from '@/services/admin/types'
+import { buildSteamImageUrl } from '@/utils/steamImage'
+import {
+    amountOf,
+    detailRows,
+    marginOf,
+    signalLabel,
+    signedPct,
+    topCandidatesOf,
+    type EventData,
+} from './traderEventDetails'
 
 const POLL_MS = 30_000
 
@@ -28,6 +38,7 @@ const dialog = ref<HTMLDialogElement | null>(null)
 const events = ref<MarketTraderEvent[]>([])
 const loading = ref(true)
 const loadError = ref(false)
+const expanded = ref(new Set<string>())
 let timer: ReturnType<typeof setInterval> | undefined
 
 const load = async () => {
@@ -49,6 +60,18 @@ onMounted(() => {
     timer = setInterval(load, POLL_MS)
 })
 onBeforeUnmount(() => clearInterval(timer))
+
+const toggle = (id: string) => {
+    const next = new Set(expanded.value)
+    if (!next.delete(id)) next.add(id)
+    expanded.value = next
+}
+
+const dataOf = (event: MarketTraderEvent) => event.data as EventData | null
+const thumb = (event: MarketTraderEvent) => buildSteamImageUrl(event.image, '64fx64f')
+const steamUrl = (name: string) => `https://steamcommunity.com/market/listings/570/${encodeURIComponent(name)}`
+const liveRoute = (name: string) => ({ name: 'steam-market', query: { name } })
+const marginClass = (pct: number | null) => (pct === null ? '' : pct >= 0 ? 'gain' : 'loss')
 </script>
 
 <template>
@@ -58,7 +81,9 @@ onBeforeUnmount(() => clearInterval(timer))
                 <h2 id="trader-history-title" class="history-title">
                     <Icon icon="mdi:history" /> Histórico do trader
                 </h2>
-                <p class="history-sub">Últimos {{ events.length }} eventos, mais novos primeiro. Atualiza a cada 30 segundos.</p>
+                <p class="history-sub">
+                    Últimos {{ events.length }} eventos, mais novos primeiro. Clique numa linha pra ver os números da decisão.
+                </p>
             </div>
             <button class="close" type="button" aria-label="Fechar histórico" @click="dialog?.close()">
                 <Icon icon="mdi:close" />
@@ -73,21 +98,86 @@ onBeforeUnmount(() => clearInterval(timer))
             <table>
                 <thead>
                     <tr>
+                        <th class="toggle-col"><span class="sr-only">Detalhes</span></th>
                         <th>Quando</th>
                         <th>Tipo</th>
                         <th>Item</th>
+                        <th class="num">Valor</th>
+                        <th class="num">Margem</th>
                         <th>O que aconteceu</th>
                     </tr>
                 </thead>
                 <tbody>
-                    <tr v-for="event in events" :key="event.id" :class="event.kind">
-                        <td class="when">{{ dayjs(event.createdAt).format('DD/MM HH:mm:ss') }}</td>
-                        <td class="kind">
-                            <Icon :icon="eventKind(event.kind).icon" /> {{ eventKind(event.kind).label }}
-                        </td>
-                        <td class="name">{{ event.marketHashName ?? '—' }}</td>
-                        <td class="message">{{ event.message }}</td>
-                    </tr>
+                    <template v-for="event in events" :key="event.id">
+                        <tr
+                            :class="[event.kind, { clickable: event.data, open: expanded.has(event.id) }]"
+                            @click="event.data && toggle(event.id)"
+                        >
+                            <td class="toggle-col">
+                                <button
+                                    v-if="event.data"
+                                    class="toggle"
+                                    type="button"
+                                    :aria-expanded="expanded.has(event.id)"
+                                    :aria-controls="`event-${event.id}`"
+                                    :aria-label="expanded.has(event.id) ? 'Esconder detalhes' : 'Ver detalhes'"
+                                    @click.stop="toggle(event.id)"
+                                >
+                                    <Icon :icon="expanded.has(event.id) ? 'mdi:chevron-down' : 'mdi:chevron-right'" />
+                                </button>
+                            </td>
+                            <td class="when">{{ dayjs(event.createdAt).format('DD/MM HH:mm:ss') }}</td>
+                            <td class="kind">
+                                <Icon :icon="eventKind(event.kind).icon" /> {{ eventKind(event.kind).label }}
+                            </td>
+                            <td class="name">
+                                <div v-if="event.marketHashName" class="item">
+                                    <img v-if="thumb(event)" :src="thumb(event)!" alt="" loading="lazy" />
+                                    <span>{{ event.marketHashName }}</span>
+                                </div>
+                                <span v-else class="muted">—</span>
+                            </td>
+                            <td class="num">{{ amountOf(dataOf(event)) }}</td>
+                            <td class="num" :class="marginClass(marginOf(dataOf(event)))">
+                                {{ marginOf(dataOf(event)) === null ? '—' : signedPct(marginOf(dataOf(event)) as number) }}
+                            </td>
+                            <td class="message">{{ event.message }}</td>
+                        </tr>
+
+                        <tr v-if="event.data && expanded.has(event.id)" :id="`event-${event.id}`" class="details-row">
+                            <td colspan="7">
+                                <div class="details">
+                                    <dl class="details-grid">
+                                        <div v-for="row in detailRows(dataOf(event)!)" :key="row.key" class="detail">
+                                            <dt>{{ row.label }}</dt>
+                                            <dd>{{ row.value }}</dd>
+                                        </div>
+                                    </dl>
+
+                                    <div v-if="topCandidatesOf(dataOf(event)).length" class="top">
+                                        <h3 class="top-title">Melhores candidatos do ciclo</h3>
+                                        <ol class="top-list">
+                                            <li v-for="candidate in topCandidatesOf(dataOf(event))" :key="candidate.name">
+                                                <span>{{ candidate.name }}</span>
+                                                <span class="muted">
+                                                    {{ signedPct(candidate.estimatedMarginPct) }} · {{ signalLabel(candidate.signal) }} · {{ candidate.sold7d }} vendas/semana
+                                                </span>
+                                            </li>
+                                        </ol>
+                                    </div>
+
+                                    <div v-if="event.marketHashName" class="links">
+                                        <RouterLink :to="liveRoute(event.marketHashName)" class="link" @click="dialog?.close()">
+                                            <Icon icon="mdi:chart-timeline-variant" /> Market ao vivo
+                                        </RouterLink>
+                                        <a :href="steamUrl(event.marketHashName)" target="_blank" rel="noopener" class="link">
+                                            <Icon icon="mdi:steam" /> Página na Steam
+                                        </a>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                    </template>
                 </tbody>
             </table>
         </div>
@@ -164,6 +254,14 @@ onBeforeUnmount(() => clearInterval(timer))
     min-height 0
     overflow auto
 
+.sr-only
+    position absolute
+    width 1px
+    height 1px
+    overflow hidden
+    clip rect(0 0 0 0)
+    white-space nowrap
+
 table
     width 100%
     border-collapse collapse
@@ -182,16 +280,45 @@ th
     background #121214
     border-bottom 1px solid rgba(255,255,255,0.08)
 
-    &:first-child
-        padding-left 2rem
-
 td
-    padding 0.55rem 0.8rem
-    vertical-align top
+    padding 0.5rem 0.8rem
+    vertical-align middle
     border-bottom 1px solid rgba(255,255,255,0.04)
 
-    &:first-child
-        padding-left 2rem
+.toggle-col
+    width 1%
+    padding-left 1.5rem
+    padding-right 0
+
+.toggle
+    display inline-flex
+    align-items center
+    justify-content center
+    width 28px
+    height 28px
+    font-size 1.1rem
+    color #94a3b8
+    background none
+    border 1px solid transparent
+    border-radius 6px
+    cursor pointer
+
+    &:hover
+        background rgba(255,255,255,0.06)
+
+    &:focus-visible
+        border-color #6366f1
+        outline none
+
+tr.clickable
+    cursor pointer
+
+    &:hover td
+        background rgba(255,255,255,0.025)
+
+tr.open td
+    background rgba(255,255,255,0.035)
+    border-bottom-color transparent
 
 .when
     color #64748b
@@ -206,12 +333,39 @@ td
         vertical-align -2px
 
 .name
-    min-width 180px
+    min-width 220px
     color #e2e8f0
+
+.item
+    display flex
+    align-items center
+    gap 0.6rem
+
+    img
+        flex none
+        width 40px
+        height 40px
+        object-fit contain
+        border-radius 6px
+        background rgba(255,255,255,0.04)
+
+.num
+    text-align right
+    white-space nowrap
+    font-variant-numeric tabular-nums
+
+.gain
+    color #86efac
+
+.loss
+    color #fca5a5
 
 .message
     min-width 260px
     color #cbd5e1
+
+.muted
+    color #64748b
 
 tr.sold .kind, tr.fill .kind
     color #86efac
@@ -222,10 +376,81 @@ tr.buy .kind, tr.list .kind
 tr.error .kind, tr.guard .kind
     color #fdba74
 
+.details-row td
+    padding 0 1.5rem 1.25rem 3.75rem
+    background rgba(255,255,255,0.035)
+
+.details
+    display flex
+    flex-direction column
+    gap 1rem
+
+.details-grid
+    display grid
+    grid-template-columns repeat(auto-fill, minmax(220px, 1fr))
+    gap 0.6rem 1.5rem
+    margin 0
+
+.detail
+    display flex
+    flex-direction column
+    gap 0.15rem
+
+    dt
+        color #64748b
+        font-size 0.74rem
+
+    dd
+        margin 0
+        color #e2e8f0
+        font-variant-numeric tabular-nums
+        overflow-wrap anywhere
+
+.top-title
+    margin 0 0 0.4rem
+    font-size 0.8rem
+    font-weight 600
+    color #94a3b8
+
+.top-list
+    margin 0
+    padding-left 1.2rem
+    display grid
+    gap 0.25rem
+
+    li
+        display flex
+        flex-wrap wrap
+        gap 0.25rem 0.75rem
+        color #e2e8f0
+
+.links
+    display flex
+    gap 0.5rem
+    flex-wrap wrap
+
+.link
+    display inline-flex
+    align-items center
+    gap 0.35rem
+    padding 0.35rem 0.75rem
+    color #cbd5e1
+    font-size 0.8rem
+    text-decoration none
+    background #1a1a1e
+    border 1px solid rgba(255,255,255,0.1)
+    border-radius 8px
+
+    &:hover
+        background #2a2a30
+
 @media (max-width: 640px)
     .history-header
         padding 1rem
 
-    th:first-child, td:first-child
-        padding-left 1rem
+    .toggle-col
+        padding-left 0.75rem
+
+    .details-row td
+        padding 0 1rem 1rem
 </style>

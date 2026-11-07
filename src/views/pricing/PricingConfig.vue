@@ -6,6 +6,7 @@ import {
     adminService,
     type ArcanaHeroMultiplier,
     type EntryPriceSource,
+    type PricingConfigBase,
 } from '@/services/admin/admin.service'
 
 const errorMessage = (err: unknown, fallback: string): string => {
@@ -18,6 +19,8 @@ const saving = ref(false)
 
 const config = reactive({
     priceSyncDiscount: 0.85,
+    priceSyncRisingMultiplier: 0.85,
+    priceSyncFallingMultiplier: 0.85,
     dropshipPriceMultiplier: 1,
     arcanaLevel1Multiplier: 1,
     arcanaLevel2Multiplier: 1,
@@ -60,12 +63,49 @@ const allPositive = computed(() =>
     Object.values(config).every((value) => Number.isFinite(value) && value > 0),
 )
 
+// Mesmos limites do backend (UpdatePricingConfigDto): salvar reprecifica o catálogo na hora.
+const TREND_MULTIPLIER_MIN = 0.3
+const TREND_MULTIPLIER_MAX = 1.5
+
+const isValidTrendMultiplier = (value: number) =>
+    value >= TREND_MULTIPLIER_MIN && value <= TREND_MULTIPLIER_MAX
+
+const trendMultipliersValid = computed(
+    () =>
+        isValidTrendMultiplier(config.priceSyncRisingMultiplier) &&
+        isValidTrendMultiplier(config.priceSyncFallingMultiplier),
+)
+
+const loadedTrendMultipliers = { rising: 0, falling: 0 }
+
+const applyTrendMultipliers = (saved: PricingConfigBase) => {
+    config.priceSyncRisingMultiplier = saved.priceSyncRisingMultiplier
+    config.priceSyncFallingMultiplier = saved.priceSyncFallingMultiplier
+    loadedTrendMultipliers.rising = saved.priceSyncRisingMultiplier
+    loadedTrendMultipliers.falling = saved.priceSyncFallingMultiplier
+}
+
+// Sem edição, o multiplicador fica fora do payload: chave nunca salva segue o desconto do sync.
+const buildConfigPayload = () => {
+    const { priceSyncRisingMultiplier, priceSyncFallingMultiplier, ...otherFields } = config
+    const risingEdited = priceSyncRisingMultiplier !== loadedTrendMultipliers.rising
+    const fallingEdited = priceSyncFallingMultiplier !== loadedTrendMultipliers.falling
+
+    return {
+        ...otherFields,
+        entryPriceSource: entryPriceSource.value,
+        ...(risingEdited ? { priceSyncRisingMultiplier } : {}),
+        ...(fallingEdited ? { priceSyncFallingMultiplier } : {}),
+    }
+}
+
 const loadConfig = async () => {
     loading.value = true
     try {
         const res = await adminService.getPricingConfig()
         if (res.data) {
             config.priceSyncDiscount = res.data.priceSyncDiscount
+            applyTrendMultipliers(res.data)
             config.dropshipPriceMultiplier = res.data.dropshipPriceMultiplier
             config.arcanaLevel1Multiplier = res.data.arcanaLevelMultipliers[1]
             config.arcanaLevel2Multiplier = res.data.arcanaLevelMultipliers[2]
@@ -94,12 +134,14 @@ const saveConfig = async () => {
         toast.error('Pisos inválidos: máximo 100%, e o absoluto não pode passar do protegido.')
         return
     }
+    if (!trendMultipliersValid.value) {
+        toast.error(`Multiplicadores de alta e baixa devem ficar entre ${TREND_MULTIPLIER_MIN} e ${TREND_MULTIPLIER_MAX}.`)
+        return
+    }
     saving.value = true
     try {
-        await adminService.setPricingConfig({
-            ...config,
-            entryPriceSource: entryPriceSource.value,
-        })
+        const res = await adminService.setPricingConfig(buildConfigPayload())
+        if (res.data) applyTrendMultipliers(res.data)
         toast.success('Configuração salva. Preços do site sendo recalculados...')
     } catch (err) {
         toast.error(errorMessage(err, 'Erro ao salvar configuração.'))
@@ -238,7 +280,23 @@ const removeHeroRow = async (row: ArcanaHeroMultiplier) => {
                             v-model.number="config.priceSyncDiscount"
                             type="number" min="0.01" step="0.01" class="field-input"
                         />
-                        <p class="field-hint">median × {{ config.priceSyncDiscount }} = {{ discountPercentLabel }}</p>
+                        <p class="field-hint">median × {{ config.priceSyncDiscount }} = {{ discountPercentLabel }}. Vale pra skin estável, ilíquida ou sem histórico.</p>
+                    </div>
+                    <div class="config-field">
+                        <label class="field-label">Multiplicador em alta (skins normais)</label>
+                        <input
+                            v-model.number="config.priceSyncRisingMultiplier"
+                            type="number" :min="TREND_MULTIPLIER_MIN" :max="TREND_MULTIPLIER_MAX" step="0.01" class="field-input"
+                        />
+                        <p class="field-hint">pico e alta: 5% ou mais acima do normal, já descontado o mercado</p>
+                    </div>
+                    <div class="config-field">
+                        <label class="field-label">Multiplicador em baixa (skins normais)</label>
+                        <input
+                            v-model.number="config.priceSyncFallingMultiplier"
+                            type="number" :min="TREND_MULTIPLIER_MIN" :max="TREND_MULTIPLIER_MAX" step="0.01" class="field-input"
+                        />
+                        <p class="field-hint">baixa e fundo: mais de 5% abaixo do normal, já descontado o mercado. O piso protegido continua valendo.</p>
                     </div>
                     <div class="config-field">
                         <label class="field-label">Multiplicador dropship</label>

@@ -29,10 +29,12 @@ withDefaults(defineProps<{ text: string; align?: 'center' | 'left' | 'right' }>(
         color #a5b4fc
 
     &:hover .bubble, &:focus-visible .bubble
-        opacity 1
-        visibility visible
+        display block
 
+// display none, não visibility: balão escondido ainda conta no tamanho rolável da página,
+// e o de um ícone perto da borda direita criava scroll horizontal na tela inteira.
 .bubble
+    display none
     position absolute
     top calc(100% + 8px)
     z-index 50
@@ -52,9 +54,6 @@ withDefaults(defineProps<{ text: string; align?: 'center' | 'left' | 'right' }>(
     letter-spacing normal
     white-space normal
     pointer-events none
-    opacity 0
-    visibility hidden
-    transition opacity 0.12s
 
     &.center
         left 50%

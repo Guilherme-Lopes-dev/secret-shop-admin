@@ -29,6 +29,7 @@ import type {
   DemandRow,
   MarketTraderConfig,
   MarketTraderEvent,
+  MarketTraderHours,
   MarketTraderOverview,
   MarketTrendsResponse,
   SwapTrendFactors,
@@ -1039,6 +1040,10 @@ export const adminService = {
 
   async getMarketTrader() {
     return api.get<MarketTraderOverview>('/admin/market-trader', { timeout: STEAM_BOT_TIMEOUT_MS })
+  },
+
+  async getMarketTraderHours() {
+    return api.get<MarketTraderHours>('/admin/market-trader/hours')
   },
 
   async getMarketTraderEvents() {

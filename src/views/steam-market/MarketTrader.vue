@@ -14,6 +14,7 @@ import type {
 } from '@/services/admin/types'
 import { formatMoney } from './marketMath'
 import TraderHistoryModal from './TraderHistoryModal.vue'
+import TraderHoursPanel from './TraderHoursPanel.vue'
 
 const POLL_MS = 30_000
 
@@ -343,6 +344,8 @@ const runNow = async () => {
                     </tbody>
                 </table>
             </section>
+
+            <TraderHoursPanel />
 
             <h2 class="section-heading"><Icon icon="mdi:tune-variant" /> Limites</h2>
             <form class="section limits" @submit.prevent="saveLimits">

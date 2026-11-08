@@ -705,6 +705,26 @@ export interface MarketTraderEvent {
   createdAt: string
 }
 
+export interface MarketTraderBookHour {
+  /** Hora de Brasília, 0–23. */
+  hour: number
+  samples: number
+  items: number
+  /** Maior lance contra o normal do próprio item: negativo = lance mais barato nessa hora. */
+  bidVsItemPct: number
+  /** Menor venda contra o normal do próprio item: positivo = vende mais caro nessa hora. */
+  askVsItemPct: number
+  /** Quanto sobra entre lance e venda, depois da taxa. */
+  spreadPct: number
+}
+
+export interface MarketTraderHours {
+  samples: number
+  items: number
+  since: string | null
+  hours: MarketTraderBookHour[]
+}
+
 export interface MarketTraderOverview {
   config: MarketTraderConfig
   /** false = servidor sem MARKET_TRADER_ENABLED: cron parado e modo real bloqueado. */

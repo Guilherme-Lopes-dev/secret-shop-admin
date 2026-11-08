@@ -2316,6 +2316,8 @@ export interface RewardClaim {
     has_trade_link: boolean
     /** Gasto total em centavos — mesma régua do filtro de lote. */
     spent: number | null
+    /** Gasto depois do último reset — é o que a trava do mínimo confere ao liberar. */
+    cycle_spent: number | null
   }
   item: {
     name:           string | null
@@ -2409,6 +2411,8 @@ export interface RewardSimulationRow {
   }
   /** Gasto que dimensiona o brinde e o orçamento que ele compra, em centavos. */
   spent:        number
+  /** Gasto depois do último reset — é o que explica o `needs_spend`. */
+  cycle_spent:  number
   budget:       number
   reached_tier: number
   /** Nível simulado — nulo quando não há o que resgatar. */

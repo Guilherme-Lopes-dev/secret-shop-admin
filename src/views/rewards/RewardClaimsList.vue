@@ -572,7 +572,17 @@ onMounted(() => {
                   <template v-else>{{ claim.tier ?? '—' }}</template>
                 </td>
                 <td class="price">{{ formatCurrency(claim.item.retail_price) }}</td>
-                <td class="price spent">{{ claim.user.spent === null ? '—' : formatCurrency(claim.user.spent) }}</td>
+                <td class="price spent">
+                  {{ claim.user.spent === null ? '—' : formatCurrency(claim.user.spent) }}
+                  <!-- só aparece depois de um reset: igual ao total, não diz nada -->
+                  <small
+                    v-if="claim.user.cycle_spent !== null && claim.user.cycle_spent !== claim.user.spent"
+                    class="cycle-spent"
+                    title="Gasto depois do último reset dos brindes — é o que a liberação confere"
+                  >
+                    ciclo {{ formatCurrency(claim.user.cycle_spent) }}
+                  </small>
+                </td>
                 <td>
                   <span class="status-badge" :class="statusOf(claim.status).cls">
                     {{ statusOf(claim.status).label }}
@@ -775,6 +785,11 @@ onMounted(() => {
 
 .spent
     color #94a3b8
+
+.cycle-spent
+    display block
+    color #64748b
+    font-size 0.7rem
 
 .bulk-row
     display flex

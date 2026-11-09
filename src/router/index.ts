@@ -90,6 +90,11 @@ const routes = [
         component: () => import('@/views/market-trends/MarketTrends.vue'),
       },
       {
+        path: 'market-trends/stories',
+        name: 'market-stories',
+        component: () => import('@/views/market-trends/StoryPicks.vue'),
+      },
+      {
         path: 'skins/prices/:uuid',
         name: 'skin-price-history',
         component: () => import('@/views/skins/SkinPriceHistory.vue'),

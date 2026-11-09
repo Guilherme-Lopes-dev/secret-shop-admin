@@ -31,6 +31,7 @@ import type {
   MarketTraderEvent,
   MarketTraderHours,
   MarketTraderOverview,
+  MarketStoriesResponse,
   MarketTrendsResponse,
   SwapTrendFactors,
   SwapTrendsResponse,
@@ -436,6 +437,15 @@ export const adminService = {
     // 1ª abertura do dia recalcula a mediana de ~1 milhão de linhas (Mês ≈ 4s local, mais em
     // produção); as seguintes vêm do cache de 10 min. Os 10s padrão cortavam no meio.
     return api.get<MarketTrendsResponse>(`/admin/market-trends?${params}`, { timeout: 60_000 })
+  },
+
+  async getMarketStories(filters: { period: number; minSold7d: number }) {
+    const params = new URLSearchParams({
+      period: String(filters.period),
+      minSold7d: String(filters.minSold7d),
+    })
+    // Mesmo snapshot da Steam das tendências: 1ª abertura do dia pode passar dos 10s padrão.
+    return api.get<MarketStoriesResponse>(`/admin/market-trends/stories?${params}`, { timeout: 60_000 })
   },
 
   /** Sem nomes: os itens com mais peso no trocador. Nome repetido no query (pode ter vírgula). */

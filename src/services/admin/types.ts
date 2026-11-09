@@ -573,11 +573,18 @@ export interface MarketTrendsResponse {
     /** Total real de termos sem resultado — a lista acima vem cortada em 25. */
     missedTotal: number
   }
-  /** 5 itens do estoque com maior lucro esperado se um story empurrar a venda. */
-  stories: MarketTrendStoryPick[]
 }
 
-export interface MarketTrendStoryPick {
+/** Todo item do estoque com lucro, ranqueado por `score`. A tela filtra e recorta. */
+export interface MarketStoriesResponse {
+  day: string
+  fromDay: string
+  period: 1 | 7 | 30
+  minSold7d: number
+  picks: StoryPick[]
+}
+
+export interface StoryPick {
   /** uuid da skin — vai como skin_uuid no composer do Instagram. */
   skinId: string
   marketHashName: string

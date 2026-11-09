@@ -10,7 +10,6 @@ import { adminService } from '@/services/admin/admin.service'
 import type {
     MarketTrendItem,
     MarketTrendSearch,
-    MarketTrendStoryPick,
     MarketTrendsResponse,
 } from '@/services/admin/types'
 import { formatCurrency } from '@/utils/formatCurrency'
@@ -79,12 +78,6 @@ const TIPS = {
     siteSide: 'Vendas pagas (com faturamento), entradas na lista de desejos e em carrinhos no período.',
     stock: 'Unidades disponíveis pra venda agora (skins + collectors). "sem" = esgotado.',
     zeroRate: 'Fatia das buscas por esse termo que não encontrou nenhum item. 100% = ninguém achou nada.',
-    stories:
-        'Os 5 itens do seu estoque que mais dão lucro se um story empurrar a venda. A conta: lucro por unidade ' +
-        '(preço da vitrine − custo de entrada) × interesse de quem já quer o item agora (carrinho pesa o dobro da ' +
-        'lista de desejos, vendas recentes e buscas também contam) × bônus se a loja está abaixo da Steam ou se o ' +
-        'item está valorizando. No máximo 2 do mesmo herói pra variar os stories. Só entra skin com custo ' +
-        'registrado e lucro de pelo menos R$ 5. "Criar story" abre o Instagram com o item e a frase já preenchidos.',
 }
 
 const STEAM_SECTIONS: Section<ItemListKey>[] = [
@@ -289,13 +282,6 @@ const openHistory = (item: MarketTrendItem) =>
 const openBuyOrder = (item: MarketTrendItem) =>
     router.push({ name: 'steam-market', query: { name: item.marketHashName, buy: '1' } })
 
-// O composer do Instagram lê esses parâmetros e já abre em modo story com o item e a frase.
-const createStory = (pick: MarketTrendStoryPick) =>
-    router.push({
-        name: 'instagram',
-        query: { skin: pick.skinId, name: pick.name, hero: pick.hero ?? undefined, message: pick.hook },
-    })
-
 // Trocar filtro rápido dispara várias buscas; só a última pode escrever na tela.
 let requestToken = 0
 
@@ -343,10 +329,16 @@ onMounted(fetchTrends)
                     <template v-if="data"> — {{ formatDay(data.day) }}</template>
                 </p>
             </div>
-            <button class="ghost-btn" :disabled="loading" @click="fetchTrends">
-                <Icon icon="mdi:refresh" width="18" :class="{ spin: loading }" />
-                Atualizar
-            </button>
+            <div class="header-actions">
+                <RouterLink :to="{ name: 'market-stories' }" class="ghost-btn">
+                    <Icon icon="mdi:instagram" width="18" />
+                    Recomendados pra story
+                </RouterLink>
+                <button class="ghost-btn" :disabled="loading" @click="fetchTrends">
+                    <Icon icon="mdi:refresh" width="18" :class="{ spin: loading }" />
+                    Atualizar
+                </button>
+            </div>
         </header>
 
         <div class="section filters-section">
@@ -468,60 +460,6 @@ onMounted(fetchTrends)
                     </div>
                 </div>
             </div>
-
-            <h2 class="group-title">
-                <Icon icon="mdi:instagram" width="20" /> Recomendados pra story
-                <InfoTip :text="TIPS.stories" align="left" />
-            </h2>
-            <div v-if="data.stories.length" class="stories-grid" :class="{ stale: loading }">
-                <article v-for="(pick, index) in data.stories" :key="pick.skinId" class="story-card">
-                    <header class="story-head">
-                        <span class="story-rank">{{ index + 1 }}</span>
-                        <img
-                            v-if="pick.image && !brokenImages.has(pick.marketHashName)"
-                            :src="buildSteamImageUrl(pick.image) ?? ''"
-                            :alt="pick.name"
-                            class="story-image"
-                            @error="brokenImages.add(pick.marketHashName)"
-                        />
-                        <span v-else class="story-image image-fallback">
-                            <Icon icon="mdi:image-off-outline" width="20" />
-                        </span>
-                    </header>
-
-                    <h3 class="story-name" :title="pick.name">{{ pick.name }}</h3>
-                    <p class="story-tags">{{ [pick.hero, pick.rarity].filter(Boolean).join(' · ') }}</p>
-
-                    <div class="story-profit" title="Preço da vitrine − custo de entrada, por unidade">
-                        <span class="story-profit-value">{{ formatCurrency(pick.profit) }}</span>
-                        <span class="muted">de lucro/un. · {{ pick.marginPct }}%</span>
-                    </div>
-
-                    <dl class="story-prices">
-                        <div><dt>Loja</dt><dd>{{ formatCurrency(pick.sitePrice) }}</dd></div>
-                        <div><dt>Custo</dt><dd>{{ formatCurrency(pick.avgCost) }}</dd></div>
-                        <div><dt>Steam</dt><dd>{{ pick.steamPrice != null ? formatCurrency(pick.steamPrice) : '—' }}</dd></div>
-                        <div><dt>Estoque</dt><dd>{{ pick.stock }}</dd></div>
-                    </dl>
-
-                    <p class="story-hook" title="Frase sugerida pro story — vai pronta pro composer do Instagram">
-                        <Icon icon="mdi:format-quote-open" width="16" />
-                        {{ pick.hook }}
-                    </p>
-
-                    <ul class="story-reasons">
-                        <li v-for="reason in pick.reasons" :key="reason">{{ reason }}</li>
-                    </ul>
-
-                    <button class="story-btn" @click="createStory(pick)">
-                        <Icon icon="mdi:plus-box-outline" width="16" />
-                        Criar story
-                    </button>
-                </article>
-            </div>
-            <p v-else class="section section-empty">
-                Nenhum item do estoque com custo registrado e lucro acima de R$ 5 agora.
-            </p>
 
             <h2 class="group-title"><Icon icon="mdi:steam" width="20" /> Steam</h2>
             <div class="sections-stack" :class="{ stale: loading }">
@@ -954,6 +892,14 @@ onMounted(fetchTrends)
 <style lang="stylus" scoped>
 @import '../../styles/report-view.styl'
 
+.header-actions
+    display flex
+    flex-wrap wrap
+    gap 0.5rem
+
+    a
+        text-decoration none
+
 .page-title
     display flex
     align-items center
@@ -1015,134 +961,6 @@ onMounted(fetchTrends)
 
     .section
         margin-bottom 0
-
-.stories-grid
-    display grid
-    grid-template-columns repeat(auto-fit, minmax(unquote('min(220px, 100%)'), 1fr))
-    gap 1rem
-
-.story-card
-    display flex
-    flex-direction column
-    gap 0.6rem
-    background #1a1a1e
-    border 1px solid rgba(255,255,255,0.05)
-    border-radius 12px
-    padding 1rem
-
-.story-head
-    position relative
-    display flex
-    justify-content center
-    background rgba(255,255,255,0.03)
-    border-radius 8px
-    padding 0.75rem
-
-.story-rank
-    position absolute
-    top 0.5rem
-    left 0.5rem
-    width 24px
-    height 24px
-    display flex
-    align-items center
-    justify-content center
-    border-radius 999px
-    background rgba(225,48,108,0.2)
-    color #f9a8d4
-    font-size 0.78rem
-    font-weight 700
-
-.story-image
-    width 120px
-    height 80px
-    object-fit contain
-
-    &.image-fallback
-        width 120px
-        height 80px
-
-.story-name
-    font-size 0.92rem
-    font-weight 700
-    line-height 1.3
-    overflow hidden
-    text-overflow ellipsis
-    white-space nowrap
-
-.story-tags
-    margin-top -0.4rem
-    font-size 0.72rem
-    color #94a3b8
-
-.story-profit
-    display flex
-    align-items baseline
-    gap 0.4rem
-    font-size 0.78rem
-
-.story-profit-value
-    font-size 1.25rem
-    font-weight 800
-    color #22c55e
-
-.story-prices
-    display grid
-    grid-template-columns repeat(2, 1fr)
-    gap 0.3rem 0.75rem
-    margin 0
-    font-size 0.76rem
-
-    div
-        display flex
-        justify-content space-between
-
-    dt
-        color #64748b
-
-    dd
-        margin 0
-        font-weight 600
-
-.story-hook
-    display flex
-    gap 0.35rem
-    padding 0.55rem 0.65rem
-    border-left 3px solid #e1306c
-    background rgba(225,48,108,0.08)
-    border-radius 0 6px 6px 0
-    font-size 0.82rem
-    font-weight 600
-    color #fce7f3
-
-.story-reasons
-    margin 0
-    padding-left 1rem
-    display flex
-    flex-direction column
-    gap 0.3rem
-    font-size 0.74rem
-    color #cbd5e1
-    line-height 1.4
-    flex 1
-
-.story-btn
-    display flex
-    align-items center
-    justify-content center
-    gap 0.4rem
-    margin-top 0.25rem
-    padding 0.5rem
-    border-radius 8px
-    border 1px solid rgba(225,48,108,0.4)
-    background rgba(225,48,108,0.15)
-    color #f9a8d4
-    font-size 0.82rem
-    font-weight 600
-    cursor pointer
-
-    &:hover, &:focus-visible
-        background rgba(225,48,108,0.25)
 
 // Listas de item ocupam a largura toda: são 8–9 colunas, lado a lado não cabe.
 .sections-stack

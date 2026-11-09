@@ -636,6 +636,108 @@ export interface SteamBotWallet {
   balanceCents: number
 }
 
+export type MarketTraderMode = 'off' | 'paper' | 'live'
+
+export interface MarketTraderLimits {
+  budgetCents: number
+  minUnitCents: number
+  maxUnitCents: number
+  minSold7d: number
+  minMarginPct: number
+  minExitMarginPct: number
+  patienceDays: number
+  bidTtlHours: number
+  maxPerItem: number
+  maxOpenBids: number
+  maxNewOrdersPerCycle: number
+  maxReadsPerCycle: number
+  maxLoss7dCents: number
+}
+
+export type MarketTraderConfig = MarketTraderLimits & { mode: MarketTraderMode }
+
+export interface MarketTraderSummary {
+  openCount: number
+  committedCents: number
+  soldCount: number
+  wins: number
+  realizedCents: number
+  returnPct: number | null
+}
+
+export interface MarketTraderDecision {
+  marginPct: number
+  expectedReceiveCents: number
+  referenceCents: number
+  signal: string
+  relativePct: number | null
+  sold7d: number
+  interest: number
+  score: number
+}
+
+export interface MarketTraderPosition {
+  id: string
+  mode: 'paper' | 'live'
+  marketHashName: string
+  status: 'bidding' | 'unclaimed' | 'holding' | 'listed' | 'sold' | 'cancelled'
+  bidCents: number
+  receiveCents: number | null
+  buyOrderId: string | null
+  createdAt: string
+  filledAt: string | null
+  unlocksAt: string | null
+  listedAt: string | null
+  closedAt: string | null
+  closedReason: string | null
+  decision: MarketTraderDecision | null
+}
+
+export interface MarketTraderEvent {
+  id: string
+  kind: string
+  message: string
+  marketHashName: string | null
+  /** Hash da CDN da Steam ou URL. */
+  image: string | null
+  /** Números da decisão: chave *Cents = dinheiro, *Pct = %. null em evento antigo. */
+  data: Record<string, unknown> | null
+  createdAt: string
+}
+
+export interface MarketTraderBookHour {
+  /** Hora de Brasília, 0–23. */
+  hour: number
+  samples: number
+  items: number
+  /** Maior lance contra o normal do próprio item: negativo = lance mais barato nessa hora. */
+  bidVsItemPct: number
+  /** Menor venda contra o normal do próprio item: positivo = vende mais caro nessa hora. */
+  askVsItemPct: number
+  /** Quanto sobra entre lance e venda, depois da taxa. */
+  spreadPct: number
+}
+
+export interface MarketTraderHours {
+  samples: number
+  items: number
+  since: string | null
+  hours: MarketTraderBookHour[]
+}
+
+export interface MarketTraderOverview {
+  config: MarketTraderConfig
+  /** false = servidor sem MARKET_TRADER_ENABLED: cron parado e modo real bloqueado. */
+  liveAllowed: boolean
+  running: boolean
+  bots: { id: string; name: string; isTrader: boolean }[]
+  wallet: SteamBotWallet | null
+  market: { day: string; deviationPct: number | null; movePct: number | null; falling: boolean } | null
+  summary: { paper: MarketTraderSummary; live: MarketTraderSummary }
+  positions: MarketTraderPosition[]
+  events: MarketTraderEvent[]
+}
+
 export interface SteamBuyOrderInput {
   /** uuid do bot (chega como `id` na lista de bots). */
   botId: string

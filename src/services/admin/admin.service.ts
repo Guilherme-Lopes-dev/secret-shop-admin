@@ -27,6 +27,10 @@ import type {
   SwapNotificationsResponse,
   PassProgressDto,
   DemandRow,
+  MarketTraderConfig,
+  MarketTraderEvent,
+  MarketTraderHours,
+  MarketTraderOverview,
   MarketTrendsResponse,
   SwapTrendFactors,
   SwapTrendsResponse,
@@ -1032,6 +1036,31 @@ export const adminService = {
 
   async cancelSteamSellListing(botId: string, listingId: string) {
     return api.post(`/admin/steam-market/sell-listings/${listingId}/cancel`, { botId }, { timeout: STEAM_BOT_WRITE_TIMEOUT_MS })
+  },
+
+  async getMarketTrader() {
+    return api.get<MarketTraderOverview>('/admin/market-trader', { timeout: STEAM_BOT_TIMEOUT_MS })
+  },
+
+  async getMarketTraderHours() {
+    return api.get<MarketTraderHours>('/admin/market-trader/hours')
+  },
+
+  async getMarketTraderEvents() {
+    return api.get<MarketTraderEvent[]>('/admin/market-trader/events')
+  },
+
+  // Desligar o modo real cancela os lances abertos na Steam, um por um.
+  async updateMarketTraderConfig(patch: Partial<MarketTraderConfig>) {
+    return api.post<MarketTraderConfig>('/admin/market-trader/config', patch, { timeout: STEAM_BOT_WRITE_TIMEOUT_MS })
+  },
+
+  async selectMarketTraderBot(botId: string) {
+    return api.post('/admin/market-trader/bot', { botId })
+  },
+
+  async runMarketTrader() {
+    return api.post('/admin/market-trader/run')
   },
 
   // Autocomplete: só as linhas do catálogo, sem as facetas (que custam ~200ms por busca).
@@ -2287,6 +2316,8 @@ export interface RewardClaim {
     has_trade_link: boolean
     /** Gasto total em centavos — mesma régua do filtro de lote. */
     spent: number | null
+    /** Gasto depois do último reset — é o que a trava do mínimo confere ao liberar. */
+    cycle_spent: number | null
   }
   item: {
     name:           string | null
@@ -2380,6 +2411,8 @@ export interface RewardSimulationRow {
   }
   /** Gasto que dimensiona o brinde e o orçamento que ele compra, em centavos. */
   spent:        number
+  /** Gasto depois do último reset — é o que explica o `needs_spend`. */
+  cycle_spent:  number
   budget:       number
   reached_tier: number
   /** Nível simulado — nulo quando não há o que resgatar. */

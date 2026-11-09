@@ -199,7 +199,16 @@ onMounted(() => fetchSimulation(1))
                     </div>
                   </button>
                 </td>
-                <td class="price">{{ formatCurrency(row.spent) }}</td>
+                <td class="price">
+                  {{ formatCurrency(row.spent) }}
+                  <small
+                    v-if="row.cycle_spent !== row.spent"
+                    class="tier-reached"
+                    title="Gasto depois do último reset dos brindes — é o que a trava do mínimo confere"
+                  >
+                    ciclo {{ formatCurrency(row.cycle_spent) }}
+                  </small>
+                </td>
                 <td class="center">
                   <span class="tier-cell">
                     baú {{ row.tier ?? '—' }}<span class="tier-of">/{{ maxRewardTier }}</span>

@@ -983,7 +983,8 @@ export type AutoStoryPlan = {
   /** Snapshot da Steam ainda calculando (boot/sync): o painel tenta de novo em seguida. */
   ranking_pending?: boolean
   coupon_problem: string | null
-  bands: { label: string; count: number; available: number; selected: number }[]
+  /** prepared = já prontas hoje (ocupam vaga); backend antigo não manda. */
+  bands: { label: string; count: number; available: number; selected: number; prepared?: number }[]
   skins: {
     skin_uuid: string
     name: string

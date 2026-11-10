@@ -154,6 +154,14 @@ const saveLayoutAsDefault = async (layout: FinishLayout) => {
     toast.success('Padrão do story automático salvo. Vale pras próximas rodadas.')
 }
 
+const bandSummary = (band: AutoStoryPlan['bands'][number]) => {
+    const prepared = band.prepared ?? 0
+    const filled = `${band.label}: ${prepared + band.selected}/${band.count}`
+    if (!prepared) return filled
+
+    return `${filled} (${prepared} já prontas)`
+}
+
 const formatTime = (value: string | null | undefined) => (value ? dayjs(value).format('DD/MM HH:mm') : '—')
 
 const runSummary = computed(() => {
@@ -261,7 +269,7 @@ onUnmounted(() => {
                     </template>
                     <template v-else>
                         Próxima rodada pega {{ plan.skins.length }} skins
-                        ({{ plan.bands.map((band) => `${band.label}: ${band.selected}/${band.count}`).join(', ') }})
+                        ({{ plan.bands.map(bandSummary).join(', ') }})
                         — {{ plan.new_arts }} sem arte, {{ plan.new_arts_left_today }} artes novas ainda liberadas hoje,
                         ~US$ {{ plan.estimated_cost_usd.toFixed(2) }}.
                     </template>

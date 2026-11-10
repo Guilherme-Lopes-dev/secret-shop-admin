@@ -30,9 +30,15 @@ const markBroken = (skinUuid: string) => {
         <div v-for="group in groups" :key="group.label" class="group">
             <h3 class="group-title">
                 {{ group.label }}
-                <span class="muted">{{ group.selected }}/{{ group.count }} · {{ group.available }} disponíveis</span>
+                <span class="muted">
+                    {{ (group.prepared ?? 0) + group.selected }}/{{ group.count }}
+                    <template v-if="group.prepared">({{ group.prepared }} já prontas)</template>
+                    · {{ group.available }} disponíveis
+                </span>
             </h3>
-            <p v-if="!group.skins.length" class="muted empty">Nenhuma skin nessa faixa hoje.</p>
+            <p v-if="!group.skins.length" class="muted empty">
+                {{ group.prepared && group.prepared >= group.count ? 'Faixa completa hoje.' : 'Nenhuma skin nessa faixa hoje.' }}
+            </p>
             <ul v-else class="skins">
                 <li v-for="(skin, index) in group.skins" :key="skin.skin_uuid" class="skin">
                     <span class="rank">{{ index + 1 }}</span>

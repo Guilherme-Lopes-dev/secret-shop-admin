@@ -39,7 +39,7 @@ const TIPS = {
         'sempre os de agora.',
     liquidity:
         'Vendas na Steam nos últimos 7 dias pra variação de preço contar. Item que quase não vende muda de preço ' +
-        'com uma venda só — abaixo disso, "valorizando" é ignorado.',
+        'com uma venda só — abaixo disso, "valorizando" e "abaixo da Steam" são ignorados.',
     signals: 'Marque pra mostrar só itens que têm todos os sinais marcados.',
     perHero: 'Corta itens do mesmo herói depois dos N primeiros, pra variar os stories.',
 }

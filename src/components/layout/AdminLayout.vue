@@ -133,6 +133,7 @@ const navGroups: NavGroup[] = [
             { label: 'Cupons', icon: 'mdi:ticket-percent-outline', to: '/coupons', name: 'coupons' },
             { label: 'Runas', icon: 'mdi:diamond-stone', to: '/runes', name: 'runes' },
             { label: 'Instagram', icon: 'mdi:instagram', to: '/instagram', name: 'instagram' },
+            { label: 'Story automático', icon: 'mdi:calendar-clock', to: '/instagram/automatico', name: 'instagram-auto-stories' },
             { label: 'Interações Instagram', icon: 'mdi:chart-line', to: '/instagram/interacoes', name: 'instagram-interactions' },
             { label: 'Voz da loja', icon: 'mdi:microphone-outline', to: '/instagram/voz', name: 'instagram-voice' },
             { label: 'Skills Instagram', icon: 'mdi:robot-outline', to: '/instagram/skills', name: 'instagram-skills' },

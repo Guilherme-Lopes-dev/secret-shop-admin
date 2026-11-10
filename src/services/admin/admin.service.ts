@@ -2,6 +2,10 @@ import { api } from '@/lib/api/api'
 import type { CatalogItem } from '@/utils/catalog'
 import type { FinishLayout } from '@/views/instagram/finishCanvas'
 import type {
+  AutoStoryConfig,
+  AutoStoryCoupon,
+  AutoStoryOverview,
+  AutoStoryPlan,
   DiscordAssignRolePayload,
   DiscordBotChannelDto,
   DiscordAuditLogDto,
@@ -1742,6 +1746,43 @@ export const adminService = {
 
   async deleteInstagramPost(uuid: string) {
     return api.delete(`/instagram/posts/${uuid}`)
+  },
+
+  // ── Story automático de skins ──────────────────────────────────────────────
+
+  async getAutoStories() {
+    return api.get<AutoStoryOverview>('/instagram/auto-stories')
+  },
+
+  /** Simula a próxima rodada (skins por faixa, artes novas, custo). Usa o ranking: pode demorar. */
+  async getAutoStoryPlan() {
+    return api.get<AutoStoryPlan>('/instagram/auto-stories/plan', { timeout: 60_000 })
+  },
+
+  async getAutoStoryCoupons() {
+    return api.get<AutoStoryCoupon[]>('/instagram/auto-stories/coupons')
+  },
+
+  /** Parcial: o backend junta com o salvo. Não mexe nos rascunhos já feitos. */
+  async updateAutoStoryConfig(data: Partial<AutoStoryConfig>) {
+    return api.put<AutoStoryOverview>('/instagram/auto-stories/config', data)
+  },
+
+  /** Dispara a rodada (conta como a do dia) e volta na hora; acompanhar por polling. */
+  async runAutoStories() {
+    return api.post<AutoStoryOverview>('/instagram/auto-stories/run')
+  },
+
+  async publishAutoStoriesToday() {
+    return api.post<AutoStoryOverview>('/instagram/auto-stories/publish-today')
+  },
+
+  async publishAutoStory(uuid: string) {
+    return api.post<AutoStoryOverview>(`/instagram/auto-stories/${uuid}/publish`)
+  },
+
+  async discardAutoStoryArt(uuid: string) {
+    return api.post<AutoStoryOverview>(`/instagram/auto-stories/${uuid}/discard-art`)
   },
 
   /** Logo + preço + frase por cima da arte da IA. Refaz sempre da arte crua; volta o post atualizado. */

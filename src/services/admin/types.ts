@@ -1,3 +1,5 @@
+import type { FinishLayout } from '@/views/instagram/finishCanvas'
+
 export interface PassTierEntry {
   rank:          number
   name:          string
@@ -878,3 +880,110 @@ export interface KitPayload {
   is_active: boolean
   skin_uuids: string[]
 }
+
+// ── Story automático de skins (/instagram/auto-stories) ─────────────────────
+
+export type AutoStoryBand = { max_cents: number | null; count: number }
+
+export type AutoStoryConfig = {
+  is_active: boolean
+  auto_publish: boolean
+  /** 0 = domingo … 6 = sábado. */
+  weekdays: number[]
+  prepare_time: string
+  publish_time: string
+  coupon_uuid: string | null
+  note_template: string
+  bands: AutoStoryBand[]
+  skip_published_days: number
+  max_per_hero: number
+  max_new_arts_per_day: number
+  period: 1 | 7 | 30
+  min_sold_7d: number
+  layout: FinishLayout | null
+}
+
+export type AutoStoryRunResult = {
+  created: number
+  reused: number
+  generated: number
+  failed: number
+  skipped: { cap_reached: number; error: number }
+  error: string | null
+}
+
+export type AutoStoryLastRun = {
+  date: string
+  trigger: 'job' | 'manual'
+  started_at: string
+  finished_at: string | null
+  interrupted?: boolean
+  result: AutoStoryRunResult | null
+}
+
+export type AutoStoryPublishResult = {
+  published: number
+  skipped_stock: number
+  repriced: number
+  failed: number
+  error: string | null
+}
+
+export type AutoStoryLastPublish = {
+  date: string
+  started_at: string
+  finished_at: string | null
+  result: AutoStoryPublishResult | null
+}
+
+export type AutoStoryMeta = {
+  band_index: number
+  /** Rótulo da faixa na hora da rodada. */
+  band_label: string
+  rank: number
+  price_cents: number
+  coupon_uuid: string
+  coupon_code: string
+  note: string
+  new_art: boolean
+}
+
+export type AutoStoryRow = {
+  /** uuid do post (o interceptor renomeia). */
+  id: string
+  status: 'GENERATING' | 'DRAFT' | 'PUBLISHING' | 'PUBLISHED' | 'FAILED'
+  error: string | null
+  image_url: string | null
+  permalink: string | null
+  published_at: string | null
+  auto_meta: AutoStoryMeta | null
+  skin: { id: string; market_hash_name: string } | null
+  current_price_cents: number | null
+  stock: number
+}
+
+export type AutoStoryOverview = {
+  config: AutoStoryConfig
+  last_run: AutoStoryLastRun | null
+  last_publish: AutoStoryLastPublish | null
+  preparing: boolean
+  publishing: boolean
+  next_run: string
+  coupon_problem: string | null
+  /** false = backend local: o cron não roda e publicar daqui é bloqueado. */
+  automation_enabled: boolean
+  today: AutoStoryRow[]
+  /** Arte crua mais recente: fundo do editor de posição. */
+  sample_art_url: string | null
+}
+
+export type AutoStoryPlan = {
+  coupon_problem: string | null
+  bands: { label: string; count: number; available: number; selected: number }[]
+  skins: { skin_uuid: string; name: string; hero: string | null; price_cents: number; band: string; has_art: boolean }[]
+  new_arts: number
+  new_arts_left_today: number
+  estimated_cost_usd: number
+}
+
+export type AutoStoryCoupon = { id: string; code: string; description: string | null }

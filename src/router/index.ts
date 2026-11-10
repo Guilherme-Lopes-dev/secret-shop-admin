@@ -303,6 +303,11 @@ const routes = [
         component: () => import('@/views/meta-ads/MetaAds.vue'),
       },
       {
+        path: 'instagram/automatico',
+        name: 'instagram-auto-stories',
+        component: () => import('@/views/instagram/InstagramAutoStories.vue'),
+      },
+      {
         path: 'instagram/interacoes',
         name: 'instagram-interactions',
         component: () => import('@/views/instagram/InstagramInteractions.vue'),

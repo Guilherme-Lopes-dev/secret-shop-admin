@@ -31,12 +31,13 @@ const NOTE_MAX_LENGTH = 60
 
 const TIPS = {
     bands: 'Faixa pelo preço da vitrine (teto incluso). Faixa sem skins suficientes sai menor: a sobra não passa pra outra. Até 20 stories por rodada somando tudo.',
-    skip: 'Skin com qualquer post publicado nesse período fica de fora.',
+    skip: 'Skin com qualquer post publicado (inclusive manual) há menos dias que isso fica de fora da faixa. Faixa com pouco estoque pede prazo menor.',
     newArts: 'Arte nova é gerada pela IA (~US$ 0,43 cada). Skin que já tem arte reaproveita sem custo. Conta job e botão juntos no dia.',
     ranking: 'Mesmo ranking da tela Recomendados pra story (lucro × interesse).',
 }
 
-type BandForm = { max_brl: number | null; count: number }
+type BandForm = { max_brl: number | null; count: number; skip_days: number }
+const DEFAULT_SKIP_DAYS = 30
 type Form = Omit<AutoStoryConfig, 'is_active' | 'auto_publish' | 'layout' | 'bands'> & { bands: BandForm[] }
 
 const toForm = (config: AutoStoryConfig): Form => ({
@@ -45,8 +46,11 @@ const toForm = (config: AutoStoryConfig): Form => ({
     publish_time: config.publish_time,
     coupon_uuid: config.coupon_uuid,
     note_template: config.note_template,
-    bands: config.bands.map((band) => ({ max_brl: band.max_cents === null ? null : band.max_cents / 100, count: band.count })),
-    skip_published_days: config.skip_published_days,
+    bands: config.bands.map((band) => ({
+        max_brl: band.max_cents === null ? null : band.max_cents / 100,
+        count: band.count,
+        skip_days: band.skip_days,
+    })),
     max_per_hero: config.max_per_hero,
     max_new_arts_per_day: config.max_new_arts_per_day,
     period: config.period,
@@ -59,6 +63,7 @@ const fromForm = (form: Form): Partial<AutoStoryConfig> => ({
         // A última faixa é sempre "sem teto".
         max_cents: index === form.bands.length - 1 || band.max_brl === null ? null : Math.round(Number(band.max_brl) * 100),
         count: Number(band.count) || 0,
+        skip_days: Number(band.skip_days) || 0,
     })),
 })
 
@@ -102,7 +107,7 @@ const addBand = () => {
     const bands = form.value.bands
     const open = bands.slice(-1)
     const lastLimit = bands[bands.length - 2]?.max_brl ?? 0
-    form.value.bands = [...bands.slice(0, -1), { max_brl: lastLimit + 100, count: 1 }, ...open]
+    form.value.bands = [...bands.slice(0, -1), { max_brl: lastLimit + 100, count: 1, skip_days: DEFAULT_SKIP_DAYS }, ...open]
 }
 
 const removeBand = (index: number) => {
@@ -236,7 +241,17 @@ const applyLayout = (layout: FinishLayout) => {
                 />
                 <span class="band-label">→</span>
                 <input v-model.number="band.count" type="number" min="0" max="10" class="band-input band-input--count" aria-label="Quantos stories" />
-                <span class="muted">stories</span>
+                <span class="muted">stories · pula publicadas há</span>
+                <input
+                    v-model.number="band.skip_days"
+                    type="number"
+                    min="0"
+                    max="90"
+                    class="band-input band-input--count"
+                    aria-label="Pular skin publicada há menos de quantos dias"
+                />
+                <span class="muted">dias</span>
+                <InfoTip v-if="index === 0" :text="TIPS.skip" />
                 <span v-if="plan?.bands[index]" class="muted">
                     ({{ plan.bands[index].available }} disponíveis hoje)
                 </span>
@@ -254,10 +269,6 @@ const applyLayout = (layout: FinishLayout) => {
         </div>
 
         <div class="filter-grid">
-            <div class="filter-field">
-                <label>Pular skin publicada nos últimos (dias) <InfoTip :text="TIPS.skip" /></label>
-                <input v-model.number="form.skip_published_days" type="number" min="0" max="90" />
-            </div>
             <div class="filter-field">
                 <label>Máximo por herói em cada faixa</label>
                 <input v-model.number="form.max_per_hero" type="number" min="0" max="10" />

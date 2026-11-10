@@ -883,7 +883,7 @@ export interface KitPayload {
 
 // ── Story automático de skins (/instagram/auto-stories) ─────────────────────
 
-export type AutoStoryBand = { max_cents: number | null; count: number }
+export type AutoStoryBand = { max_cents: number | null; count: number; skip_days: number }
 
 export type AutoStoryConfig = {
   is_active: boolean
@@ -895,7 +895,6 @@ export type AutoStoryConfig = {
   coupon_uuid: string | null
   note_template: string
   bands: AutoStoryBand[]
-  skip_published_days: number
   max_per_hero: number
   max_new_arts_per_day: number
   period: 1 | 7 | 30

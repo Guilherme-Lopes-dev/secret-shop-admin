@@ -953,6 +953,9 @@ export type AutoStoryRow = {
   status: 'GENERATING' | 'DRAFT' | 'PUBLISHING' | 'PUBLISHED' | 'FAILED'
   error: string | null
   image_url: string | null
+  /** Arte crua (sem preço/cupom): fundo do editor de posição. */
+  base_image_url: string | null
+  finish_layout: FinishLayout | null
   permalink: string | null
   published_at: string | null
   auto_meta: AutoStoryMeta | null

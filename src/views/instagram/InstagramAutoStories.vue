@@ -14,6 +14,9 @@ import type {
 import AutoStoryConfigForm from './AutoStoryConfigForm.vue'
 import AutoStoryPlanList from './AutoStoryPlanList.vue'
 import AutoStoryToday from './AutoStoryToday.vue'
+import FinishEditor from './FinishEditor.vue'
+import { DEFAULT_LAYOUT, type FinishLayout } from './finishCanvas'
+import { mediaUrl } from '@/utils/mediaUrl'
 
 const POLL_MS = 4000
 const BUSY_STATUSES: AutoStoryRow['status'][] = ['GENERATING', 'PUBLISHING']
@@ -116,6 +119,39 @@ const removeRow = async (row: AutoStoryRow) => {
     } catch (err) {
         toast.error(apiMessage(err, 'Não deu pra apagar.'))
     }
+}
+
+// ── Ajuste de posição de um rascunho ─────────────────────────────────────────
+const editing = ref<AutoStoryRow | null>(null)
+const applyingLayout = ref(false)
+const configLayout = computed(() => overview.value?.config.layout ?? DEFAULT_LAYOUT.STORY)
+// Mesmo preço que já está na arte: quem confere o preço atual é a publicação.
+const editingPrice = computed(() => (editing.value?.auto_meta ? editing.value.auto_meta.price_cents / 100 : null))
+
+const applyLayout = async (layout: FinishLayout) => {
+    const row = editing.value
+    if (!row) return
+    applyingLayout.value = true
+    try {
+        await adminService.finishInstagramPost(row.id, {
+            layout,
+            price_brl: editingPrice.value ?? undefined,
+            note: row.auto_meta?.note || undefined,
+        })
+        editing.value = null
+        await load()
+        toast.success('Arte ajustada.')
+    } catch (err) {
+        toast.error(apiMessage(err, 'Não deu pra ajustar a arte.'))
+    } finally {
+        applyingLayout.value = false
+    }
+}
+
+// "Salvar como padrão" aqui = posição da config (próximas rodadas).
+const saveLayoutAsDefault = async (layout: FinishLayout) => {
+    await act(() => adminService.updateAutoStoryConfig({ layout }), 'Não deu pra salvar o padrão.')
+    toast.success('Padrão do story automático salvo. Vale pras próximas rodadas.')
 }
 
 const formatTime = (value: string | null | undefined) => (value ? dayjs(value).format('DD/MM HH:mm') : '—')
@@ -243,6 +279,22 @@ onUnmounted(() => {
                     @publish="publishOne"
                     @remove="removeRow"
                     @discard-art="discardArt"
+                    @adjust="editing = $event"
+                />
+
+                <FinishEditor
+                    v-if="editing?.base_image_url"
+                    kind="STORY"
+                    :base-url="mediaUrl(editing.base_image_url)"
+                    :subject="editing.skin?.market_hash_name ?? null"
+                    :price="editingPrice"
+                    :note="editing.auto_meta?.note ?? null"
+                    :initial-layout="editing.finish_layout ?? configLayout"
+                    :default-layout="configLayout"
+                    :applying="applyingLayout"
+                    @close="editing = null"
+                    @apply="applyLayout"
+                    @save-default="saveLayoutAsDefault"
                 />
             </section>
 

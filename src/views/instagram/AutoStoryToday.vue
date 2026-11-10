@@ -15,6 +15,7 @@ const emit = defineEmits<{
     publish: [row: AutoStoryRow]
     remove: [row: AutoStoryRow]
     discardArt: [row: AutoStoryRow]
+    adjust: [row: AutoStoryRow]
 }>()
 
 const STATUS: Record<AutoStoryRow['status'], string> = {
@@ -75,6 +76,15 @@ const canRemove = (row: AutoStoryRow) => row.status === 'DRAFT' || (row.status =
                     @click="emit('publish', row)"
                 >
                     <Icon icon="mdi:send" width="15" /> Publicar
+                </button>
+                <button
+                    v-if="row.status === 'DRAFT' && row.base_image_url"
+                    class="action"
+                    :disabled="publishing"
+                    title="Arrastar preço, cupom e logo só nessa arte"
+                    @click="emit('adjust', row)"
+                >
+                    <Icon icon="mdi:cursor-move" width="15" /> Ajustar posição
                 </button>
                 <button v-if="row.status === 'DRAFT'" class="action" title="A próxima rodada gera outra arte pra essa skin" @click="emit('discardArt', row)">
                     <Icon icon="mdi:image-remove-outline" width="15" /> Descartar arte

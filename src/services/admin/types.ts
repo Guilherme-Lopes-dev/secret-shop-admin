@@ -980,7 +980,16 @@ export type AutoStoryOverview = {
 export type AutoStoryPlan = {
   coupon_problem: string | null
   bands: { label: string; count: number; available: number; selected: number }[]
-  skins: { skin_uuid: string; name: string; hero: string | null; price_cents: number; band: string; has_art: boolean }[]
+  skins: {
+    skin_uuid: string
+    name: string
+    /** Ícone da Steam (hash ou URL). Backend antigo não manda. */
+    image?: string | null
+    hero: string | null
+    price_cents: number
+    band: string
+    has_art: boolean
+  }[]
   new_arts: number
   new_arts_left_today: number
   estimated_cost_usd: number

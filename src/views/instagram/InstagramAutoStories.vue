@@ -12,6 +12,7 @@ import type {
     AutoStoryRow,
 } from '@/services/admin/types'
 import AutoStoryConfigForm from './AutoStoryConfigForm.vue'
+import AutoStoryPlanList from './AutoStoryPlanList.vue'
 import AutoStoryToday from './AutoStoryToday.vue'
 
 const POLL_MS = 4000
@@ -214,6 +215,11 @@ onUnmounted(() => clearInterval(timer))
                     </template>
                 </p>
 
+                <details v-if="plan && !plan.coupon_problem && !overview.preparing" class="plan-details" open>
+                    <summary>Selecionadas pra próxima rodada ({{ plan.skins.length }})</summary>
+                    <AutoStoryPlanList :plan="plan" />
+                </details>
+
                 <AutoStoryToday
                     :rows="overview.today"
                     :can-publish="overview.automation_enabled"
@@ -263,6 +269,17 @@ onUnmounted(() => clearInterval(timer))
     margin 0 0 1rem
     color #94a3b8
     font-size 0.8rem
+
+.plan-details
+    margin-bottom 1.25rem
+    padding-bottom 1rem
+    border-bottom 1px solid rgba(255,255,255,0.05)
+
+    summary
+        cursor pointer
+        color #a5b4fc
+        font-size 0.82rem
+        margin-bottom 0.75rem
 
 .local-banner
     display flex

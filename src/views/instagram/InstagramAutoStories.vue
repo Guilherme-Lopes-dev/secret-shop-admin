@@ -45,10 +45,16 @@ const load = async () => {
     }
 }
 
+const PLAN_RETRY_MS = 15_000
+let planRetry: ReturnType<typeof setTimeout> | undefined
+
+// Ranking ainda calculando (deploy/sync recalcula o snapshot da Steam): pergunta de novo sozinho.
 const loadPlan = async () => {
+    clearTimeout(planRetry)
     planLoading.value = true
     try {
         plan.value = (await adminService.getAutoStoryPlan()).data
+        if (plan.value.ranking_pending) planRetry = setTimeout(loadPlan, PLAN_RETRY_MS)
     } catch (err) {
         plan.value = null
         toast.error(apiMessage(err, 'Não deu pra simular a próxima rodada.'))
@@ -154,7 +160,10 @@ onMounted(() => {
     timer = setInterval(poll, POLL_MS)
 })
 
-onUnmounted(() => clearInterval(timer))
+onUnmounted(() => {
+    clearInterval(timer)
+    clearTimeout(planRetry)
+})
 </script>
 
 <template>
@@ -205,8 +214,15 @@ onUnmounted(() => clearInterval(timer))
                     </div>
                 </div>
 
+                <p v-if="planLoading && !plan" class="plan">
+                    <Icon icon="mdi:loading" class="spin" width="14" /> Simulando a próxima rodada...
+                </p>
                 <p v-if="plan && !overview.preparing" class="plan">
                     <template v-if="plan.coupon_problem">Próxima rodada não roda: {{ plan.coupon_problem }}</template>
+                    <template v-else-if="plan.ranking_pending">
+                        <Icon icon="mdi:loading" class="spin" width="14" />
+                        Ranking da Steam ainda calculando (acontece logo depois de deploy ou do sync de estoque). Tento de novo sozinho.
+                    </template>
                     <template v-else>
                         Próxima rodada pega {{ plan.skins.length }} skins
                         ({{ plan.bands.map((band) => `${band.label}: ${band.selected}/${band.count}`).join(', ') }})
@@ -215,7 +231,7 @@ onUnmounted(() => clearInterval(timer))
                     </template>
                 </p>
 
-                <details v-if="plan && !plan.coupon_problem && !overview.preparing" class="plan-details" open>
+                <details v-if="plan && !plan.coupon_problem && !plan.ranking_pending && !overview.preparing" class="plan-details" open>
                     <summary>Selecionadas pra próxima rodada ({{ plan.skins.length }})</summary>
                     <AutoStoryPlanList :plan="plan" />
                 </details>

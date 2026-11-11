@@ -16,7 +16,8 @@
           <thead>
             <tr>
               <th>Título</th>
-              <th>Status</th>
+              <th>Popup</th>
+              <th>Feed</th>
               <th>Publicação</th>
               <th>Criado em</th>
               <th>Ações</th>
@@ -27,6 +28,7 @@
               <tr v-for="n in 5" :key="n" class="skeleton-row">
                 <td><div class="skeleton" style="width:200px;height:14px" /></td>
                 <td><div class="skeleton" style="width:70px;height:22px;border-radius:999px" /></td>
+                <td><div class="skeleton" style="width:40px;height:14px" /></td>
                 <td><div class="skeleton" style="width:110px;height:14px" /></td>
                 <td><div class="skeleton" style="width:90px;height:14px" /></td>
                 <td><div class="skeleton" style="width:100px;height:28px;border-radius:8px" /></td>
@@ -43,6 +45,7 @@
                     {{ statusLabel(item) }}
                   </span>
                 </td>
+                <td class="text-muted">{{ item.show_in_feed ? 'Sim' : 'Não' }}</td>
                 <td>
                   <span v-if="item.published_at" class="text-muted">
                     {{ $dayjs(item.published_at).format('DD/MM/YY HH:mm') }}
@@ -58,7 +61,7 @@
                 </td>
               </tr>
               <tr v-if="!loading && news.length === 0">
-                <td colspan="5" class="empty-state">Nenhuma novidade cadastrada.</td>
+                <td colspan="6" class="empty-state">Nenhuma novidade cadastrada.</td>
               </tr>
             </template>
           </tbody>
@@ -113,7 +116,7 @@ const statusClass = (item: any) => {
 }
 
 const statusTooltip = (item: any) => {
-  if (!item.is_active) return 'Desativado manualmente — não aparece para usuários'
+  if (!item.is_active) return 'Popup desligado (o feed é controlado à parte)'
   if (item.published_at && new Date(item.published_at) > now()) return `Vai aparecer a partir de ${new Date(item.published_at).toLocaleString('pt-BR')}`
   if (!item.published_at) return 'Ativo imediatamente — aparece para usuários logados'
   return 'Ativo — aparece para usuários logados'

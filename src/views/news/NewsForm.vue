@@ -145,11 +145,11 @@
           <div class="field toggle-row">
             <label class="toggle-label">
               <div>
-                <span>Ativo</span>
+                <span>Popup</span>
                 <p class="field-hint">
-                  <template v-if="!form.is_active">Inativo — não aparece para ninguém.</template>
-                  <template v-else-if="form.published_at && new Date(form.published_at) > new Date()">Agendado — aparece em {{ formatDate(form.published_at) }}.</template>
-                  <template v-else>Ativo — aparece para usuários logados.</template>
+                  <template v-if="!form.is_active">Desligado — o popup não abre pra ninguém.</template>
+                  <template v-else-if="form.published_at && new Date(form.published_at) > new Date()">Agendado — o popup abre a partir de {{ formatDate(form.published_at) }}.</template>
+                  <template v-else>Ligado — o popup abre pra usuários logados.</template>
                 </p>
               </div>
               <button
@@ -157,6 +157,26 @@
                 class="toggle"
                 :class="{ 'toggle--on': form.is_active }"
                 @click="form.is_active = !form.is_active"
+              >
+                <span class="toggle-knob" />
+              </button>
+            </label>
+          </div>
+
+          <div class="field toggle-row">
+            <label class="toggle-label">
+              <div>
+                <span>Mostrar no feed</span>
+                <p class="field-hint">
+                  <template v-if="!form.show_in_feed">Fora do feed — não aparece nas Novidades da loja.</template>
+                  <template v-else>Aparece nas Novidades da loja (megafone no topo do site), a partir da data de publicação, mesmo com o popup desligado.</template>
+                </p>
+              </div>
+              <button
+                type="button"
+                class="toggle"
+                :class="{ 'toggle--on': form.show_in_feed }"
+                @click="form.show_in_feed = !form.show_in_feed"
               >
                 <span class="toggle-knob" />
               </button>
@@ -249,6 +269,7 @@ const form = reactive({
   coupon_code: '',
   published_at: '',
   is_active: true,
+  show_in_feed: true,
 })
 
 interface Coupon {
@@ -346,7 +367,7 @@ const statusClass = computed(() => {
 })
 
 const statusTip = computed(() => {
-  if (!form.is_active) return 'Não aparece para usuários.'
+  if (!form.is_active) return 'Popup desligado.'
   if (form.published_at && new Date(form.published_at) > new Date()) return `Aparece a partir de ${formatDate(form.published_at)}.`
   if (!form.published_at) return 'Aparece imediatamente para usuários logados.'
   return 'Aparece para usuários logados.'
@@ -366,6 +387,7 @@ const submit = async () => {
       coupon_code: form.coupon_code || null,
       published_at: toISOorNull(form.published_at),
       is_active: form.is_active,
+      show_in_feed: form.show_in_feed,
     }
 
     if (isEdit.value) {
@@ -389,6 +411,7 @@ const fillForm = (data: any) => {
   form.coupon_code = data.coupon_code ?? ''
   form.published_at = data.published_at ? new Date(data.published_at).toISOString().slice(0, 16) : ''
   form.is_active = data.is_active ?? true
+  form.show_in_feed = data.show_in_feed ?? true
   editor.value?.commands.setContent(data.body ?? '')
 }
 

@@ -1,0 +1,79 @@
+// Mesmo visual das seções do AdsDashboard.
+.section
+  background #16161a
+  border 1px solid rgba(255,255,255,0.06)
+  border-radius 12px
+  padding 1.25rem
+  margin-bottom 1.5rem
+  display flex
+  flex-direction column
+  gap 1rem
+
+.section-title
+  font-size 1rem
+  font-weight 600
+  margin 0 0 4px
+
+.hint
+  display block
+  margin 0
+  font-size 0.75rem
+  color rgba(255,255,255,0.45)
+
+.error-msg
+  color #fc8181
+  font-size 0.85rem
+  margin 0
+
+.warn
+  margin 0
+  padding 10px 14px
+  background rgba(251,191,36,0.08)
+  border 1px solid rgba(251,191,36,0.3)
+  border-radius 8px
+  color #fbbf24
+  font-size 0.85rem
+
+.table-wrap
+  overflow auto
+  max-height 420px
+
+.table
+  width 100%
+  border-collapse collapse
+  font-size 0.82rem
+  th, td
+    padding 8px 10px
+    border-bottom 1px solid rgba(255,255,255,0.06)
+    text-align left
+  th
+    position sticky
+    top 0
+    background #16161a
+    color rgba(255,255,255,0.5)
+    font-weight 500
+  .num
+    text-align right
+    font-variant-numeric tabular-nums
+
+.status
+  font-size 0.7rem
+  padding 2px 8px
+  border-radius 99px
+  background rgba(255,255,255,0.08)
+  &.active
+    background rgba(52,211,153,0.15)
+    color #34d399
+  &.paused
+    background rgba(251,191,36,0.12)
+    color #fbbf24
+  &.with_issues, &.disapproved
+    background rgba(252,129,129,0.12)
+    color #fc8181
+
+.link
+  color #a5b4fc
+  font-size 0.8rem
+  text-decoration none
+  &:hover
+    text-decoration underline

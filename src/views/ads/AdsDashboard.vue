@@ -109,6 +109,8 @@
     </section>
 
     <AdsAnalyses :network="network" :disabled="!configured" :apply-enabled="!!status?.apply_enabled" />
+
+    <slot />
   </div>
 </template>
 

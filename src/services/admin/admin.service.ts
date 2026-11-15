@@ -1686,6 +1686,32 @@ export const adminService = {
     return api.post(`/meta-ads/suggestions/${id}/reject`, { note })
   },
 
+  async getMetaPixelHealth() {
+    return api.get<MetaPixelHealth>('/meta-ads/pixel')
+  },
+
+  async getMetaCreatives() {
+    return api.get<MetaCreative[]>('/meta-ads/creatives')
+  },
+
+  async getMetaActivities() {
+    return api.get<MetaActivity[]>('/meta-ads/activities')
+  },
+
+  async getMetaStructure() {
+    return api.get<MetaCampaignNode[]>('/meta-ads/manage')
+  },
+
+  /** Ativa/pausa ou muda orçamento. Backend recusa com META_ADS_APPLY_ENABLED desligado. */
+  async updateMetaEntity(id: string, change: MetaEntityChange) {
+    return api.patch(`/meta-ads/manage/${id}`, change)
+  },
+
+  /** Cria campanha + conjunto + anúncio, tudo pausado. */
+  async createMetaAd(input: MetaNewAd) {
+    return api.post<{ campaign_id: string; ad_set_id: string; ad_id: string }>('/meta-ads/manage/ads', input)
+  },
+
   // ── Instagram ───────────────────────────────────────────────────────────────
 
   async getInstagramAccount() {
@@ -2228,6 +2254,61 @@ export type InstagramStory = {
 
 /** Cada rede tem os seus: Google (campaign, ad_group, ...), Meta (campaign, ad_set, ad). */
 export type AdsLevel = string
+
+export type MetaPixelHealth = {
+  name: string
+  last_fired_at: string | null
+  unavailable: boolean
+  /** Volume por evento nos últimos `days` dias, maior primeiro. */
+  events: { event: string; count: number }[]
+  /** Nota de correspondência (EMQ, 0 a 10) por evento; `error` quando a Meta recusou a consulta. */
+  quality: { events: { event: string; score: number | null }[]; error: string | null }
+  days: number
+  capi_purchases_sent: number
+}
+
+export type MetaCreative = {
+  id: string
+  name: string
+  status: string
+  preview_url: string | null
+  image_url: string | null
+  title: string | null
+  body: string | null
+}
+
+export type MetaActivity = {
+  at: string
+  event: string
+  actor: string | null
+  object: string | null
+  object_type: string | null
+  change: string | null
+}
+
+export type MetaNode = {
+  id: string
+  name: string
+  status: string
+  effective_status: string
+  /** null = sem orçamento próprio (anúncio, ou conjunto debaixo de campanha com orçamento). */
+  daily_budget_brl: number | null
+}
+
+export type MetaCampaignNode = MetaNode & { ad_sets: (MetaNode & { ads: MetaNode[] })[] }
+
+export type MetaEntityChange = { status?: 'ACTIVE' | 'PAUSED'; daily_budget_brl?: number }
+
+export type MetaNewAd = {
+  name: string
+  objective: 'traffic' | 'sales'
+  daily_budget_brl: number
+  link: string
+  image_url: string
+  message: string
+  headline: string
+  call_to_action: string
+}
 
 export type AdsStatus = {
   missing_env: string[]

@@ -303,6 +303,24 @@ const routes = [
         component: () => import('@/views/meta-ads/MetaAds.vue'),
       },
       {
+        path: 'campanhas',
+        name: 'campaigns-view',
+        component: () => import('@/views/campaigns/CampaignsPage.vue'),
+        props: { page: 'view' },
+      },
+      {
+        path: 'campanhas/editar',
+        name: 'campaigns-edit',
+        component: () => import('@/views/campaigns/CampaignsPage.vue'),
+        props: { page: 'edit' },
+      },
+      {
+        path: 'campanhas/criar',
+        name: 'campaigns-create',
+        component: () => import('@/views/campaigns/CampaignsPage.vue'),
+        props: { page: 'create' },
+      },
+      {
         path: 'instagram/automatico',
         name: 'instagram-auto-stories',
         component: () => import('@/views/instagram/InstagramAutoStories.vue'),

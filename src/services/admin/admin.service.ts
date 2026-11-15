@@ -1646,6 +1646,41 @@ export const adminService = {
     return api.post(`/google-ads/suggestions/${id}/reject`, { note })
   },
 
+  async getGoogleConversions() {
+    return api.get<GoogleConversions>('/google-ads/conversions')
+  },
+
+  async getGoogleSearchAds() {
+    return api.get<GoogleSearchAd[]>('/google-ads/ads')
+  },
+
+  async getGoogleChanges() {
+    return api.get<GoogleChange[]>('/google-ads/changes')
+  },
+
+  async getGoogleStructure() {
+    return api.get<GoogleCampaignNode[]>('/google-ads/manage')
+  },
+
+  /** Ativa/pausa ou muda orçamento. Backend recusa com GOOGLE_ADS_APPLY_ENABLED desligado. */
+  async updateGoogleResource(resourceName: string, change: GoogleResourceChange) {
+    return api.post('/google-ads/manage/update', { resource_name: resourceName, ...change })
+  },
+
+  /** Ativa vários de uma vez (anúncio + palavras-chave): ou todos, ou nenhum. */
+  async enableGoogleResources(resourceNames: string[]) {
+    return api.post<{ enabled: number }>('/google-ads/manage/enable', { resource_names: resourceNames })
+  },
+
+  async addGoogleNegative(campaign: string, keyword: GoogleKeyword) {
+    return api.post('/google-ads/manage/negatives', { campaign, ...keyword })
+  },
+
+  /** Anúncio de pesquisa + palavras-chave, tudo pausado, num grupo existente. */
+  async createGoogleSearchAd(input: GoogleNewSearchAd) {
+    return api.post<{ created: number }>('/google-ads/manage/ads', input)
+  },
+
   // ── Meta Ads ────────────────────────────────────────────────────────────────
 
   async getMetaAdsStatus() {
@@ -2284,6 +2319,69 @@ export type MetaActivity = {
   object: string | null
   object_type: string | null
   change: string | null
+}
+
+export type GoogleConversionAction = {
+  resource_name: string
+  name: string
+  /** ENABLED, HIDDEN... */
+  status: string
+  primary: boolean
+  category: string | null
+  conversions: number
+  value_brl: number
+  /** Último dia com conversão nos últimos 30 dias. */
+  last_conversion_on: string | null
+}
+
+export type GoogleConversions = { days: number; actions: GoogleConversionAction[] }
+
+export type GoogleSearchAd = {
+  resource_name: string
+  status: string
+  approval: string | null
+  strength: string | null
+  campaign: string | null
+  ad_group: string | null
+  final_url: string | null
+  headlines: string[]
+  descriptions: string[]
+}
+
+export type GoogleChange = {
+  /** Horário da conta (SP), sem fuso. */
+  at: string
+  operation: string
+  resource: string
+  fields: string | null
+  campaign: string | null
+  ad_group: string | null
+  user: string | null
+  source: string | null
+}
+
+export type GoogleNode = { resource_name: string; name: string; status: string; daily_budget_brl: number | null }
+
+export type GoogleCampaignNode = GoogleNode & {
+  /** SEARCH, PERFORMANCE_MAX... Negativa por campanha só vale em SEARCH. */
+  channel: string | null
+  ad_groups: (GoogleNode & { ads: GoogleNode[]; keywords: GoogleNode[] })[]
+}
+
+export type GoogleResourceChange = { status?: 'ENABLED' | 'PAUSED'; daily_budget_brl?: number }
+
+export type GoogleMatchType = 'EXACT' | 'PHRASE' | 'BROAD'
+
+export type GoogleKeyword = { text: string; match_type: GoogleMatchType }
+
+export type GoogleNewSearchAd = {
+  ad_group: string
+  final_url: string
+  headlines: string[]
+  descriptions: string[]
+  path1?: string
+  path2?: string
+  keywords: GoogleKeyword[]
 }
 
 export type MetaNode = {

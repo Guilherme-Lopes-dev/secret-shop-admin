@@ -37,7 +37,7 @@ const pageUrl = (pageId: string) => `${LIBRARY_URL}?${new URLSearchParams({ ...B
 </script>
 
 <style lang="stylus" scoped>
-@import './section.styl'
+@import '../ads/section.styl'
 
 .search
   display flex

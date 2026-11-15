@@ -1,12 +1,13 @@
 <template>
   <section class="section">
     <div>
-      <h2 class="section-title">Novo anúncio</h2>
+      <h2 class="section-title">Novo anúncio na Meta</h2>
       <span class="hint">
         Cria campanha, conjunto e anúncio de imagem, tudo pausado. Público aberto no Brasil (Advantage+), link com utm.
-        Depois confira e ative em "Gerenciar campanhas".
+        Depois confira e ative em "Editar".
       </span>
     </div>
+    <p v-if="!writable" class="warn">Escrita na Meta desligada: falta <code>META_ADS_APPLY_ENABLED=true</code> no backend.</p>
     <form class="form" @submit.prevent="submit">
       <label class="field">
         <span>Nome</span>
@@ -28,12 +29,19 @@
       </label>
       <label class="field">
         <span>Link</span>
-        <input v-model.trim="form.link" type="url" required />
+        <input v-model.trim="form.link" type="url" pattern="https://.*" title="Precisa começar com https://" required />
       </label>
       <div class="field">
         <span>Imagem</span>
         <input :key="fileInputKey" type="file" accept="image/png,image/jpeg" :disabled="uploading" @change="upload" />
-        <input v-model.trim="form.image_url" type="url" required placeholder="ou cole uma URL https" />
+        <input
+          v-model.trim="form.image_url"
+          type="url"
+          pattern="https://.*"
+          title="Precisa começar com https://"
+          required
+          placeholder="ou cole uma URL https"
+        />
         <img v-if="form.image_url" :src="form.image_url" alt="Prévia da imagem" class="preview" />
       </div>
       <label class="field">
@@ -59,12 +67,14 @@
 
 <script setup lang="ts">
 import { reactive, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { toast } from 'vue3-toastify'
 import { adminService, type MetaNewAd } from '@/services/admin/admin.service'
 import { mediaUrl } from '@/utils/mediaUrl'
+import { useApplyEnabled } from '@/views/ads/useLive'
 
-defineProps<{ writable: boolean }>()
-const emit = defineEmits<{ created: [] }>()
+const router = useRouter()
+const writable = useApplyEnabled(adminService.getMetaAdsStatus)
 
 const CALLS_TO_ACTION = {
   SHOP_NOW: 'Comprar agora',
@@ -112,10 +122,10 @@ const submit = async () => {
   saving.value = true
   try {
     await adminService.createMetaAd({ ...form })
-    toast.success('Criado pausado na Meta. Confira e ative em "Gerenciar campanhas".')
+    toast.success('Criado pausado na Meta. Confira e ative aqui.')
     Object.assign(form, emptyForm())
     fileInputKey.value++
-    emit('created')
+    router.push({ name: 'campaigns-edit' })
   } catch (err: any) {
     toast.error(errorOf(err, 'A Meta recusou o anúncio.'))
   } finally {
@@ -125,7 +135,7 @@ const submit = async () => {
 </script>
 
 <style lang="stylus" scoped>
-@import './section.styl'
+@import '../ads/section.styl'
 
 .form
   display grid

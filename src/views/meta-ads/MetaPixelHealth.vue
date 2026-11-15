@@ -53,7 +53,7 @@
 import { computed } from 'vue'
 import dayjs from 'dayjs'
 import { adminService } from '@/services/admin/admin.service'
-import { useLive } from './useLive'
+import { useLive } from '@/views/ads/useLive'
 
 const { data: pixel, error } = useLive(adminService.getMetaPixelHealth, 'Não carregou o Pixel da Meta.')
 
@@ -71,7 +71,7 @@ const scoreOf = (event: string) => scores.value.get(event)?.toLocaleString('pt-B
 </script>
 
 <style lang="stylus" scoped>
-@import './section.styl'
+@import '../ads/section.styl'
 
 .totals
   display grid

@@ -35,13 +35,13 @@
 <script setup lang="ts">
 import dayjs from 'dayjs'
 import { adminService } from '@/services/admin/admin.service'
-import { useLive } from './useLive'
+import { useLive } from '@/views/ads/useLive'
 
 const { data: activities, error } = useLive(adminService.getMetaActivities, 'Não carregou o histórico da Meta.')
 </script>
 
 <style lang="stylus" scoped>
-@import './section.styl'
+@import '../ads/section.styl'
 
 .nowrap
   white-space nowrap

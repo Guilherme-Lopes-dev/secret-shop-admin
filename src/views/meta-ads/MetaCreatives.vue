@@ -12,7 +12,7 @@
         <img v-if="creative.image_url" :src="creative.image_url" :alt="creative.name" class="card__image" loading="lazy" />
         <div v-else class="card__image card__image--empty">sem imagem</div>
         <div class="card__body">
-          <span class="status" :class="creative.status.toLowerCase()">{{ creative.status }}</span>
+          <span class="status" :class="statusClass(creative.status)">{{ creative.status }}</span>
           <strong class="card__name">{{ creative.name }}</strong>
           <span v-if="creative.title" class="card__title">{{ creative.title }}</span>
           <p v-if="creative.body" class="card__text">{{ creative.body }}</p>
@@ -27,13 +27,14 @@
 
 <script setup lang="ts">
 import { adminService } from '@/services/admin/admin.service'
-import { useLive } from './useLive'
+import { statusClass } from '@/views/ads/status'
+import { useLive } from '@/views/ads/useLive'
 
 const { data: creatives, error } = useLive(adminService.getMetaCreatives, 'Não carregou os criativos da Meta.')
 </script>
 
 <style lang="stylus" scoped>
-@import './section.styl'
+@import '../ads/section.styl'
 
 .grid
   display grid

@@ -137,8 +137,6 @@ const navGroups: NavGroup[] = [
             { label: 'Interações Instagram', icon: 'mdi:chart-line', to: '/instagram/interacoes', name: 'instagram-interactions' },
             { label: 'Voz da loja', icon: 'mdi:microphone-outline', to: '/instagram/voz', name: 'instagram-voice' },
             { label: 'Skills Instagram', icon: 'mdi:robot-outline', to: '/instagram/skills', name: 'instagram-skills' },
-            { label: 'Análise Google', icon: 'mdi:google-ads', to: '/google-ads', name: 'google-ads' },
-            { label: 'Análise Meta', icon: 'mdi:facebook', to: '/meta-ads', name: 'meta-ads' },
             { label: 'Sorteios', icon: 'mdi:ticket-confirmation-outline', to: '/raffles', name: 'raffles' },
             { label: 'Novidades', icon: 'mdi:bullhorn-outline', to: '/news', name: 'news' },
             { label: 'Feedbacks', icon: 'mdi:comment-quote-outline', to: '/feedbacks', name: 'feedbacks' },
@@ -152,6 +150,8 @@ const navGroups: NavGroup[] = [
         icon: 'mdi:bullhorn-variant-outline',
         key: 'campanhas',
         items: [
+            { label: 'Análise Google', icon: 'mdi:google-ads', to: '/google-ads', name: 'google-ads' },
+            { label: 'Análise Meta', icon: 'mdi:facebook', to: '/meta-ads', name: 'meta-ads' },
             { label: 'Ver', icon: 'mdi:eye-outline', to: '/campanhas', name: 'campaigns-view' },
             { label: 'Editar', icon: 'mdi:pencil-outline', to: '/campanhas/editar', name: 'campaigns-edit' },
             { label: 'Criar', icon: 'mdi:plus-circle-outline', to: '/campanhas/criar', name: 'campaigns-create' },

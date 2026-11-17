@@ -66,9 +66,23 @@ export type CrmCampaign =
   | 'second_purchase'
   | 'loyalty'
 
+/** Tempo logado aproximado (via refresh de sessão), janela de `days` dias. */
+export interface UserUsageSummary {
+  days: number
+  sessions: number
+  total_minutes: number
+  avg_minutes: number
+}
+
+export interface UserUsageDetail extends UserUsageSummary {
+  recent: { started_at: string; ended_at: string; minutes: number }[]
+}
+
 export interface DashboardAccess {
   days: number
-  byDay: { day: string; users: number; visitors: number }[]
+  /** Minutos logado por usuário por dia ativo, na janela. Opcional até o back novo subir. */
+  avgMinutes?: number
+  byDay: { day: string; users: number; visitors: number; avgMinutes?: number }[]
   byHour: { hour: number; users: number; visitors: number }[]
 }
 

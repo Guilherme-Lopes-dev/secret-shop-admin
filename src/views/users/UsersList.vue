@@ -3,6 +3,7 @@ import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { adminService } from '@/services/admin/admin.service'
 import { formatCurrency } from '@/utils/formatCurrency'
+import { formatMinutes } from '@/utils/formatMinutes'
 import { Icon } from '@iconify/vue'
 import { toast } from 'vue3-toastify'
 import { persistedRef } from '@/utils/persistedRef'
@@ -309,6 +310,7 @@ onMounted(() => {
                             <th>Trade</th>
                             <th>Cadastro</th>
                             <th>Último login</th>
+                            <th title="Média por sessão nos últimos 30 dias (aprox., via refresh de sessão) e, embaixo, sessões e total">Tempo logado</th>
                             <th>Ações</th>
                         </tr>
                     </thead>
@@ -336,6 +338,7 @@ onMounted(() => {
                                 <td><div class="skeleton skeleton-line" style="width: 70px" /></td>
                                 <td><div class="skeleton skeleton-line" style="width: 80px" /></td>
                                 <td><div class="skeleton skeleton-line" style="width: 90px" /></td>
+                                <td><div class="skeleton skeleton-line" style="width: 70px" /></td>
                                 <td><div class="skeleton skeleton-line" style="width: 40px" /></td>
                             </tr>
                         </template>
@@ -407,12 +410,16 @@ onMounted(() => {
                                 </td>
                                 <td>{{ $dayjs(user.created_at).format('DD/MM/YYYY') }}</td>
                                 <td>{{ user.last_login_at ? $dayjs(user.last_login_at).format('DD/MM/YY HH:mm') : '—' }}</td>
+                                <td class="usage-cell">
+                                    {{ formatMinutes(user.usage?.avg_minutes) }}
+                                    <small v-if="user.usage?.sessions">{{ user.usage.sessions }} sessões · {{ formatMinutes(user.usage.total_minutes) }}</small>
+                                </td>
                                 <td>
                                     <button class="btn-view" @click.stop="router.push(`/users/${user.id}`)">Ver</button>
                                 </td>
                             </tr>
                             <tr v-if="users.length === 0">
-                                <td colspan="14" class="empty-state">Nenhum usuário encontrado.</td>
+                                <td colspan="15" class="empty-state">Nenhum usuário encontrado.</td>
                             </tr>
                         </template>
                     </tbody>
@@ -700,6 +707,16 @@ table
 
 .balance-zero
     color #475569
+
+.usage-cell
+    font-size 0.82rem
+    white-space nowrap
+
+    small
+        display block
+        margin-top 2px
+        font-size 0.72rem
+        color #64748b
 
 .status-badge
     padding 3px 8px

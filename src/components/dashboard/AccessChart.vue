@@ -5,15 +5,18 @@ import Chart from 'chart.js/auto'
 import dayjs from 'dayjs'
 import { adminService, type DashboardAccess } from '@/services/admin/admin.service'
 import { persistedRef } from '@/utils/persistedRef'
+import { formatMinutes } from '@/utils/formatMinutes'
 
 type Mode = 'day' | 'hour'
 type Series = 'visitors' | 'users'
-type Point = { label: string; visitors: number; users: number }
+type Point = { label: string; visitors: number; users: number; avgMinutes?: number }
 
 const PERIODS = [7, 30, 90]
 const VISITORS_COLOR = 'rgba(0, 188, 212, 0.3)'
 const VISITORS_PEAK_COLOR = '#00bcd4'
 const USERS_COLOR = '#6366f1'
+const USAGE_COLOR = '#f59e0b'
+const USAGE_LABEL = 'Tempo médio logado'
 
 const modes: Record<Mode, { label: string; suffix: string; points: (data: DashboardAccess) => Point[] }> = {
     day: {
@@ -59,6 +62,34 @@ const fetchAccess = async () => {
     }
 }
 
+const averageUsage = computed(() => access.value?.avgMinutes ?? 0)
+
+// tempo logado só existe por dia; por hora não tem como dividir uma sessão
+const usageDatasets = () => {
+    if (mode.value !== 'day') return []
+
+    return [
+        {
+            type: 'line' as const,
+            label: USAGE_LABEL,
+            data: points.value.map(point => point.avgMinutes ?? 0),
+            borderColor: USAGE_COLOR,
+            backgroundColor: USAGE_COLOR,
+            borderDash: [4, 4],
+            pointRadius: 2,
+            tension: 0.3,
+            yAxisID: 'minutes',
+            order: 0,
+        },
+    ]
+}
+
+const tooltipLabel = (label: string, raw: unknown, suffix: string) => {
+    if (label === USAGE_LABEL) return `${label}: ${formatMinutes(Number(raw))}`
+
+    return `${label}: ${raw}${suffix}`
+}
+
 const visitorBarColors = () => {
     const peak = peakOf('visitors')
     return points.value.map(point => (point === peak ? VISITORS_PEAK_COLOR : VISITORS_COLOR))
@@ -91,6 +122,7 @@ const renderChart = () => {
                     tension: 0.3,
                     order: 1,
                 },
+                ...usageDatasets(),
             ],
         },
         options: {
@@ -99,11 +131,18 @@ const renderChart = () => {
             interaction: { mode: 'index', intersect: false },
             plugins: {
                 legend: { labels: { color: '#94a3b8', boxWidth: 12 } },
-                tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${ctx.raw}${suffix}` } },
+                tooltip: { callbacks: { label: ctx => tooltipLabel(ctx.dataset.label ?? '', ctx.raw, suffix) } },
             },
             scales: {
                 y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.07)' }, ticks: { color: '#94a3b8' } },
                 x: { grid: { display: false }, ticks: { color: '#94a3b8' } },
+                minutes: {
+                    display: mode.value === 'day',
+                    position: 'right',
+                    beginAtZero: true,
+                    grid: { display: false },
+                    ticks: { color: USAGE_COLOR, callback: value => formatMinutes(Number(value)) },
+                },
             },
         },
     })
@@ -120,7 +159,7 @@ onUnmounted(() => chart?.destroy())
         <div class="section-header">
             <div>
                 <h2 class="section-title">Pico de acesso</h2>
-                <p class="section-hint">Visitantes = navegadores distintos (inclui anônimos) · Logados = contas com sessão ativa</p>
+                <p class="section-hint">Visitantes = navegadores distintos (inclui anônimos) · Logados = contas com sessão ativa · Tempo logado ≈ por refresh de sessão (~15 min), sessão de no máx. 3h, sem admins</p>
             </div>
             <div class="controls">
                 <div class="toggle">
@@ -148,12 +187,18 @@ onUnmounted(() => chart?.destroy())
             </div>
         </div>
 
-        <div v-if="peaks.length" class="peaks">
+        <div v-if="peaks.length || averageUsage" class="peaks">
             <p v-for="peak in peaks" :key="peak.key" class="peak">
                 <Icon icon="mdi:trending-up" width="16" :color="series[peak.key].color" />
                 Pico {{ series[peak.key].label.toLowerCase() }}:
                 <strong :style="{ color: series[peak.key].color }">{{ peak.point!.label }}</strong>
                 · {{ peak.point![peak.key].toLocaleString('pt-BR') }}{{ modes[mode].suffix }}
+            </p>
+            <p v-if="averageUsage" class="peak">
+                <Icon icon="mdi:timer-outline" width="16" :color="USAGE_COLOR" />
+                {{ USAGE_LABEL }}:
+                <strong :style="{ color: USAGE_COLOR }">{{ formatMinutes(averageUsage) }}</strong>
+                por usuário/dia
             </p>
         </div>
 

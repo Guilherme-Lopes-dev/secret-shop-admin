@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { adminService } from '@/services/admin/admin.service'
+import { adminService, type UserUsageDetail } from '@/services/admin/admin.service'
 import { formatCurrency } from '@/utils/formatCurrency'
+import { formatMinutes } from '@/utils/formatMinutes'
 import { Icon } from '@iconify/vue'
 import { toast } from 'vue3-toastify'
 import UserPassCard from '@/components/passes/UserPassCard.vue'
@@ -22,6 +23,7 @@ import {
 const route = useRoute()
 const router = useRouter()
 const user = ref<any>(null)
+const usage = computed<UserUsageDetail | undefined>(() => user.value?.usage)
 const loading = ref(true)
 const error = ref('')
 
@@ -309,6 +311,15 @@ onMounted(fetchUser)
                         <span class="stat-value">{{ formatCurrency(user.cashback_balance ?? 0) }}</span>
                     </div>
                 </div>
+                <div class="stat-card" title="Média por sessão nos últimos 30 dias (aprox., via refresh de sessão)">
+                    <div class="stat-icon stat-icon--blue">
+                        <Icon icon="mdi:timer-outline" width="22" />
+                    </div>
+                    <div class="stat-info">
+                        <span class="stat-label">Tempo médio logado (30d)</span>
+                        <span class="stat-value">{{ formatMinutes(usage?.avg_minutes) }}</span>
+                    </div>
+                </div>
                 <div class="stat-card stat-card--runes">
                     <div class="stat-info">
                         <span class="stat-label">Runas {{ (user.runes ?? []).length }}/{{ RUNE_TYPES.length }}</span>
@@ -488,6 +499,35 @@ onMounted(fetchUser)
                                         </span>
                                     </td>
                                     <td>{{ $dayjs(order.created_at).format('DD/MM/YY HH:mm') }}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </details>
+
+                <details class="section" open>
+                    <summary class="section-title">
+                        Sessões (30d)
+                        <span class="section-note">
+                            {{ usage?.sessions ?? 0 }} sessões · {{ formatMinutes(usage?.total_minutes) }} no total ·
+                            aprox. via refresh (~15 min), máx. 3h por sessão
+                        </span>
+                    </summary>
+                    <div v-if="!usage?.recent?.length" class="empty-state">Nenhuma sessão nos últimos 30 dias.</div>
+                    <div v-else class="table-wrapper">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Início</th>
+                                    <th>Fim</th>
+                                    <th>Duração</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="session in usage?.recent ?? []" :key="session.started_at">
+                                    <td>{{ $dayjs(session.started_at).format('DD/MM/YY HH:mm') }}</td>
+                                    <td>{{ $dayjs(session.ended_at).format('DD/MM/YY HH:mm') }}</td>
+                                    <td>{{ formatMinutes(session.minutes) }}</td>
                                 </tr>
                             </tbody>
                         </table>

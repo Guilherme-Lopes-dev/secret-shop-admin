@@ -64,6 +64,7 @@ const sortOptions = [
     { label: 'Último login', value: 'last_login' },
     { label: 'Maior saldo de vendas', value: 'store_credit' },
     { label: 'Maior cashback', value: 'cashback' },
+    { label: 'Maior sessão (30d)', value: 'longest_session' },
 ]
 
 // Em minutos. "Agora" = mesma janela do card "Logados agora" do dashboard.
@@ -310,7 +311,7 @@ onMounted(() => {
                             <th>Trade</th>
                             <th>Cadastro</th>
                             <th>Último login</th>
-                            <th title="Média por sessão nos últimos 30 dias (aprox., via refresh de sessão) e, embaixo, sessões e total">Tempo logado</th>
+                            <th title="Média por sessão nos últimos 30 dias (aprox., via refresh de sessão) e, embaixo, sessões, total e maior sessão">Tempo logado</th>
                             <th>Ações</th>
                         </tr>
                     </thead>
@@ -413,6 +414,7 @@ onMounted(() => {
                                 <td class="usage-cell">
                                     {{ formatMinutes(user.usage?.avg_minutes) }}
                                     <small v-if="user.usage?.sessions">{{ user.usage.sessions }} sessões · {{ formatMinutes(user.usage.total_minutes) }}</small>
+                                    <small v-if="user.usage?.sessions">maior {{ formatMinutes(user.usage.max_minutes) }}</small>
                                 </td>
                                 <td>
                                     <button class="btn-view" @click.stop="router.push(`/users/${user.id}`)">Ver</button>

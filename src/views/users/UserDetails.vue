@@ -510,6 +510,7 @@ onMounted(fetchUser)
                         Sessões (30d)
                         <span class="section-note">
                             {{ usage?.sessions ?? 0 }} sessões · {{ formatMinutes(usage?.total_minutes) }} no total ·
+                            maior {{ formatMinutes(usage?.max_minutes) }} ·
                             aprox. via refresh (~15 min), máx. 3h por sessão
                         </span>
                     </summary>

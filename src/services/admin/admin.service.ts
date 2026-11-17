@@ -72,6 +72,7 @@ export interface UserUsageSummary {
   sessions: number
   total_minutes: number
   avg_minutes: number
+  max_minutes: number
 }
 
 export interface UserUsageDetail extends UserUsageSummary {

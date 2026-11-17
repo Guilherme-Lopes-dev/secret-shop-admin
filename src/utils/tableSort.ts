@@ -1,5 +1,15 @@
 export type SortState = { column: string; desc: boolean }
 
+export type SortDirection = 'asc' | 'desc'
+
+export type DirectionLabels = Record<SortDirection, string>
+
+/** Texto do botão de direção conforme o que a coluna mede. */
+export const DIRECTION_LABELS = {
+    amount: { desc: 'Maior → menor', asc: 'Menor → maior' },
+    date: { desc: 'Mais recente', asc: 'Mais antigo' },
+} satisfies Record<string, DirectionLabels>
+
 export type SortGetters<T> = Record<string, (row: T) => number | null | undefined>
 
 /** Ciclo do clique no cabeçalho: maior primeiro → menor primeiro → volta pra ordem original. */

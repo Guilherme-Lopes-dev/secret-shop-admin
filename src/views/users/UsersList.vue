@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { adminService } from '@/services/admin/admin.service'
 import { formatCurrency } from '@/utils/formatCurrency'
@@ -9,6 +9,8 @@ import { toast } from 'vue3-toastify'
 import { persistedRef } from '@/utils/persistedRef'
 import RefreshFriendshipButton from '@/components/common/RefreshFriendshipButton.vue'
 import FilterField from '@/components/common/FilterField.vue'
+import SortDirectionToggle from '@/components/common/SortDirectionToggle.vue'
+import { DIRECTION_LABELS, type DirectionLabels, type SortDirection } from '@/utils/tableSort'
 import { ONLINE_NOW_MINUTES } from '@/utils/onlineNow'
 import {
     FRIENDSHIP_DURATION_PRESETS,
@@ -30,6 +32,7 @@ const totalItems = ref(0)
 const limit = ref(20)
 const search = persistedRef('users:search', '')
 const sortFilter = persistedRef('users:sort', '')
+const sortDirection = persistedRef<SortDirection>('users:sort-dir', 'desc')
 const tierRankFilter = ref<number | ''>('')
 const minOrdersInput = persistedRef('users:min-orders', '')
 const maxOrdersInput = persistedRef('users:max-orders', '')
@@ -57,13 +60,13 @@ const TIERS = [
     { rank: 6, name: 'Immortal',  color: '#E4AE33' },
 ]
 
-const sortOptions = [
-    { label: 'Mais recente', value: '' },
-    { label: 'Mais pedidos', value: 'orders' },
-    { label: 'Maior gasto', value: 'spent' },
-    { label: 'Último login', value: 'last_login' },
-    { label: 'Maior saldo de vendas', value: 'store_credit' },
-    { label: 'Maior cashback', value: 'cashback' },
+const sortOptions: Array<{ label: string; value: string; labels?: DirectionLabels }> = [
+    { label: 'Cadastro', value: '', labels: DIRECTION_LABELS.date },
+    { label: 'Pedidos', value: 'orders' },
+    { label: 'Valor gasto', value: 'spent' },
+    { label: 'Último login', value: 'last_login', labels: DIRECTION_LABELS.date },
+    { label: 'Saldo de vendas', value: 'store_credit' },
+    { label: 'Cashback', value: 'cashback' },
     { label: 'Maior sessão (30d)', value: 'longest_session' },
 ]
 
@@ -93,6 +96,7 @@ const applyOnlineNowLink = () => {
     runeFilter.value = []
     lastLoginFilter.value = ONLINE_NOW_MINUTES
     sortFilter.value = 'last_login'
+    sortDirection.value = 'desc'
     const { lastLogin: _consumed, ...rest } = route.query
     router.replace({ query: rest })
 }
@@ -124,6 +128,7 @@ const fetchUsers = async (page: number) => {
             },
             runeFilter.value,
             lastLoginFilter.value ? parseInt(lastLoginFilter.value) : undefined,
+            sortDirection.value,
         )
         if (response.data) {
             users.value = response.data.data
@@ -141,6 +146,14 @@ const fetchUsers = async (page: number) => {
 let filterTimeout: ReturnType<typeof setTimeout> | null = null
 
 const onFilterChange = () => fetchUsers(1)
+
+const sortLabels = computed(() => sortOptions.find(option => option.value === sortFilter.value)?.labels)
+
+// direção não vaza de uma ordenação pra outra: "menor gasto" não deve virar "login mais antigo"
+const onSortChange = () => {
+    sortDirection.value = 'desc'
+    onFilterChange()
+}
 const onFilterInput = () => {
     if (filterTimeout) clearTimeout(filterTimeout)
     filterTimeout = setTimeout(() => fetchUsers(1), 300)
@@ -199,9 +212,12 @@ onMounted(() => {
                 </div>
             </FilterField>
             <FilterField label="Ordenar por">
-                <select v-model="sortFilter" @change="onFilterChange" class="filter-select">
-                    <option v-for="opt in sortOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-                </select>
+                <div class="sort-control">
+                    <select v-model="sortFilter" @change="onSortChange" class="filter-select">
+                        <option v-for="opt in sortOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+                    </select>
+                    <SortDirectionToggle v-model="sortDirection" :labels="sortLabels" @change="onFilterChange" />
+                </div>
             </FilterField>
         </div>
 
@@ -500,6 +516,10 @@ onMounted(() => {
 
     &:focus
         border-color rgba(99,102,241,0.4)
+
+.sort-control
+    display flex
+    gap 0.4rem
 
 .filter-select
     background #1a1a1e

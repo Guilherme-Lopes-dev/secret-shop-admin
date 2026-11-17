@@ -56,6 +56,7 @@ import type {
   Kit,
   KitPayload,
 } from './types'
+import type { SortDirection } from '@/utils/tableSort'
 
 export type CrmCampaign =
   | 'abandoned_cart'
@@ -100,6 +101,7 @@ export interface CrmListParams {
   hero?: string
   source?: CrmSource
   sort?: CrmSort
+  sortDir?: SortDirection
 }
 
 export interface CrmHero {
@@ -542,8 +544,10 @@ export const adminService = {
     friendship?: { friendship?: string; minFriendDays?: number; maxFriendDays?: number },
     runes: string[] = [],
     lastLoginMinutes?: number,
+    sortDir?: SortDirection,
   ) {
     const params = new URLSearchParams({ page: String(page), limit: String(limit) })
+    if (sortDir) params.append('sortDir', sortDir)
     if (lastLoginMinutes !== undefined) params.append('lastLoginMinutes', String(lastLoginMinutes))
     if (runes.length) params.append('runes', runes.join(','))
     if (search) params.append('search', search)
@@ -2005,6 +2009,7 @@ export const adminService = {
     if (params.hero) query.append('hero', params.hero)
     if (params.source) query.append('source', params.source)
     if (params.sort) query.append('sort', params.sort)
+    if (params.sortDir) query.append('sortDir', params.sortDir)
     return api.get<CrmListResponse>(`/admin/crm/customers?${query}`)
   },
 

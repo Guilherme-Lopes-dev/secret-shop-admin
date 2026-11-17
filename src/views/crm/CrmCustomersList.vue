@@ -3,6 +3,8 @@ import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import FilterField from '@/components/common/FilterField.vue'
+import SortDirectionToggle from '@/components/common/SortDirectionToggle.vue'
+import { DIRECTION_LABELS, type DirectionLabels, type SortDirection } from '@/utils/tableSort'
 import { toast } from 'vue3-toastify'
 import { adminService, type CrmCampaign, type CrmCustomer, type CrmSort, type CrmSource } from '@/services/admin/admin.service'
 import { formatCurrency } from '@/utils/formatCurrency'
@@ -26,13 +28,18 @@ const campaignFilter = persistedRef<CrmCampaign | ''>('crm:campaign', '')
 const heroFilter = persistedRef('crm:hero', '')
 const sourceFilter = persistedRef<CrmSource | ''>('crm:source', '')
 const sortFilter = persistedRef<CrmSort>('crm:sort', 'spent')
+const sortDirection = persistedRef<SortDirection>('crm:sort-dir', 'desc')
+// `inactive` virou "Última compra" + menor → maior
+if (sortFilter.value === 'inactive') {
+    sortFilter.value = 'recent'
+    sortDirection.value = 'asc'
+}
 
-const sortOptions: Array<{ label: string; value: CrmSort }> = [
-    { label: 'Maior gasto', value: 'spent' },
-    { label: 'Mais compras', value: 'orders' },
-    { label: 'Comprou mais recente', value: 'recent' },
-    { label: 'Mais tempo sem comprar', value: 'inactive' },
-    { label: 'Cadastro mais recente', value: 'newest' },
+const sortOptions: Array<{ label: string; value: CrmSort; labels?: DirectionLabels }> = [
+    { label: 'Valor gasto', value: 'spent' },
+    { label: 'Compras', value: 'orders' },
+    { label: 'Última compra', value: 'recent', labels: DIRECTION_LABELS.date },
+    { label: 'Cadastro', value: 'newest', labels: DIRECTION_LABELS.date },
 ]
 
 const SOURCE_OPTIONS: Array<{ label: string; value: CrmSource }> = [
@@ -81,6 +88,7 @@ const fetchCustomers = async (page: number) => {
             hero: heroFilter.value || undefined,
             source: sourceFilter.value || undefined,
             sort: sortFilter.value,
+            sortDir: sortDirection.value,
         })
         customers.value = data.data
         segments.value = data.segments
@@ -110,6 +118,14 @@ const onSearchInput = () => {
     searchTimeout = setTimeout(() => fetchCustomers(1), 250)
 }
 const onFilterChange = () => fetchCustomers(1)
+
+const sortLabels = computed(() => sortOptions.find(option => option.value === sortFilter.value)?.labels)
+
+// direção não vaza de uma ordenação pra outra: "menor gasto" não deve virar "login mais antigo"
+const onSortChange = () => {
+    sortDirection.value = 'desc'
+    onFilterChange()
+}
 
 const toggleSegment = (campaign: CrmCampaign) => {
     campaignFilter.value = campaignFilter.value === campaign ? '' : campaign
@@ -212,9 +228,12 @@ onMounted(() => {
                 </select>
             </FilterField>
             <FilterField label="Ordenar por">
-                <select v-model="sortFilter" @change="onFilterChange" class="filter-select">
-                    <option v-for="opt in sortOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-                </select>
+                <div class="sort-control">
+                    <select v-model="sortFilter" @change="onSortChange" class="filter-select">
+                        <option v-for="opt in sortOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+                    </select>
+                    <SortDirectionToggle v-model="sortDirection" :labels="sortLabels" @change="onFilterChange" />
+                </div>
             </FilterField>
         </div>
 
@@ -498,6 +517,10 @@ onMounted(() => {
 
     &:focus
         border-color rgba(99,102,241,0.4)
+
+.sort-control
+    display flex
+    gap 0.4rem
 
 .filter-select
     background #1a1a1e

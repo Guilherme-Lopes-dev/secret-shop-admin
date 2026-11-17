@@ -545,9 +545,12 @@ export const adminService = {
     runes: string[] = [],
     lastLoginMinutes?: number,
     sortDir?: SortDirection,
+    usage: { min?: number; max?: number } = {},
   ) {
     const params = new URLSearchParams({ page: String(page), limit: String(limit) })
     if (sortDir) params.append('sortDir', sortDir)
+    if (usage.min !== undefined) params.append('minUsageMinutes', String(usage.min))
+    if (usage.max !== undefined) params.append('maxUsageMinutes', String(usage.max))
     if (lastLoginMinutes !== undefined) params.append('lastLoginMinutes', String(lastLoginMinutes))
     if (runes.length) params.append('runes', runes.join(','))
     if (search) params.append('search', search)

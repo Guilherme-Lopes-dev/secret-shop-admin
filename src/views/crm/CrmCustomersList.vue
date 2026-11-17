@@ -3,6 +3,9 @@ import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import FilterField from '@/components/common/FilterField.vue'
+import FilterPanel from '@/components/common/FilterPanel.vue'
+import FilterGroup from '@/components/common/FilterGroup.vue'
+import { activeFilter, optionLabel, type ActiveFilter } from '@/utils/activeFilters'
 import SortDirectionToggle from '@/components/common/SortDirectionToggle.vue'
 import { DIRECTION_LABELS, type DirectionLabels, type SortDirection } from '@/utils/tableSort'
 import { toast } from 'vue3-toastify'
@@ -119,6 +122,12 @@ const onSearchInput = () => {
 }
 const onFilterChange = () => fetchCustomers(1)
 
+const activeFilters = computed<ActiveFilter[]>(() => [
+    ...activeFilter('source', sourceFilter.value && `Origem: ${optionLabel(SOURCE_OPTIONS, sourceFilter.value)}`, () => { sourceFilter.value = '' }),
+    ...activeFilter('campaign', campaignFilter.value && `Campanha: ${optionLabel(CAMPAIGN_OPTIONS, campaignFilter.value)}`, () => { campaignFilter.value = '' }),
+    ...activeFilter('hero', heroFilter.value && `Herói: ${heroFilter.value}`, () => { heroFilter.value = '' }),
+])
+
 const sortLabels = computed(() => sortOptions.find(option => option.value === sortFilter.value)?.labels)
 
 // direção não vaza de uma ordenação pra outra: "menor gasto" não deve virar "login mais antigo"
@@ -196,46 +205,53 @@ onMounted(() => {
             </button>
         </div>
 
-        <div class="filters-row">
-            <FilterField label="Buscar" class="search-field">
-                <div class="search-wrap">
-                    <Icon icon="mdi:magnify" class="search-icon" />
-                    <input
-                        v-model="search"
-                        @input="onSearchInput"
-                        type="search"
-                        placeholder="Nome, e-mail ou Steam ID..."
-                        class="search-input"
-                    />
-                </div>
-            </FilterField>
-            <FilterField label="Origem">
-                <select v-model="sourceFilter" @change="onFilterChange" class="filter-select">
-                    <option value="">Todas</option>
-                    <option v-for="opt in SOURCE_OPTIONS" :key="opt.value" :value="opt.value">{{ sourceLabel(opt) }}</option>
-                </select>
-            </FilterField>
-            <FilterField label="Campanha">
-                <select v-model="campaignFilter" @change="onFilterChange" class="filter-select">
-                    <option value="">Todas</option>
-                    <option v-for="opt in CAMPAIGN_OPTIONS" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-                </select>
-            </FilterField>
-            <FilterField label="Herói">
-                <select v-model="heroFilter" @change="onFilterChange" class="filter-select">
-                    <option value="">Todos</option>
-                    <option v-for="hero in heroes" :key="hero.name" :value="hero.name">{{ hero.name }}</option>
-                </select>
-            </FilterField>
-            <FilterField label="Ordenar por">
-                <div class="sort-control">
-                    <select v-model="sortFilter" @change="onSortChange" class="filter-select">
-                        <option v-for="opt in sortOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+        <FilterPanel storage-key="crm" :filters="activeFilters" @change="onFilterChange">
+            <template #search>
+                <FilterField label="Buscar">
+                    <div class="search-wrap">
+                        <Icon icon="mdi:magnify" class="search-icon" />
+                        <input
+                            v-model="search"
+                            @input="onSearchInput"
+                            type="search"
+                            placeholder="Nome, e-mail ou Steam ID..."
+                            class="search-input"
+                        />
+                    </div>
+                </FilterField>
+            </template>
+            <template #sort>
+                <FilterField label="Ordenar por">
+                    <div class="sort-control">
+                        <select v-model="sortFilter" @change="onSortChange" class="filter-select">
+                            <option v-for="opt in sortOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+                        </select>
+                        <SortDirectionToggle v-model="sortDirection" :labels="sortLabels" @change="onFilterChange" />
+                    </div>
+                </FilterField>
+            </template>
+
+            <FilterGroup title="Segmentação">
+                <FilterField label="Origem">
+                    <select v-model="sourceFilter" @change="onFilterChange" class="filter-select">
+                        <option value="">Todas</option>
+                        <option v-for="opt in SOURCE_OPTIONS" :key="opt.value" :value="opt.value">{{ sourceLabel(opt) }}</option>
                     </select>
-                    <SortDirectionToggle v-model="sortDirection" :labels="sortLabels" @change="onFilterChange" />
-                </div>
-            </FilterField>
-        </div>
+                </FilterField>
+                <FilterField label="Campanha">
+                    <select v-model="campaignFilter" @change="onFilterChange" class="filter-select">
+                        <option value="">Todas</option>
+                        <option v-for="opt in CAMPAIGN_OPTIONS" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+                    </select>
+                </FilterField>
+                <FilterField label="Herói">
+                    <select v-model="heroFilter" @change="onFilterChange" class="filter-select">
+                        <option value="">Todos</option>
+                        <option v-for="hero in heroes" :key="hero.name" :value="hero.name">{{ hero.name }}</option>
+                    </select>
+                </FilterField>
+            </FilterGroup>
+        </FilterPanel>
 
         <div class="section">
             <div class="table-wrapper">
@@ -478,62 +494,7 @@ onMounted(() => {
     color #94a3b8
     font-size 0.78rem
 
-.filters-row
-    display flex
-    align-items flex-end
-    gap 0.75rem
-    flex-wrap wrap
-    margin-bottom 1.25rem
-
-.search-field
-    flex 1
-    min-width 220px
-
-.search-wrap
-    position relative
-
-.search-icon
-    position absolute
-    left 0.65rem
-    top 50%
-    transform translateY(-50%)
-    color #64748b
-    font-size 1rem
-    pointer-events none
-
-.search-input
-    width 100%
-    background #1a1a1e
-    border 1px solid rgba(255,255,255,0.08)
-    border-radius 8px
-    color #fff
-    padding 0.5rem 0.75rem 0.5rem 2.1rem
-    font-size 0.875rem
-    outline none
-    box-sizing border-box
-
-    &::placeholder
-        color #64748b
-
-    &:focus
-        border-color rgba(99,102,241,0.4)
-
-.sort-control
-    display flex
-    gap 0.4rem
-
-.filter-select
-    background #1a1a1e
-    border 1px solid rgba(255,255,255,0.08)
-    border-radius 8px
-    color #fff
-    padding 0.5rem 0.75rem
-    font-size 0.875rem
-    outline none
-    cursor pointer
-
-    option
-        background #1a1a1e
+@import '../../styles/filter-controls.styl'
 
 .section
     background #1a1a1e

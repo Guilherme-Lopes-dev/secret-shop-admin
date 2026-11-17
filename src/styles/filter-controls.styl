@@ -1,0 +1,85 @@
+// Controles dos filtros das tabelas (dentro do FilterPanel). Importado no <style scoped> de cada tela:
+// o conteúdo de slot pertence à tela, então o estilo precisa morar no escopo dela.
+control-height = 38px
+control-bg = #1f1f24
+control-border = rgba(255,255,255,0.1)
+control-border-hover = rgba(255,255,255,0.22)
+control-focus = #00bcd4
+
+control()
+    height control-height
+    box-sizing border-box
+    background control-bg
+    border 1px solid control-border
+    border-radius 8px
+    color #f1f5f9
+    font-size 0.875rem
+    outline none
+    transition border-color 0.15s, box-shadow 0.15s
+
+    &:hover
+        border-color control-border-hover
+
+    &:focus-visible
+        border-color control-focus
+        box-shadow 0 0 0 3px rgba(0,188,212,0.2)
+
+    &::placeholder
+        color #64748b
+
+.search-wrap
+    position relative
+
+.search-icon
+    position absolute
+    left 0.7rem
+    top 50%
+    transform translateY(-50%)
+    color #64748b
+    font-size 1rem
+    pointer-events none
+
+.search-input
+    control()
+    width 100%
+    padding 0 0.75rem 0 2.2rem
+
+.sort-control
+    display flex
+    gap 0.4rem
+
+.filter-select
+    control()
+    width 100%
+    padding 0 0.75rem
+    cursor pointer
+
+    option
+        background #1a1a1e
+
+.sort-control .filter-select
+    width auto
+    min-width 170px
+
+.range-group
+    display flex
+    align-items center
+    gap 0.4rem
+
+.range-input
+    control()
+    flex 1
+    min-width 0
+    padding 0 0.6rem
+
+    &::-webkit-outer-spin-button,
+    &::-webkit-inner-spin-button
+        -webkit-appearance none
+
+.range-sep
+    color #64748b
+    font-size 0.875rem
+
+@media (prefers-reduced-motion: reduce)
+    .search-input, .filter-select, .range-input
+        transition none

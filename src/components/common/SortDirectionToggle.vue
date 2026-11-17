@@ -43,16 +43,26 @@ const toggle = () => {
     display inline-flex
     align-items center
     gap 0.35rem
-    background #1a1a1e
-    border 1px solid rgba(255,255,255,0.08)
+    height 38px
+    box-sizing border-box
+    background #1f1f24
+    border 1px solid rgba(255,255,255,0.1)
     border-radius 8px
     color #cbd5e1
-    padding 0.5rem 0.75rem
+    padding 0 0.75rem
     font-size 0.8rem
     white-space nowrap
     cursor pointer
+    transition border-color 0.15s, color 0.15s
 
     &:hover
         color #fff
-        border-color rgba(255,255,255,0.18)
+        border-color rgba(255,255,255,0.22)
+
+    &:active
+        transform translateY(1px)
+
+    &:focus-visible
+        outline 2px solid #00bcd4
+        outline-offset 2px
 </style>

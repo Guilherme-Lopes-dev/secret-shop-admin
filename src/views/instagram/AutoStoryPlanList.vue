@@ -17,6 +17,11 @@ const groups = computed(() =>
     })),
 )
 
+const kits = computed(() => props.plan.kits ?? [])
+const collectors = computed(() => props.plan.collectors ?? [])
+// Backend antigo não manda os grupos novos: só mostra quando vem.
+const hasExtras = computed(() => props.plan.kits !== undefined)
+
 const imageOf = (image: string | null | undefined, skinUuid: string) =>
     image && !brokenImages.value.has(skinUuid) ? buildSteamImageUrl(image) : null
 
@@ -37,7 +42,7 @@ const markBroken = (skinUuid: string) => {
                 </span>
             </h3>
             <p v-if="!group.skins.length" class="muted empty">
-                {{ group.prepared && group.prepared >= group.count ? 'Faixa completa hoje.' : 'Nenhuma skin nessa faixa hoje.' }}
+                {{ group.prepared && group.prepared >= group.count ? 'Faixa completa hoje.' : plan.skin_empty_reason ?? 'Nenhuma skin nessa faixa hoje.' }}
             </p>
             <ul v-else class="skins">
                 <li v-for="(skin, index) in group.skins" :key="skin.skin_uuid" class="skin">
@@ -52,7 +57,13 @@ const markBroken = (skinUuid: string) => {
                     <span v-else class="image image--empty"><Icon icon="mdi:image-off-outline" width="16" /></span>
                     <div class="info">
                         <strong class="name" :title="skin.name">{{ skin.name }}</strong>
-                        <span class="muted">{{ [skin.hero, formatCurrency(skin.price_cents)].filter(Boolean).join(' · ') }}</span>
+                        <span class="muted">
+                            {{
+                                [skin.hero, formatCurrency(skin.price_cents), skin.slot_time && `sai ${skin.slot_time}`, skin.from_stock && 'fora do ranking']
+                                    .filter(Boolean)
+                                    .join(' · ')
+                            }}
+                        </span>
                     </div>
                     <span
                         class="badge"
@@ -64,6 +75,52 @@ const markBroken = (skinUuid: string) => {
                 </li>
             </ul>
         </div>
+
+        <template v-if="hasExtras">
+            <div class="group">
+                <h3 class="group-title">Combos <span class="muted">montagem sem IA, sem custo</span></h3>
+                <p v-if="!kits.length" class="muted empty">{{ plan.kit_empty_reason ?? 'Nenhum combo.' }}</p>
+                <ul v-else class="skins">
+                    <li v-for="(kit, index) in kits" :key="kit.kit_uuid" class="skin">
+                        <span class="rank">{{ index + 1 }}</span>
+                        <div class="info">
+                            <strong class="name" :title="kit.name">{{ kit.name }}</strong>
+                            <span class="muted">
+                                {{
+                                    [
+                                        `${kit.pieces} peças`,
+                                        formatCurrency(kit.price_cents),
+                                        kit.items_total_cents > kit.price_cents && `separado ${formatCurrency(kit.items_total_cents)}`,
+                                        kit.slot_time && `sai ${kit.slot_time}`,
+                                    ]
+                                        .filter(Boolean)
+                                        .join(' · ')
+                                }}
+                            </span>
+                        </div>
+                    </li>
+                </ul>
+            </div>
+            <div class="group">
+                <h3 class="group-title">Collectors <span class="muted">montagem sem IA, sem custo</span></h3>
+                <p v-if="!collectors.length" class="muted empty">{{ plan.collector_empty_reason ?? 'Nenhum collector.' }}</p>
+                <ul v-else class="skins">
+                    <li v-for="(set, index) in collectors" :key="set.defindex" class="skin">
+                        <span class="rank">{{ index + 1 }}</span>
+                        <div class="info">
+                            <strong class="name" :title="set.name">{{ set.name }}</strong>
+                            <span class="muted">
+                                {{
+                                    [set.hero, formatCurrency(set.price_cents), `${set.units} em estoque`, set.slot_time && `sai ${set.slot_time}`]
+                                        .filter(Boolean)
+                                        .join(' · ')
+                                }}
+                            </span>
+                        </div>
+                    </li>
+                </ul>
+            </div>
+        </template>
     </div>
 </template>
 

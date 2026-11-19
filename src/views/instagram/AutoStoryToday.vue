@@ -35,6 +35,27 @@ const priceChanged = (row: AutoStoryRow) =>
 // nem apagar — a linha é o que segura a skin fora da próxima rodada de hoje.
 const publishFailed = (row: AutoStoryRow) => row.status === 'FAILED' && !!row.image_url
 const canRemove = (row: AutoStoryRow) => row.status === 'DRAFT' || (row.status === 'FAILED' && !row.image_url)
+
+const KIND_LABEL: Record<NonNullable<AutoStoryRow['item']>, string> = {
+    skin: 'Skin',
+    kit: 'Combo',
+    collector: 'Collector',
+}
+const kindOf = (row: AutoStoryRow) => row.item ?? 'skin'
+// Combo/collector é montagem refeita a cada rodada: não tem arte de biblioteca pra descartar.
+const isMontage = (row: AutoStoryRow) => kindOf(row) !== 'skin'
+const nameOf = (row: AutoStoryRow) => row.name ?? row.skin?.market_hash_name ?? 'Item removido'
+const stockLabel = (row: AutoStoryRow) => (kindOf(row) === 'kit' ? `${row.stock} combos completos` : `estoque ${row.stock}`)
+const detailOf = (row: AutoStoryRow) =>
+    [
+        row.auto_meta?.band_label ?? '—',
+        `#${row.auto_meta?.rank ?? '—'}`,
+        row.auto_meta?.slot_time && `sai ${row.auto_meta.slot_time}`,
+        row.auto_meta?.from_stock && 'fora do ranking',
+        stockLabel(row),
+    ]
+        .filter(Boolean)
+        .join(' · ')
 </script>
 
 <template>
@@ -50,8 +71,9 @@ const canRemove = (row: AutoStoryRow) => row.status === 'DRAFT' || (row.status =
             </span>
 
             <div class="info">
-                <strong class="name" :title="row.skin?.market_hash_name">{{ row.skin?.market_hash_name ?? 'Skin removida' }}</strong>
-                <span class="muted">{{ row.auto_meta?.band_label ?? '—' }} · #{{ row.auto_meta?.rank ?? '—' }} · estoque {{ row.stock }}</span>
+                <span class="kind" :class="`kind--${kindOf(row)}`">{{ KIND_LABEL[kindOf(row)] }}</span>
+                <strong class="name" :title="nameOf(row)">{{ nameOf(row) }}</strong>
+                <span class="muted">{{ detailOf(row) }}</span>
                 <span>
                     {{ formatCurrency(row.auto_meta?.price_cents) }} na arte
                     <span v-if="priceChanged(row)" class="warn" title="Na publicação a arte é refeita com o preço atual">
@@ -86,7 +108,12 @@ const canRemove = (row: AutoStoryRow) => row.status === 'DRAFT' || (row.status =
                 >
                     <Icon icon="mdi:cursor-move" width="15" /> Ajustar posição
                 </button>
-                <button v-if="row.status === 'DRAFT'" class="action" title="A próxima rodada gera outra arte pra essa skin" @click="emit('discardArt', row)">
+                <button
+                    v-if="row.status === 'DRAFT' && !isMontage(row)"
+                    class="action"
+                    title="A próxima rodada gera outra arte pra essa skin"
+                    @click="emit('discardArt', row)"
+                >
                     <Icon icon="mdi:image-remove-outline" width="15" /> Descartar arte
                 </button>
                 <button v-if="canRemove(row)" class="action action--danger" @click="emit('remove', row)">
@@ -145,6 +172,23 @@ const canRemove = (row: AutoStoryRow) => row.status === 'DRAFT' || (row.status =
     flex-direction column
     gap 0.2rem
     font-size 0.78rem
+
+.kind
+    align-self flex-start
+    padding 0.05rem 0.4rem
+    border-radius 999px
+    font-size 0.65rem
+    font-weight 600
+    background rgba(255,255,255,0.06)
+    color #94a3b8
+
+.kind--kit
+    background rgba(165,180,252,0.12)
+    color #a5b4fc
+
+.kind--collector
+    background rgba(251,191,36,0.12)
+    color #fbbf24
 
 .name
     font-size 0.85rem

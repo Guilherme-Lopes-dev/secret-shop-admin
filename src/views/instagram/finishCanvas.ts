@@ -14,11 +14,14 @@ export type FinishLayout = {
   price: { x: number; y: number; size: number }
 }
 export type Rect = { left: number; top: number; width: number; height: number }
-export type FinishContent = { price: number | null; note: string | null; logo: HTMLImageElement }
+/** Ícone da frase: ticket (cupom, padrão) ou relógio (story da runa). */
+export type NoteIcon = 'ticket' | 'clock'
+export type FinishContent = { price: number | null; note: string | null; logo: HTMLImageElement; noteIcon?: NoteIcon }
 
 // Mesmos números do finish.ts do backend.
 const PRICE = { fontScale: 0.62, currencyScale: 0.46, tracking: -0.02, padX: 0.42, padY: 0.3, gap: 0.14 }
-const NOTE = { padX: 0.8, padY: 0.55, gap: 0.5, iconHeight: 1, iconWidth: 1.45, maxRadius: 1.1 }
+const NOTE = { padX: 0.8, padY: 0.55, gap: 0.5, iconHeight: 1, maxRadius: 1.1 }
+const ICON_WIDTH_RATIO: Record<NoteIcon, number> = { ticket: 1.45, clock: 1 }
 const GLASS = {
   blur: 0.22,
   saturation: 1.6,
@@ -199,14 +202,21 @@ const wrapParagraph = (ctx: CanvasRenderingContext2D, paragraph: string, maxWidt
 const noteLines = (ctx: CanvasRenderingContext2D, note: string, maxWidth: number) =>
   note.split(/\r?\n/).flatMap((paragraph) => wrapParagraph(ctx, paragraph, maxWidth))
 
-const noteRect = (ctx: CanvasRenderingContext2D, layout: FinishLayout, note: string, width: number, height: number) => {
+const noteRect = (
+  ctx: CanvasRenderingContext2D,
+  layout: FinishLayout,
+  note: string,
+  icon: NoteIcon,
+  width: number,
+  height: number,
+) => {
   const size = Math.round(layout.note.size * width)
   withFont(ctx, size, 600)
   const padX = Math.round(size * NOTE.padX)
   const padY = Math.round(size * NOTE.padY)
   const gap = Math.round(size * NOTE.gap)
   const iconHeight = Math.round(size * NOTE.iconHeight)
-  const iconWidth = Math.round(size * NOTE.iconWidth)
+  const iconWidth = Math.round(iconHeight * ICON_WIDTH_RATIO[icon])
   const lines = noteLines(ctx, note, noteWrapWidth(layout, width, size, padX * 3 + iconWidth + gap))
   const ink = blockInk(ctx, lines, size)
   const contentHeight = Math.max(ink.height, iconHeight)
@@ -246,7 +256,7 @@ export const elementRects = (ctx: CanvasRenderingContext2D, layout: FinishLayout
   const { width, height } = ctx.canvas
   const rects: Partial<Record<ElementKey, Rect>> = {}
   if (content.price != null) rects.price = priceRect(ctx, layout, content.price, width, height)
-  if (content.note) rects.note = noteRect(ctx, layout, content.note, width, height)
+  if (content.note) rects.note = noteRect(ctx, layout, content.note, content.noteIcon ?? 'ticket', width, height)
   rects.logo = logoRect(layout, content.logo, width, height)
   return rects
 }
@@ -350,11 +360,7 @@ const drawPrice = (ctx: CanvasRenderingContext2D, base: HTMLImageElement, layout
 }
 
 // Ticket amarelo com recorte nas laterais e picote (= ticketIcon do backend).
-const drawTicket = (ctx: CanvasRenderingContext2D, left: number, top: number, iconWidth: number, iconHeight: number) => {
-  const icon = document.createElement('canvas')
-  icon.width = iconWidth
-  icon.height = iconHeight
-  const ic = icon.getContext('2d')!
+const paintTicket = (ic: CanvasRenderingContext2D, iconWidth: number, iconHeight: number) => {
   ic.fillStyle = COLORS.accent
   ic.beginPath()
   ic.roundRect(0, 0, iconWidth, iconHeight, iconHeight * 0.18)
@@ -372,6 +378,37 @@ const drawTicket = (ctx: CanvasRenderingContext2D, left: number, top: number, ic
   ic.moveTo(iconWidth * 0.64, iconHeight * 0.22)
   ic.lineTo(iconWidth * 0.64, iconHeight * 0.78)
   ic.stroke()
+}
+
+// Relógio amarelo com ponteiros escuros em 12h e 3h (= clockIcon do backend).
+const paintClock = (ic: CanvasRenderingContext2D, _iconWidth: number, iconHeight: number) => {
+  const center = iconHeight / 2
+  ic.fillStyle = COLORS.accent
+  ic.beginPath()
+  ic.arc(center, center, center, 0, Math.PI * 2)
+  ic.fill()
+  ic.strokeStyle = COLORS.perforation
+  ic.lineWidth = iconHeight * 0.09
+  ic.lineCap = 'round'
+  ic.lineJoin = 'round'
+  ic.beginPath()
+  ic.moveTo(center, iconHeight * 0.22)
+  ic.lineTo(center, center)
+  ic.lineTo(iconHeight * 0.72, center)
+  ic.stroke()
+}
+
+const ICON_PAINTERS: Record<NoteIcon, (ic: CanvasRenderingContext2D, width: number, height: number) => void> = {
+  ticket: paintTicket,
+  clock: paintClock,
+}
+
+// Ícone num canvas à parte: o recorte do ticket (destination-out) não pode furar o selo.
+const drawIcon = (ctx: CanvasRenderingContext2D, kind: NoteIcon, left: number, top: number, iconWidth: number, iconHeight: number) => {
+  const icon = document.createElement('canvas')
+  icon.width = iconWidth
+  icon.height = iconHeight
+  ICON_PAINTERS[kind](icon.getContext('2d')!, iconWidth, iconHeight)
   ctx.drawImage(icon, left, top)
 }
 
@@ -383,14 +420,22 @@ const drawNoteLine = (ctx: CanvasRenderingContext2D, line: string, x: number, ba
     return cursor + ctx.measureText(part).width
   }, x)
 
-const drawNote = (ctx: CanvasRenderingContext2D, base: HTMLImageElement, layout: FinishLayout, note: string) => {
+// Uma linha: ícone no meio do selo. Várias: alinhado à primeira linha (= iconOffset do backend).
+const CAP_HEIGHT = 0.73
+const iconOffset = (inkHeight: number, contentHeight: number, iconHeight: number, size: number) => {
+  if (inkHeight <= size * MULTILINE_INK) return Math.round((contentHeight - iconHeight) / 2)
+  return Math.round((size * CAP_HEIGHT - iconHeight) / 2)
+}
+
+const drawNote = (ctx: CanvasRenderingContext2D, base: HTMLImageElement, layout: FinishLayout, note: string, icon: NoteIcon) => {
   const { width, height } = ctx.canvas
-  const rect = noteRect(ctx, layout, note, width, height)
+  const rect = noteRect(ctx, layout, note, icon, width, height)
   drawCapsule(ctx, base, rect, noteRadius(rect.ink.height, rect.height, rect.size))
-  drawTicket(
+  drawIcon(
     ctx,
+    icon,
     rect.left + rect.padX,
-    rect.top + rect.padY + Math.round((rect.contentHeight - rect.iconHeight) / 2),
+    rect.top + rect.padY + iconOffset(rect.ink.height, rect.contentHeight, rect.iconHeight, rect.size),
     rect.iconWidth,
     rect.iconHeight,
   )
@@ -405,7 +450,7 @@ export const drawFinish = (ctx: CanvasRenderingContext2D, base: HTMLImageElement
   ctx.clearRect(0, 0, width, height)
   ctx.drawImage(base, 0, 0, width, height)
   if (content.price != null) drawPrice(ctx, base, layout, content.price)
-  if (content.note) drawNote(ctx, base, layout, content.note)
+  if (content.note) drawNote(ctx, base, layout, content.note, content.noteIcon ?? 'ticket')
   const logo = logoRect(layout, content.logo, width, height)
   ctx.drawImage(content.logo, logo.left, logo.top, logo.width, logo.height)
 }

@@ -71,6 +71,7 @@
       :applying="saving"
       :logo-src="runeInfo('HASTE').image"
       logo-label="Runa"
+      note-icon="clock"
       @close="editorOpen = false"
       @apply="applyLayout"
       @save-default="applyLayout"

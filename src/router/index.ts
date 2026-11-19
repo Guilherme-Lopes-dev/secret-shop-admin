@@ -206,6 +206,11 @@ const routes = [
         component: () => import('@/views/reports/Reports.vue'),
       },
       {
+        path: 'analise-patch',
+        name: 'patch-analysis',
+        component: () => import('@/views/patch-analysis/PatchAnalysis.vue'),
+      },
+      {
         path: 'reports/wix',
         name: 'wix-purchases',
         component: () => import('@/views/reports/WixPurchases.vue'),

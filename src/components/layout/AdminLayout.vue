@@ -164,6 +164,7 @@ const navGroups: NavGroup[] = [
         items: [
             { label: 'Relatórios', icon: 'mdi:file-chart-outline', to: '/reports', name: 'reports' },
             { label: 'Histórico', icon: 'mdi:history', to: '/historico', name: 'historico' },
+            { label: 'Análise de patch', icon: 'mdi:sword-cross', to: '/analise-patch', name: 'patch-analysis' },
         ],
     },
     {

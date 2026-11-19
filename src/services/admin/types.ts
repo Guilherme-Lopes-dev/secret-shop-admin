@@ -883,15 +883,24 @@ export interface KitPayload {
 
 // ── Story automático de skins (/instagram/auto-stories) ─────────────────────
 
-export type AutoStoryBand = { max_cents: number | null; count: number; skip_days: number }
+export type AutoStoryBand = {
+  max_cents: number | null
+  count: number
+  skip_days: number
+  /** Faixa curta completa com skin do estoque fora do ranking. */
+  fill_from_stock: boolean
+}
+
+export type AutoStoryKind = 'skin' | 'kit' | 'collector'
 
 export type AutoStoryConfig = {
   is_active: boolean
   auto_publish: boolean
-  /** 0 = domingo … 6 = sábado. */
+  /** Dias das skins. 0 = domingo … 6 = sábado. */
   weekdays: number[]
   prepare_time: string
-  publish_time: string
+  /** Horários de publicar, crescentes; o lote do dia se divide entre eles. */
+  publish_times: string[]
   coupon_uuid: string | null
   note_template: string
   bands: AutoStoryBand[]
@@ -899,7 +908,21 @@ export type AutoStoryConfig = {
   max_new_arts_per_day: number
   period: 1 | 7 | 30
   min_sold_7d: number
+  kit_count: number
+  kit_weekdays: number[]
+  kit_skip_days: number
+  collector_count: number
+  collector_weekdays: number[]
+  collector_skip_days: number
   layout: FinishLayout | null
+}
+
+export type AutoStoryKindResult = {
+  created: number
+  failed: number
+  /** Peças que viraram ladrilho vazio (ícone não baixou). */
+  placeholders: number
+  empty_reason: string | null
 }
 
 export type AutoStoryRunResult = {
@@ -907,7 +930,12 @@ export type AutoStoryRunResult = {
   reused: number
   generated: number
   failed: number
+  /** Backend antigo não manda. */
+  from_stock?: number
   skipped: { cap_reached: number; error: number }
+  skin_empty_reason?: string | null
+  kits?: AutoStoryKindResult
+  collectors?: AutoStoryKindResult
   error: string | null
 }
 
@@ -930,21 +958,29 @@ export type AutoStoryPublishResult = {
 
 export type AutoStoryLastPublish = {
   date: string
+  /** Horário que a rodada cobriu. */
+  slot_time?: string
   started_at: string
   finished_at: string | null
   result: AutoStoryPublishResult | null
+  /** Soma dos horários do dia. */
+  day?: AutoStoryPublishResult
 }
 
 export type AutoStoryMeta = {
-  band_index: number
-  /** Rótulo da faixa na hora da rodada. */
+  item?: AutoStoryKind
+  band_index: number | null
+  /** Rótulo da faixa na hora da rodada ("Combo"/"Collector" pros outros tipos). */
   band_label: string
   rank: number
+  /** Horário em que sai (HH:MM). */
+  slot_time?: string
   price_cents: number
   coupon_uuid: string
   coupon_code: string
   note: string
   new_art: boolean
+  from_stock?: boolean
 }
 
 export type AutoStoryRow = {
@@ -960,7 +996,12 @@ export type AutoStoryRow = {
   published_at: string | null
   auto_meta: AutoStoryMeta | null
   skin: { id: string; market_hash_name: string } | null
+  /** Backend antigo não manda. */
+  item?: AutoStoryKind
+  /** Skin, nome do combo ou do set. */
+  name?: string | null
   current_price_cents: number | null
+  /** Skin/collector: unidades. Combo: quantos kits completos o estoque monta. */
   stock: number
 }
 
@@ -977,6 +1018,11 @@ export type AutoStoryOverview = {
   today: AutoStoryRow[]
   /** Arte crua mais recente: fundo do editor de posição. */
   sample_art_url: string | null
+  /** Teto de stories por dia com todos os tipos, e o máximo permitido. */
+  max_daily_count?: number
+  max_total_count?: number
+  /** Teto de gasto com arte nova (só skin), US$/mês. */
+  monthly_art_ceiling_usd?: number
 }
 
 export type AutoStoryPlan = {
@@ -984,7 +1030,7 @@ export type AutoStoryPlan = {
   ranking_pending?: boolean
   coupon_problem: string | null
   /** prepared = já prontas hoje (ocupam vaga); backend antigo não manda. */
-  bands: { label: string; count: number; available: number; selected: number; prepared?: number }[]
+  bands: { label: string; count: number; available: number; selected: number; prepared?: number; fill_from_stock?: boolean }[]
   skins: {
     skin_uuid: string
     name: string
@@ -994,7 +1040,29 @@ export type AutoStoryPlan = {
     price_cents: number
     band: string
     has_art: boolean
+    /** Entrou pelo "completar com estoque". */
+    from_stock?: boolean
+    slot_time?: string | null
   }[]
+  kits?: {
+    kit_uuid: string
+    name: string
+    price_cents: number
+    items_total_cents: number
+    pieces: number
+    slot_time: string | null
+  }[]
+  collectors?: {
+    defindex: string
+    name: string
+    hero: string | null
+    price_cents: number
+    units: number
+    slot_time: string | null
+  }[]
+  skin_empty_reason?: string | null
+  kit_empty_reason?: string | null
+  collector_empty_reason?: string | null
   new_arts: number
   new_arts_left_today: number
   estimated_cost_usd: number

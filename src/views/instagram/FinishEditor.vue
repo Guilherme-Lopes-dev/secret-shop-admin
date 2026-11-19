@@ -71,6 +71,7 @@ import {
   type ElementKey,
   type FinishLayout,
   type Kind,
+  type NoteIcon,
   type Rect,
 } from './finishCanvas'
 
@@ -87,6 +88,8 @@ const props = defineProps<{
   /** Imagem no lugar do logo da loja (story de runa usa a arte do tipo). */
   logoSrc?: string
   logoLabel?: string
+  /** Ícone da frase: ticket (cupom, padrão) ou relógio (story de runa). */
+  noteIcon?: NoteIcon
 }>()
 const emit = defineEmits<{ close: []; apply: [layout: FinishLayout]; saveDefault: [layout: FinishLayout] }>()
 
@@ -127,7 +130,7 @@ const activeSize = computed({
 })
 
 const context = () => canvas.value?.getContext('2d') ?? null
-const content = () => ({ price: props.price, note: props.note, logo })
+const content = () => ({ price: props.price, note: props.note, logo, noteIcon: props.noteIcon })
 
 const rects = (): Partial<Record<ElementKey, Rect>> => {
   const ctx = context()

@@ -7,6 +7,7 @@ import { adminService } from '@/services/admin/admin.service'
 import type {
     AutoStoryConfig,
     AutoStoryCoupon,
+    AutoStoryKindResult,
     AutoStoryOverview,
     AutoStoryPlan,
     AutoStoryRow,
@@ -88,8 +89,9 @@ const saveConfig = async (data: Partial<AutoStoryConfig>) => {
 const runNow = async () => {
     const preview = plan.value
     // Sem prévia (falhou ao simular) não dá pra prometer número nem custo.
+    const stories = preview ? preview.skins.length + (preview.kits?.length ?? 0) + (preview.collectors?.length ?? 0) : 0
     const detail = preview
-        ? ` ${preview.skins.length} stories, ${preview.new_arts} artes novas (~US$ ${preview.estimated_cost_usd.toFixed(2)}).`
+        ? ` ${stories} stories, ${preview.new_arts} artes novas (~US$ ${preview.estimated_cost_usd.toFixed(2)}).`
         : ' Sem prévia: quantidade e custo dependem do ranking de agora.'
     if (!confirm(`Preparar a rodada agora?${detail} Conta como a rodada de hoje.`)) return
 
@@ -97,12 +99,14 @@ const runNow = async () => {
 }
 
 const publishAll = async () => {
-    if (!confirm(`Publicar no Instagram os ${readyCount.value} stories prontos de hoje, um por vez?`)) return
+    const times = overview.value?.config.publish_times ?? []
+    const ignoresTimes = times.length > 1 ? ' Isso ignora os horários: sai tudo agora.' : ''
+    if (!confirm(`Publicar no Instagram os ${readyCount.value} stories prontos de hoje, um por vez?${ignoresTimes}`)) return
     await act(() => adminService.publishAutoStoriesToday(), 'Não deu pra publicar.')
 }
 
 const publishOne = async (row: AutoStoryRow) => {
-    if (!confirm(`Publicar "${row.skin?.market_hash_name}" no Instagram?`)) return
+    if (!confirm(`Publicar "${row.name ?? row.skin?.market_hash_name}" no Instagram?`)) return
     await act(() => adminService.publishAutoStory(row.id), 'Não deu pra publicar.')
 }
 
@@ -174,21 +178,37 @@ const runSummary = computed(() => {
 
     const origin = run.trigger === 'job' ? 'agendada' : 'manual'
     const skipped = result.skipped.cap_reached + result.skipped.error
+    const fromStock = result.from_stock ? ` (${result.from_stock} do estoque fora do ranking)` : ''
     return (
         `${formatTime(run.started_at)} (${origin}${run.interrupted ? ', interrompida' : ''}): ` +
-        `${result.created} prontos, ${result.reused} com arte reaproveitada, ${result.generated} artes novas, ` +
-        `${result.failed} falhas, ${skipped} puladas`
+        `${result.created} skins prontas${fromStock}, ${result.reused} com arte reaproveitada, ${result.generated} artes novas, ` +
+        `${result.failed} falhas, ${skipped} puladas` +
+        kindSummary('combos', result.kits) +
+        kindSummary('collectors', result.collectors)
     )
 })
+
+// "· combos: 3 prontos" / "· collectors: nenhum (o cupom só vale pra skins.)"; dia sem o tipo não aparece.
+const kindSummary = (label: string, kind: AutoStoryKindResult | undefined) => {
+    if (!kind) return ''
+    if (kind.created || kind.failed) {
+        const placeholders = kind.placeholders ? `, ${kind.placeholders} peças sem imagem` : ''
+        return ` · ${label}: ${kind.created} prontos, ${kind.failed} falhas${placeholders}`
+    }
+    if (!kind.empty_reason || kind.empty_reason.startsWith('não é dia')) return ''
+    return ` · ${label}: nenhum (${kind.empty_reason})`
+}
 
 const publishSummary = computed(() => {
     const publish = overview.value?.last_publish
     if (!publish) return 'Nenhuma publicação automática ainda.'
     if (!publish.finished_at) return `Publicando desde ${formatTime(publish.started_at)}...`
     const result = publish.result
-    if (result?.error) return `${formatTime(publish.started_at)}: parou — ${result.error}`
+    const slot = publish.slot_time ? ` (horário ${publish.slot_time})` : ''
+    if (result?.error) return `${formatTime(publish.started_at)}${slot}: parou — ${result.error}`
 
-    return `${formatTime(publish.started_at)}: ${result?.published ?? 0} publicados, ${result?.skipped_stock ?? 0} sem estoque ou fora da vitrine, ${result?.failed ?? 0} falharam`
+    const day = publish.day ? ` · hoje no total: ${publish.day.published} publicados` : ''
+    return `${formatTime(publish.started_at)}${slot}: ${result?.published ?? 0} publicados, ${result?.skipped_stock ?? 0} sem estoque ou fora da vitrine, ${result?.failed ?? 0} falharam${day}`
 })
 
 let timer: ReturnType<typeof setInterval> | undefined
